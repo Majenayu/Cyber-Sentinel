@@ -160,6 +160,12 @@ export default function App() {
   const [readoutTranscript, setReadoutTranscript] = useState<string[]>([]);
   const [showReadout, setShowReadout] = useState(false);
 
+  const [isiOS, setIsiOS] = useState(false);
+
+  useEffect(() => {
+    setIsiOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream);
+  }, []);
+
   const loadData = useCallback(async () => {
     setLoadingJobs(true);
     try {
@@ -421,13 +427,33 @@ export default function App() {
 
   return (
     <div
-      className="w-full h-screen overflow-hidden flex flex-col"
+      className="w-full h-screen overflow-hidden flex flex-col pt-[env(safe-area-inset-top)]"
       style={{
         background: "#0a0f1e",
         fontFamily: "'Outfit', sans-serif",
         position: "relative",
       }}
     >
+      {/* iOS Install Hint */}
+      <AnimatePresence>
+        {isiOS && !window.matchMedia('(display-mode: standalone)').matches && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+            className="fixed bottom-6 left-6 right-6 z-[60] p-4 rounded-2xl shadow-2xl"
+            style={{ ...glass, border: "1px solid rgba(99,102,241,0.5)" }}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-indigo-500/20 text-indigo-400">
+                <Download size={18} />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-white">Install App</p>
+                <p className="text-[10px] text-slate-400">Tap the Share icon <span className="inline-block px-1 border border-slate-600 rounded">⎋</span> then "Add to Home Screen"</p>
+              </div>
+              <button onClick={() => setIsiOS(false)} className="p-2 text-slate-500"><X size={14} /></button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0 }}>
         <div style={{ position: "absolute", top: "-20%", left: "-15%", width: "65%", height: "65%", background: "radial-gradient(circle, rgba(99,102,241,0.10) 0%, transparent 70%)" }} />
         <div style={{ position: "absolute", bottom: "-20%", right: "-15%", width: "65%", height: "65%", background: "radial-gradient(circle, rgba(16,185,129,0.08) 0%, transparent 70%)" }} />
