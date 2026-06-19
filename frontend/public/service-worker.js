@@ -1,5 +1,5 @@
-const CACHE_NAME = "sunday-mac-47-v2";
-const urlsToCache = ["/", "/index.html"];
+const CACHE_NAME = "sunday-mac-47-v3";
+const urlsToCache = ["/", "/index.html", "/?source=pwa"];
 
 // ── Install ────────────────────────────────────────────────────────────────
 self.addEventListener("install", (event) => {
