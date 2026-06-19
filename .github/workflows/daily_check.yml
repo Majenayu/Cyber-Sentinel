@@ -8,14 +8,15 @@ on:
 jobs:
   hunt:
     runs-on: ubuntu-latest
+    environment: sunday_mac_47
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 18
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
           cache-dependency-path: jobs/package.json
 
