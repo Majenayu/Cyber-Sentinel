@@ -25,6 +25,7 @@ import {
   Pause,
   Play,
   RefreshCw,
+  Info,
 } from "lucide-react";
 
 // ── Types & API ────────────────────────────────────────────────────────────────
@@ -86,6 +87,7 @@ const api = {
     body: JSON.stringify(sub.toJSON())
   }).then(r => r.json()),
   scanNow: () => fetch(`${API_BASE}/api/scan-now`, { method: 'POST' }).then(r => r.json()),
+  testPush: () => fetch(`${API_BASE}/api/send-push`, { method: 'POST' }).then(r => r.json()),
 };
 
 // ── Shared glass styles ────────────────────────────────────────────────────────
@@ -172,12 +174,18 @@ export default function App() {
     const sw = 'serviceWorker' in navigator;
     const reg = sw ? await navigator.serviceWorker.getRegistration() : null;
     const sub = reg ? await reg.pushManager.getSubscription() : null;
+    let vapidStatus = false;
+    try {
+      const { publicKey } = await api.getVapidKey();
+      vapidStatus = !!publicKey;
+    } catch (e) { console.error("Vapid check failed", e); }
+    
     setDebugInfo({
       standalone: window.matchMedia('(display-mode: standalone)').matches,
       sw: !!reg,
       push: !!sub,
       perm: (window as any).Notification?.permission || 'unsupported',
-      vapid: !!(await api.getVapidKey()).publicKey,
+      vapid: vapidStatus,
       agent: navigator.userAgent
     });
   }, []);
@@ -246,36 +254,43 @@ export default function App() {
 
   const enablePush = async () => {
     if (!('Notification' in window)) {
-      alert("This browser does not support notifications.");
+      alert("⚠️ Notifications are not supported in this browser. On iOS, you MUST 'Add to Home Screen' first.");
       return;
     }
     
     if (Notification.permission === 'denied') {
-      alert("Notification permission was denied. Please reset it in your browser settings.");
+      alert("🚫 Notifications are blocked. Please reset permissions in your browser/app settings.");
       return;
     }
 
     try {
       const reg = await navigator.serviceWorker.ready;
+      if (!reg.pushManager) {
+        alert("❌ Push Manager not available. Ensure you are on a secure (HTTPS) connection.");
+        return;
+      }
+
       const { publicKey } = await api.getVapidKey();
       if (!publicKey) {
-        alert("Push server key not found. Ensure VAPID_PUBLIC_KEY is set in your environment.");
+        alert("❌ Server VAPID key is missing. Check your Render Environment Variables.");
         return;
       }
       
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey),
+        applicationServerKey: urlBase64ToUint8Array(publicKey.trim()),
       });
       await api.pushSubscribe(sub);
       setPushEnabled(true);
-      alert("✅ Notifications enabled! You'll receive your 8 AM briefing here.");
+      await refreshDebug();
+      alert("✅ Notifications Enabled! You will receive a test push in 5 seconds.");
+      setTimeout(() => api.testPush(), 5000);
     } catch (e: any) {
       console.error("Push subscribe failed:", e);
       if (isiOS && !window.matchMedia('(display-mode: standalone)').matches) {
-        alert("📍 On iOS, you MUST add the app to your Home Screen before you can enable notifications.");
+        alert("📍 On iOS, notifications ONLY work after you 'Add to Home Screen'. Tap the Share button below.");
       } else {
-        alert(`Failed to subscribe: ${e.message || "Unknown error"}. Check if your browser supports push notifications.`);
+        alert(`❌ Error: ${e.message || "Failed to subscribe"}.`);
       }
     }
   };
@@ -596,6 +611,53 @@ export default function App() {
           )}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {showDebug && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-3xl p-6 relative" style={glass}>
+              <button onClick={() => setShowDebug(false)} className="absolute top-4 right-4 text-slate-400"><X size={20}/></button>
+              <h3 className="text-xl font-bold text-white mb-4">PWA Health Check</h3>
+              <div className="space-y-3">
+                {[
+                  { l: "Standalone Mode", v: debugInfo.standalone ? "✅ Yes" : "❌ No", d: "Is it running as an app?" },
+                  { l: "Service Worker", v: debugInfo.sw ? "✅ Active" : "❌ Missing", d: "Required for 'Install' prompt." },
+                  { l: "Push Permission", v: debugInfo.perm === 'granted' ? "✅ Granted" : `⚠️ ${debugInfo.perm}`, d: "Notification status." },
+                  { l: "Push Subscription", v: debugInfo.push ? "✅ Subscribed" : "❌ Not Active", d: "Server-side link." },
+                  { l: "VAPID Keys", v: debugInfo.vapid ? "✅ Loaded" : "❌ Failed", d: "Security keys for push." }
+                ].map((item, i) => (
+                  <div key={i} className="p-3 rounded-xl bg-white/5 border border-white/10">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs text-slate-400">{item.l}</span>
+                      <span className="text-sm font-bold text-white">{item.v}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">{item.d}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-6">
+                <button onClick={refreshDebug} className="py-3 rounded-xl bg-white/5 border border-white/10 text-white font-bold text-xs">Refresh Status</button>
+                <button onClick={() => api.testPush()} className="py-3 rounded-xl bg-indigo-500 text-white font-bold text-xs">Test Push</button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <footer className="shrink-0 p-4 border-t border-white/5 flex justify-between items-center bg-[#0a0f1e]/80 backdrop-blur-md">
+        <div className="flex gap-4">
+          <button onClick={() => { refreshDebug(); setShowDebug(true); }} className="text-slate-500 hover:text-indigo-400 transition-colors">
+            <Info size={16} />
+          </button>
+          <p className="text-[10px] text-slate-600 uppercase tracking-widest font-bold">Sunday Mac 47 // v2.2</p>
+        </div>
+        <div className="flex gap-2">
+          {isiOS && !window.matchMedia('(display-mode: standalone)').matches && (
+            <span className="px-2 py-1 rounded bg-amber-500/10 text-amber-500 text-[10px] font-bold">Install Required</span>
+          )}
+        </div>
+      </footer>
     </div>
   );
 }
