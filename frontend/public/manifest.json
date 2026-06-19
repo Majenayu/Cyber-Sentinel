@@ -1,0 +1,20 @@
+{
+  "short_name": "Sunday Mac 47",
+  "name": "Sunday Mac 47: AI Job Assistant",
+  "description": "Autonomous AI agent that monitors company career pages and delivers real-time job notifications with voice briefings.",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0a0f1e",
+  "background_color": "#0a0f1e",
+  "categories": ["productivity", "utilities"]
+}

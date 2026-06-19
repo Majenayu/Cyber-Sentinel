@@ -1,0 +1,48 @@
+name: Daily Job Hunt 🕐 8AM IST
+
+on:
+  schedule:
+    - cron: '30 2 * * *' # 8:00 AM IST = 02:30 AM UTC
+  workflow_dispatch: # allow manual runs
+
+jobs:
+  hunt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: jobs/package.json
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          npm install
+          cd ../jobs
+          npm install
+
+      - name: Run job hunter
+        run: node jobs/scraper.js
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          GEMINI_API_KEYS: ${{ secrets.GEMINI_API_KEYS }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+
+      - name: Trigger daily briefing push
+        if: success()
+        run: |
+          if [ -n "${{ secrets.BACKEND_URL }}" ]; then
+            curl -s -X POST "${{ secrets.BACKEND_URL }}/api/send-push" \
+              -H "Content-Type: application/json" \
+              --max-time 10 || echo "Push notification send skipped (server not reachable)"
+          else
+            echo "BACKEND_URL secret not set — skipping push notification"
+          fi
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
