@@ -229,18 +229,38 @@ export default function App() {
   }, []);
 
   const enablePush = async () => {
+    if (!('Notification' in window)) {
+      alert("This browser does not support notifications.");
+      return;
+    }
+    
+    if (Notification.permission === 'denied') {
+      alert("Notification permission was denied. Please reset it in your browser settings.");
+      return;
+    }
+
     try {
       const reg = await navigator.serviceWorker.ready;
       const { publicKey } = await api.getVapidKey();
-      if (!publicKey) { alert("Push not configured on server"); return; }
+      if (!publicKey) {
+        alert("Push server key not found. Ensure VAPID_PUBLIC_KEY is set in your environment.");
+        return;
+      }
+      
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
       await api.pushSubscribe(sub);
       setPushEnabled(true);
-    } catch (e) {
+      alert("✅ Notifications enabled! You'll receive your 8 AM briefing here.");
+    } catch (e: any) {
       console.error("Push subscribe failed:", e);
+      if (isiOS && !window.matchMedia('(display-mode: standalone)').matches) {
+        alert("📍 On iOS, you MUST add the app to your Home Screen before you can enable notifications.");
+      } else {
+        alert(`Failed to subscribe: ${e.message || "Unknown error"}. Check if your browser supports push notifications.`);
+      }
     }
   };
 

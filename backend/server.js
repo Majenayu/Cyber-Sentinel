@@ -137,7 +137,19 @@ app.delete("/api/watchers/:id", async (req, res) => {
 // ─── Job Match Routes ──────────────────────────────────────────────────────
 app.get("/api/matches", async (req, res) => {
   try {
-    res.json(await JobMatch.find().sort({ createdAt: -1 }).limit(100));
+    const activeWatchers = await Watcher.find({ isActive: true });
+    const watcherIds = activeWatchers.map(w => w._id);
+    const companyNames = activeWatchers.map(w => w.companyName);
+
+    // Only show jobs from active watchers
+    const jobs = await JobMatch.find({
+      $or: [
+        { watcherId: { $in: watcherIds } },
+        { company: { $in: companyNames } }
+      ]
+    }).sort({ createdAt: -1 }).limit(100);
+    
+    res.json(jobs);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -291,8 +303,17 @@ app.post("/api/cleanup-junk", async (req, res) => {
 // ─── Daily Briefing ────────────────────────────────────────────────────────
 app.get("/api/daily-briefing", async (req, res) => {
   try {
-    const matches = await JobMatch.find({ "feedback.status": { $ne: "negative" } })
-      .sort({ relevanceScore: -1, createdAt: -1 });
+    const activeWatchers = await Watcher.find({ isActive: true });
+    const watcherIds = activeWatchers.map(w => w._id);
+    const companyNames = activeWatchers.map(w => w.companyName);
+
+    const matches = await JobMatch.find({ 
+      "feedback.status": { $ne: "negative" },
+      $or: [
+        { watcherId: { $in: watcherIds } },
+        { company: { $in: companyNames } }
+      ]
+    }).sort({ relevanceScore: -1, createdAt: -1 });
     // Pick top job per company
     const seen = new Set();
     const briefing = [];
@@ -327,9 +348,18 @@ app.post("/api/push-unsubscribe", async (req, res) => {
 
 app.post("/api/send-push", async (req, res) => {
   try {
-    // Get daily briefing
-    const matches = await JobMatch.find({ "feedback.status": { $ne: "negative" } })
-      .sort({ relevanceScore: -1, createdAt: -1 });
+    const activeWatchers = await Watcher.find({ isActive: true });
+    const watcherIds = activeWatchers.map(w => w._id);
+    const companyNames = activeWatchers.map(w => w.companyName);
+
+    // Get daily briefing for active watchers
+    const matches = await JobMatch.find({ 
+      "feedback.status": { $ne: "negative" },
+      $or: [
+        { watcherId: { $in: watcherIds } },
+        { company: { $in: companyNames } }
+      ]
+    }).sort({ relevanceScore: -1, createdAt: -1 });
     const seen = new Set();
     const briefing = [];
     for (const job of matches) {
