@@ -161,9 +161,25 @@ export default function App() {
   const [showReadout, setShowReadout] = useState(false);
 
   const [isiOS, setIsiOS] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<any>({});
 
   useEffect(() => {
     setIsiOS(/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream);
+  }, []);
+
+  const refreshDebug = useCallback(async () => {
+    const sw = 'serviceWorker' in navigator;
+    const reg = sw ? await navigator.serviceWorker.getRegistration() : null;
+    const sub = reg ? await reg.pushManager.getSubscription() : null;
+    setDebugInfo({
+      standalone: window.matchMedia('(display-mode: standalone)').matches,
+      sw: !!reg,
+      push: !!sub,
+      perm: (window as any).Notification?.permission || 'unsupported',
+      vapid: !!(await api.getVapidKey()).publicKey,
+      agent: navigator.userAgent
+    });
   }, []);
 
   const loadData = useCallback(async () => {

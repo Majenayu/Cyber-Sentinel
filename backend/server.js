@@ -329,7 +329,8 @@ app.get("/api/daily-briefing", async (req, res) => {
 
 // ─── Push Notification Endpoints ───────────────────────────────────────────
 app.get("/api/vapid-public-key", (req, res) => {
-  res.json({ publicKey: process.env.VAPID_PUBLIC_KEY || "" });
+  const key = (process.env.VAPID_PUBLIC_KEY || "").trim();
+  res.json({ publicKey: key });
 });
 
 app.post("/api/push-subscribe", async (req, res) => {
