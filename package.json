@@ -1,0 +1,20 @@
+{
+  "name": "sunday-mac-47",
+  "version": "1.0.0",
+  "description": "Sunday Mac 47 AI Job Navigator - Merged Monorepo",
+  "main": "backend/server.js",
+  "scripts": {
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "install:jobs": "cd jobs && npm install",
+    "build": "cd frontend && npm run build",
+    "postinstall": "npm run install:backend && npm run install:frontend && npm run install:jobs",
+    "start": "node backend/server.js",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && node server.js",
+    "dev:frontend": "cd frontend && npm run dev"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

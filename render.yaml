@@ -1,0 +1,26 @@
+services:
+  # ─── Unified Sunday Mac 47 Service ────────────────────────────────────────
+  - type: web
+    name: sunday-mac-47
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+      - key: MONGO_URI
+        sync: false
+      - key: GEMINI_API_KEYS
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: COHERE_API_KEY
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_EMAIL
+        sync: false
+      - key: FRONTEND_URL
+        value: "*" # With unified deployment, this can be restricted to the service URL later

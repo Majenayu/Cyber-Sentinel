@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const path = require("path");
 require("dotenv").config();
 
 const app = express();
@@ -345,6 +346,17 @@ app.post("/api/scan-now", async (req, res) => {
 
 // ─── Health check ──────────────────────────────────────────────────────────
 app.get("/health", (req, res) => res.json({ status: "ok", providers: aiService.providers.length }));
+
+// ─── Serve Frontend Static Files (Production) ──────────────────────────────
+const DIST_PATH = path.join(__dirname, "../frontend/dist");
+app.use(express.static(DIST_PATH));
+
+// SPA Fallback: all non-api routes go to index.html
+app.get("*", (req, res) => {
+  if (!req.path.startsWith("/api/")) {
+    res.sendFile(path.join(DIST_PATH, "index.html"));
+  }
+});
 
 const server = app.listen(PORT, () => console.log(`🚀 Sunday Mac 47 running on http://localhost:${PORT}`));
 
