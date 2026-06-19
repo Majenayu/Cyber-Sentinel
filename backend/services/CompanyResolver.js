@@ -50,7 +50,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
 
 async function probeUrl(url) {
   try {
-    const res = await fetchWithTimeout(normalizeUrl(url), { method: "GET" }, 8000);
+    const res = await fetchWithTimeout(normalizeUrl(url), { method: "GET" }, 15000);
     const finalUrl = res.url || normalizeUrl(url);
     const text = res.ok ? await res.text() : "";
     return { ok: res.ok, status: res.status, url: finalUrl, text };
