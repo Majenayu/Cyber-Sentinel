@@ -44,6 +44,7 @@ const jobMatchSchema = new mongoose.Schema({
     status: { type: String, enum: ['pending', 'positive', 'negative'], default: 'pending' },
     reason: String
   },
+  watcherId: { type: mongoose.Schema.Types.ObjectId, ref: "Watcher" },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -116,8 +117,20 @@ app.put("/api/watchers/:id", async (req, res) => {
 
 app.delete("/api/watchers/:id", async (req, res) => {
   try {
-    await Watcher.findByIdAndDelete(req.params.id);
-    res.json({ message: "Watcher removed" });
+    const watcher = await Watcher.findById(req.params.id);
+    if (watcher) {
+      const company = watcher.companyName;
+      // Delete matching jobs by company (fallback for old jobs) or watcherId
+      const result = await JobMatch.deleteMany({ 
+        $or: [
+          { watcherId: watcher._id },
+          { company: watcher.companyName }
+        ]
+      });
+      console.log(`🗑️ Removed watcher and ${result.deletedCount} job(s) for ${company}`);
+      await Watcher.deleteOne({ _id: req.params.id });
+    }
+    res.json({ message: "Watcher and associated jobs removed" });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

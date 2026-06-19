@@ -27,6 +27,7 @@ const jobMatchSchema = new mongoose.Schema({
     status: { type: String, enum: ["pending", "positive", "negative"], default: "pending" },
     reason: String,
   },
+  watcherId: { type: mongoose.Schema.Types.ObjectId, ref: "Watcher" },
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -199,6 +200,7 @@ async function saveMatches(matches, watcher) {
       link,
       relevanceScore: score,
       feedback: { status: "pending" },
+      watcherId: watcher._id,
     }).save();
 
     saved.push(savedMatch);
