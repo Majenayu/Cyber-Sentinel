@@ -1,8 +1,9 @@
 services:
-  # ─── Unified Sunday Mac 47 Service ────────────────────────────────────────
+  # ─── Unified Sunday Mac 47 Service (FREE TIER) ────────────────────────────
   - type: web
     name: sunday-mac-47
     runtime: node
+    plan: free # Explicitly request the free plan
     buildCommand: npm install && npm run build
     startCommand: npm start
     envVars:
@@ -17,10 +18,10 @@ services:
       - key: COHERE_API_KEY
         sync: false
       - key: VAPID_PUBLIC_KEY
-        sync: false
+        value: "BFOMavH4fuxFj6WmQSYRZukMVum5ZvmzJIMDyjRfgXDe6w-QCUD4J-km1d5vVw0B0aB_ogo4HxSfzO0wib3D_CU"
       - key: VAPID_PRIVATE_KEY
-        sync: false
+        value: "eDa7UfhZiUUp5v5pZml1m9FPV2Gxe__U9GSoOayVwG8"
       - key: VAPID_EMAIL
-        sync: false
+        value: "mailto:sundaymac47@example.com"
       - key: FRONTEND_URL
-        value: "*" # With unified deployment, this can be restricted to the service URL later
+        value: "*"
