@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🛡️ Cyber Sentinel
 
-## Getting Started
+**Cyber Sentinel** is a high-performance, monochromatic terminal-themed AI assistant designed specifically for penetration testing, security operations, and HTB Academy studies. It combines a sleek "Cyberpunk" aesthetic with a robust RAG (Retrieval-Augmented Generation) infrastructure powered by **Next.js 15**, **MongoDB**, and **Groq AI**.
 
-First, run the development server:
+## 🚀 Key Modules
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **📊 sys.dashboard**: Real-time telemetry overview of your intelligence vault, tool registry, and session logs.
+- **🤖 AI Ops (Terminal)**: A multi-session chat environment that remembers your context. Powered by Llama-3-70b via Groq for unopinionated security guidance.
+- **📚 sys.knowledge_vault**: A permanent, searchable archive for your HTB Academy notes and vulnerability research.
+- **🛠️ sys.tools**: A pre-loaded registry of expert pentesting cheatsheets for industry-standard tools like Nmap, SQLmap, and Hydra.
+- **📜 sys.commands**: A visual payload synthesizer. Save, categorize, and copy your most complex scripts with one click.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Frontend/Backend**: Next.js 15 (App Router)
+- **Styling**: Tailwind CSS v4 (Alpha/Beta)
+- **Database**: MongoDB (Persistence Layer)
+- **Intelligence**: Groq AI (Llama-3.3-70b Engine)
+- **UI Components**: Lucide-React + Framer Motion
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 💾 Installation & Setup
 
-## Learn More
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/Majenayu/Cyber-Sentinel.git
+   cd Cyber-Sentinel
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+2. **Configure Environment**:
+   Create a `.env.local` file in the root with:
+   ```env
+   MONGODB_URI=your_mongodb_connection_string
+   GROQ_API_KEY=your_groq_api_key
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+3. **Install Dependencies**:
+   ```bash
+   npm install --no-audit --no-fund
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+4. **Launch the Terminal**:
+   ```bash
+   npm run dev
+   ```
 
-## Deploy on Vercel
+## 🛡️ License
+Distributed under the MIT License. View `LICENSE` for more information.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+**OPERATIONAL STATUS: [READY]**
