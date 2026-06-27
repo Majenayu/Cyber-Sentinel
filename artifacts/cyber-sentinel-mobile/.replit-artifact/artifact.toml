@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/cyber-sentinel-mobile/"
+title = "CyberSentinel Mobile"
+version = "1.0.0"
+id = "artifacts/cyber-sentinel-mobile"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/cyber-sentinel-mobile/" ]
+localPort = 22083
+
+[services.development]
+run = "pnpm --filter @workspace/cyber-sentinel-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/cyber-sentinel-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/cyber-sentinel-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "22083"
+BASE_PATH = "/cyber-sentinel-mobile/"
