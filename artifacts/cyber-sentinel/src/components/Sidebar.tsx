@@ -8,7 +8,11 @@ function cn(...inputs: (string | boolean | undefined | null)[]) {
   return twMerge(clsx(inputs));
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+  onNavigate?: () => void;
+}
+
+export default function Sidebar({ onNavigate }: SidebarProps) {
   const [pathname] = useLocation();
 
   const navItems = [
@@ -34,8 +38,9 @@ export default function Sidebar() {
           return (
             <Link key={item.href} href={item.href}>
               <div
+                onClick={onNavigate}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 border cursor-pointer",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-200 border cursor-pointer",
                   isActive
                     ? "bg-primary/10 text-primary border-primary/20"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary border-transparent"
@@ -57,7 +62,7 @@ export default function Sidebar() {
           </span>
         </div>
         <Link href="/settings">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer">
+          <div onClick={onNavigate} className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer">
             <Settings size={16} />
             <span>Settings</span>
           </div>

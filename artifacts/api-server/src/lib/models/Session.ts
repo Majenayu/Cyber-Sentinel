@@ -26,9 +26,8 @@ const SessionSchema: Schema = new Schema({
   updatedAt: { type: Date, default: Date.now },
 });
 
-SessionSchema.pre('save', function(next: (err?: Error) => void) {
+SessionSchema.pre('save', async function() {
   (this as any).updatedAt = new Date();
-  next();
 });
 
 export default mongoose.models.Session || mongoose.model<ISession>('Session', SessionSchema);
