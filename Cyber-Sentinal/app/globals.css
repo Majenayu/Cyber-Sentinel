@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+:root {
+  --background: 220 15% 4%;
+  --foreground: 120 10% 85%;
+  --card: 220 15% 6%;
+  --card-foreground: 120 10% 85%;
+  --card-border: 120 20% 12%;
+  --popover: 220 15% 6%;
+  --popover-foreground: 120 10% 85%;
+  --border: 120 20% 12%;
+  --input: 120 20% 15%;
+  --primary: 120 100% 40%;
+  --primary-foreground: 220 20% 4%;
+  --secondary: 120 20% 12%;
+  --secondary-foreground: 120 100% 40%;
+  --accent: 120 30% 10%;
+  --accent-foreground: 120 100% 40%;
+  --destructive: 0 100% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --ring: 120 100% 40%;
+  --radius: 0.25rem;
+}
+
+@theme {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Custom Scrollbar to match terminal theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--secondary));
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--primary));
+}
+
+/* Glass panel effect similar to Replit project */
+.glass-card {
+  background: hsla(220, 15%, 6%, 0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid hsl(var(--border));
+}
+
+.terminal-accent {
+  color: hsl(var(--primary));
+  text-shadow: 0 0 10px hsla(120, 100%, 40%, 0.3);
+}
+
+.scanline-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%,
+    rgba(0, 0, 0, 0.1) 50%
+  ),
+  linear-gradient(
+    90deg,
+    rgba(255, 0, 0, 0.03),
+    rgba(0, 255, 0, 0.01),
+    rgba(0, 0, 255, 0.03)
+  );
+  z-index: 9999;
+  background-size: 100% 4px, 3px 100%;
+  pointer-events: none;
+  opacity: 0.3;
+}
