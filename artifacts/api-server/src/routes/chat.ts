@@ -143,4 +143,16 @@ router.post('/chat/sessions/:id/messages', async (req, res) => {
   }
 });
 
+router.post('/chat/enhance-prompt', async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt?.trim()) return res.status(400).json({ error: 'prompt required' });
+    const { enhancePrompt } = await import('../lib/groq');
+    const enhanced = await enhancePrompt(prompt.trim());
+    res.json({ enhanced });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

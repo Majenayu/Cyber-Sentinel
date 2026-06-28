@@ -94,6 +94,32 @@ export async function getChatResponse(userMessage: string, history: any[] = []) 
   }
 }
 
+/** Prompt enhancer — rewrites a rough user prompt into a precise pentesting query */
+export async function enhancePrompt(roughPrompt: string): Promise<string> {
+  const groq = getGroqClient();
+  const completion = await groq.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    temperature: 0.4,
+    max_tokens: 300,
+    messages: [
+      {
+        role: 'system',
+        content: `You are a prompt engineer specializing in pentesting AI queries. 
+Your job: take the user's rough, vague, or poorly-worded prompt and rewrite it into a precise, specific, expert-level pentesting question that will get the best possible answer from a red team AI.
+
+Rules:
+- Return ONLY the improved prompt — no explanation, no preamble, no quotes around it
+- Keep the user's original intent but make it specific: add the tool name, ask for exact commands, flags, OS variants, and expected output
+- If the prompt mentions a technique, ask for the full attack chain
+- If vague (e.g. "how to crack wifi"), specify: tool, attack type, steps, both Linux and Windows
+- Max 3 sentences. Dense and precise.`,
+      },
+      { role: 'user', content: roughPrompt },
+    ],
+  });
+  return completion.choices[0]?.message?.content?.trim() ?? roughPrompt;
+}
+
 /** Streaming — yields text chunks, returns full content when done */
 export async function streamChatResponse(
   userMessage: string,

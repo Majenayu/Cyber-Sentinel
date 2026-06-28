@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Bot, User, Send, Plus, Trash2, MessageSquare, Terminal,
-  Loader2, ChevronRight, ShieldAlert, ChevronLeft, BookmarkPlus, X, Save,
+  Loader2, ChevronRight, ShieldAlert, ChevronLeft, BookmarkPlus, X, Save, Sparkles,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -91,6 +91,8 @@ export default function ChatPage() {
   const [saveModal, setSaveModal] = useState<SaveModal | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [enhanceTooltip, setEnhanceTooltip] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -236,6 +238,28 @@ export default function ChatPage() {
     abortRef.current?.abort();
     setMessages(prev => prev.map(m => m.streaming ? { ...m, streaming: false } : m));
     setIsLoading(false);
+  };
+
+  const enhanceInput = async () => {
+    const text = input.trim();
+    if (!text || isEnhancing || isLoading) return;
+    setIsEnhancing(true);
+    setEnhanceTooltip('');
+    try {
+      const res = await fetch('/api/chat/enhance-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: text }),
+      });
+      const data = await res.json();
+      if (data.enhanced) {
+        setInput(data.enhanced);
+        setEnhanceTooltip('✓ Enhanced');
+        setTimeout(() => setEnhanceTooltip(''), 2000);
+      }
+    } catch {}
+    setIsEnhancing(false);
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   const openSaveModal = (content: string) => {
@@ -496,12 +520,12 @@ export default function ChatPage() {
               ref={inputRef}
               value={input}
               onChange={e => setInput(e.target.value)}
-              placeholder={currentSessionId ? 'Enter operational directive…' : 'Create a session first…'}
+              placeholder={currentSessionId ? 'Enter directive… or type rough idea and hit ✨' : 'Create a session first…'}
               disabled={!currentSessionId}
-              className="w-full bg-black/50 border border-border focus:border-primary/50 focus:ring-1 focus:ring-primary/20 rounded-lg pl-8 pr-24 py-2.5 text-xs md:text-sm focus:outline-none transition-all placeholder:text-muted-foreground/25 font-mono"
+              className="w-full bg-black/50 border border-border focus:border-primary/50 focus:ring-1 focus:ring-primary/20 rounded-lg pl-8 pr-36 py-2.5 text-xs md:text-sm focus:outline-none transition-all placeholder:text-muted-foreground/25 font-mono"
             />
             <div className="absolute inset-y-0 right-2 flex items-center gap-1">
-              {isLoading && (
+              {isLoading ? (
                 <button
                   type="button"
                   onClick={stopStreaming}
@@ -509,6 +533,26 @@ export default function ChatPage() {
                 >
                   stop
                 </button>
+              ) : (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={enhanceInput}
+                    disabled={!input.trim() || isEnhancing || isLoading}
+                    title="Enhance prompt — rewrites your rough idea into a precise query"
+                    className={cn(
+                      "h-7 px-2 rounded border text-[10px] flex items-center gap-1 transition-all",
+                      input.trim() && !isEnhancing
+                        ? "border-yellow-400/50 text-yellow-400 hover:bg-yellow-400/10 hover:border-yellow-400"
+                        : "border-border text-muted-foreground/30 cursor-not-allowed"
+                    )}
+                  >
+                    {isEnhancing
+                      ? <Loader2 size={11} className="animate-spin" />
+                      : <Sparkles size={11} />}
+                    <span className="hidden sm:inline">{isEnhancing ? 'enhancing…' : enhanceTooltip || 'enhance'}</span>
+                  </button>
+                </div>
               )}
               <button
                 type="submit"
@@ -520,7 +564,7 @@ export default function ChatPage() {
             </div>
           </form>
           <p className="max-w-4xl mx-auto mt-1.5 text-[10px] text-muted-foreground/35 text-center md:text-left">
-            GROQ • LLAMA-3.3-70B • STREAMING ENABLED • KNOWLEDGE VAULT CONTEXT INJECTION • WIN+LINUX COMMANDS
+            GROQ • LLAMA-3.3-70B • STREAMING • ✨ PROMPT ENHANCER • KNOWLEDGE VAULT • WIN+LINUX
           </p>
         </div>
       </div>
