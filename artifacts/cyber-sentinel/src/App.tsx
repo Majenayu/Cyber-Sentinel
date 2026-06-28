@@ -9,6 +9,7 @@ import ChatPage from "@/pages/Chat";
 import VaultPage from "@/pages/Vault";
 import ToolsPage from "@/pages/Tools";
 import CommandsPage from "@/pages/Commands";
+import SettingsPage from "@/pages/Settings";
 import Sidebar from "@/components/Sidebar";
 import { Menu, X } from "lucide-react";
 
@@ -59,6 +60,7 @@ function Layout() {
             <Route path="/vault" component={VaultPage} />
             <Route path="/tools" component={ToolsPage} />
             <Route path="/commands" component={CommandsPage} />
+            <Route path="/settings" component={SettingsPage} />
             <Route component={NotFound} />
           </Switch>
         </div>

@@ -1,10 +1,25 @@
-import React from 'react';
-import { Terminal, Database, Wrench, Bot, Activity, ShieldCheck } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Terminal, Database, Wrench, Bot, Activity, ShieldCheck, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Link } from 'wouter';
 import { useGetStats } from '@workspace/api-client-react';
 
+interface HealthStatus {
+  database: string;
+  ai: string;
+  encryption: string;
+}
+
 export default function Dashboard() {
   const { data: stats, isLoading } = useGetStats();
+  const [health, setHealth] = useState<HealthStatus | null>(null);
+  const [healthLoading, setHealthLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/health/status')
+      .then(r => r.json())
+      .then(d => { setHealth(d); setHealthLoading(false); })
+      .catch(() => setHealthLoading(false));
+  }, []);
 
   if (isLoading) {
     return (
@@ -13,6 +28,17 @@ export default function Dashboard() {
       </div>
     );
   }
+
+  const StatusValue = ({ value }: { value: string | undefined }) => {
+    if (healthLoading || value === undefined) return <Loader2 size={12} className="animate-spin text-muted-foreground" />;
+    const ok = value === 'ONLINE' || value === 'AES-256 ACTIVE';
+    return (
+      <span className={`flex items-center gap-1.5 font-bold text-xs md:text-sm ${ok ? 'text-primary' : 'text-red-400'}`}>
+        {ok ? <CheckCircle size={12} /> : <XCircle size={12} />}
+        {value}
+      </span>
+    );
+  };
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8 font-mono">
@@ -57,10 +83,14 @@ export default function Dashboard() {
               <Activity className="text-primary" size={16} /> System Status
             </div>
             <div className="p-4 md:p-5 space-y-3 md:space-y-4 font-mono text-xs md:text-sm">
-              {[['Core Database', 'ONLINE'], ['AI Module (Groq)', 'ONLINE'], ['Encryption', 'AES-256 ACTIVE']].map(([label, val]) => (
+              {([
+                ['Core Database', health?.database],
+                ['AI Module (Groq)', health?.ai],
+                ['Encryption', health?.encryption],
+              ] as [string, string | undefined][]).map(([label, val]) => (
                 <div key={label} className="flex justify-between items-center border-b border-border pb-3 last:border-0 last:pb-0">
                   <span className="text-muted-foreground">{label}</span>
-                  <span className="text-primary font-bold">{val}</span>
+                  <StatusValue value={val} />
                 </div>
               ))}
             </div>

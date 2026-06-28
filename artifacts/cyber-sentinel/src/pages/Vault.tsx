@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, FileText, Trash2, Edit, Save, X, ExternalLink, Loader2, ChevronLeft } from 'lucide-react';
+import { Search, Plus, FileText, Trash2, Edit, Save, X, ExternalLink, Loader2, ChevronLeft, Tag } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -11,15 +11,30 @@ function renderContent(content: string) {
   const parts = content.split(/(```[\s\S]*?```)/g);
   return parts.map((part, i) => {
     if (part.startsWith('```') && part.endsWith('```')) {
-      const match = part.match(/```(\w*)\n([\s\S]*?)```/);
-      const code = match ? match[2] : part.slice(3, -3);
+      const match = part.match(/```(\w*)\n?([\s\S]*?)```/);
+      const lang = match?.[1] ?? '';
+      const code = match?.[2] ?? part.slice(3, -3);
       return (
-        <pre key={i} className="bg-black/80 text-primary p-3 md:p-4 rounded border border-border overflow-x-auto my-3 md:my-4 font-mono text-xs md:text-sm shadow-inner">
-          <code>{code.trim()}</code>
-        </pre>
+        <div key={i} className="relative group/code my-3 md:my-4">
+          {lang && (
+            <div className="flex items-center justify-between bg-black/80 px-3 py-1 rounded-t border border-primary/10 border-b-0">
+              <span className="text-[10px] text-primary/60 uppercase font-mono">{lang}</span>
+              <button
+                onClick={() => navigator.clipboard.writeText(code.trim())}
+                className="text-[10px] text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover/code:opacity-100"
+              >copy</button>
+            </div>
+          )}
+          <pre className={cn(
+            "bg-black/80 text-primary p-3 md:p-4 overflow-x-auto font-mono text-xs md:text-sm shadow-inner border border-primary/10",
+            lang ? "rounded-b rounded-tr" : "rounded"
+          )}>
+            <code>{code.trim()}</code>
+          </pre>
+        </div>
       );
     }
-    return <div key={i} className="whitespace-pre-wrap mb-3 text-xs md:text-sm">{part}</div>;
+    return <div key={i} className="whitespace-pre-wrap mb-3 text-xs md:text-sm leading-relaxed">{part}</div>;
   });
 }
 
@@ -33,6 +48,7 @@ export default function VaultPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({ title: '', content: '', source: '', tags: '' });
   const [showList, setShowList] = useState(true);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   const fetchEntries = async (q?: string) => {
     const url = q ? `/api/knowledge?q=${encodeURIComponent(q)}` : '/api/knowledge';
@@ -47,10 +63,21 @@ export default function VaultPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchQuery.length === 0 || searchQuery.length > 2) fetchEntries(searchQuery || undefined);
+      if (searchQuery.length === 0 || searchQuery.length > 2) {
+        fetchEntries(searchQuery || undefined);
+        setActiveTag(null);
+      }
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Collect all unique tags from all entries
+  const allTags = Array.from(new Set(entries.flatMap(e => e.tags ?? []))).sort();
+
+  // Filter entries by active tag (client-side)
+  const visibleEntries = activeTag
+    ? entries.filter(e => (e.tags ?? []).includes(activeTag))
+    : entries;
 
   const selectedEntry = entries.find(e => e.id === selectedId);
 
@@ -109,7 +136,7 @@ export default function VaultPage() {
         "md:w-72 md:flex",
         showList ? "flex flex-col w-full md:w-72 absolute md:static inset-0 z-10 bg-background" : "hidden md:flex"
       )}>
-        <div className="p-3 md:p-4 border-b border-border space-y-3">
+        <div className="p-3 md:p-4 border-b border-border space-y-2.5">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold flex items-center gap-2 text-xs md:text-sm"><FileText size={16} className="text-primary" /> Knowledge</h2>
             <button onClick={() => { setIsCreating(true); setIsEditing(false); setSelectedId(null); setShowList(false); }}
@@ -122,22 +149,61 @@ export default function VaultPage() {
             <input placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-8 pr-3 py-2 bg-black/50 border border-border rounded text-xs focus:outline-none focus:border-primary" />
           </div>
+          {/* Tag filter bar */}
+          {allTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+              {activeTag && (
+                <button
+                  onClick={() => setActiveTag(null)}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] bg-primary/20 text-primary border border-primary/40 transition-colors"
+                >
+                  <X size={8} /> clear
+                </button>
+              )}
+              {allTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+                  className={cn(
+                    'flex items-center gap-1 px-2 py-0.5 rounded text-[10px] border transition-colors',
+                    activeTag === tag
+                      ? 'bg-primary text-black border-primary font-bold'
+                      : 'bg-background border-border text-muted-foreground hover:border-primary/40 hover:text-primary'
+                  )}
+                >
+                  <Tag size={8} />#{tag}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {isLoading ? <div className="p-4 text-center text-xs text-muted-foreground">Loading...</div>
-            : entries.length === 0 ? <div className="p-4 text-center text-xs text-muted-foreground">No entries. Create your first record.</div>
-            : entries.map(entry => (
+            : visibleEntries.length === 0
+              ? <div className="p-4 text-center text-xs text-muted-foreground">
+                  {activeTag ? `No entries tagged #${activeTag}.` : 'No entries. Create your first record.'}
+                </div>
+              : visibleEntries.map(entry => (
               <div key={entry.id} onClick={() => handleSelect(entry.id)}
                 className={cn('p-3 rounded-md cursor-pointer transition-all border', selectedId === entry.id && !isCreating ? 'bg-secondary border-primary/30' : 'border-transparent hover:bg-secondary/50')}>
                 <div className="font-medium text-xs truncate">{entry.title}</div>
-                <div className="flex gap-1 mt-1.5 overflow-hidden">
-                  {(entry.tags ?? []).slice(0, 3).map((tag: string) => (
-                    <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-background border border-border rounded text-muted-foreground">{tag}</span>
+                <div className="flex gap-1 mt-1.5 flex-wrap">
+                  {(entry.tags ?? []).slice(0, 4).map((tag: string) => (
+                    <span key={tag} className={cn(
+                      'text-[10px] px-1.5 py-0.5 rounded border',
+                      activeTag === tag ? 'bg-primary/20 border-primary/40 text-primary' : 'bg-background border-border text-muted-foreground'
+                    )}>{tag}</span>
                   ))}
                 </div>
               </div>
             ))}
         </div>
+        {allTags.length > 0 && (
+          <div className="p-2 border-t border-border text-[10px] text-muted-foreground/50 text-center">
+            {visibleEntries.length} / {entries.length} entries
+            {activeTag && ` · #${activeTag}`}
+          </div>
+        )}
       </div>
 
       {/* Detail/edit panel */}
@@ -169,13 +235,17 @@ export default function VaultPage() {
               <input placeholder="Title" value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })}
                 className="w-full px-3 py-2.5 text-sm bg-secondary/50 border border-border rounded focus:outline-none focus:border-primary" />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <input placeholder="Tags (comma separated)" value={formData.tags} onChange={e => setFormData({ ...formData, tags: e.target.value })}
+                <input placeholder="Tags (comma separated, e.g. nmap, recon)" value={formData.tags} onChange={e => setFormData({ ...formData, tags: e.target.value })}
                   className="w-full px-3 py-2 text-xs bg-secondary/50 border border-border rounded focus:outline-none focus:border-primary" />
                 <input placeholder="Source URL (optional)" value={formData.source} onChange={e => setFormData({ ...formData, source: e.target.value })}
                   className="w-full px-3 py-2 text-xs bg-secondary/50 border border-border rounded focus:outline-none focus:border-primary" />
               </div>
-              <textarea placeholder="Content (markdown supported)..." value={formData.content} onChange={e => setFormData({ ...formData, content: e.target.value })}
-                className="flex-1 w-full resize-none border border-border text-xs p-3 bg-black/30 focus:outline-none focus:border-primary rounded font-mono min-h-[200px] md:min-h-0" />
+              <textarea
+                placeholder="Paste content here — HTB Academy notes, writeups, commands, markdown all supported..."
+                value={formData.content}
+                onChange={e => setFormData({ ...formData, content: e.target.value })}
+                className="flex-1 w-full resize-none border border-border text-xs p-3 bg-black/30 focus:outline-none focus:border-primary rounded font-mono min-h-[200px] md:min-h-0"
+              />
             </div>
           </div>
         ) : selectedEntry ? (
