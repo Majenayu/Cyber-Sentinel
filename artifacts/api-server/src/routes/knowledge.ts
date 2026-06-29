@@ -30,34 +30,91 @@ router.get('/knowledge', async (req, res) => {
   }
 });
 
-const SIMPLIFY_SYSTEM_PROMPT = `You are a technical writer cleaning up a cybersecurity knowledge base entry.
+const SIMPLIFY_SYSTEM_PROMPT = `You are a formatting cleaner for a cybersecurity knowledge base.
 
-Your job: rewrite the content to be clean, readable, and well-structured.
+YOUR ONLY JOB: clean up the formatting and readability of the text. You are NOT summarizing. You are NOT condensing.
 
-RULES:
-1. Remove HTML artifacts, navigation menus, cookie notices, ads, footer boilerplate, "click here" links, and any repeated junk text.
-2. Keep ALL technical content exactly: tool names, commands, IP addresses, flags, CVE numbers, technique names.
-3. Preserve code blocks — wrap in triple-backticks with language label (bash, python, etc.) if not already formatted.
-4. Write explanations in simple, plain English — short sentences, no jargon walls.
-5. Use markdown: ## for main sections, ### for subsections, bullet lists for steps or options.
-6. Short paragraphs (2–4 sentences). Replace long walls of text with focused paragraphs.
-7. If steps are sequential, use a numbered list.
-8. Remove duplicate content.
-9. Output ONLY the cleaned markdown — no preamble like "Here is the cleaned version:" — just start writing.`;
+CRITICAL RULE — READ THIS FIRST:
+- The output MUST be approximately the SAME LENGTH as the input or longer.
+- Every piece of technical information in the input must appear in the output.
+- Do NOT remove any technical details, steps, explanations, examples, or commands.
+- If in doubt about whether to keep something technical, KEEP IT.
 
-async function runSimplify(title: string, content: string): Promise<string> {
+WHAT TO REMOVE (junk only):
+- Raw HTML tags (<div>, <span>, <nav>, <footer>, etc.)
+- Cookie consent notices, "Accept cookies", GDPR banners
+- Navigation menus (repeated lists of page links)
+- Advertisement text, "sponsored by", "click here", "subscribe now"
+- Repeated header/footer boilerplate (site name repeated on every paragraph)
+- Excessive blank lines (more than 2 in a row)
+
+WHAT TO DO WITH THE REAL CONTENT:
+- Keep every sentence, explanation, command, flag, IP, URL, CVE, step, example exactly
+- Fix formatting: add markdown headings (## ##) to organize sections that don't have them
+- Wrap bare commands in code blocks with the right language label (bash, python, powershell)
+- Break very long run-on paragraphs into 2-4 sentence chunks — but keep all the text
+- Use bullet lists for lists that are written inline with commas
+
+OUTPUT RULES:
+- Output ONLY the cleaned text. No preamble. No "Here is the cleaned version:".
+- The output length should be similar to or greater than the input length.`;
+
+/** Split content into chunks at natural line boundaries */
+function splitIntoChunks(text: string, maxChars: number): string[] {
+  if (text.length <= maxChars) return [text];
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < text.length) {
+    let end = start + maxChars;
+    if (end >= text.length) {
+      chunks.push(text.slice(start));
+      break;
+    }
+    // Find the nearest newline before the limit
+    const newlineIdx = text.lastIndexOf('\n', end);
+    if (newlineIdx > start + maxChars / 2) {
+      end = newlineIdx;
+    }
+    chunks.push(text.slice(start, end));
+    start = end + 1;
+  }
+  return chunks;
+}
+
+async function cleanChunk(title: string, chunk: string, chunkNum: number, total: number): Promise<string> {
   const providers = getAvailableProviders();
-  if (providers.length === 0) throw new Error('No AI providers configured');
+  const label = total > 1 ? ` (part ${chunkNum} of ${total})` : '';
   const messages = [
-    { role: 'user' as const, content: `Clean and simplify this knowledge base entry into readable markdown:\n\nTitle: ${title}\n\nContent:\n${content.slice(0, 8000)}` },
+    {
+      role: 'user' as const,
+      content: `Clean the formatting of this knowledge base chunk${label}. Keep ALL content — do NOT summarize or shorten. Only fix formatting, remove HTML junk, and add markdown structure.\n\nTitle: ${title}\n\n---\n${chunk}\n---`,
+    },
   ];
   for (const provider of providers) {
     try {
       const result = await provider.call(messages, SIMPLIFY_SYSTEM_PROMPT);
-      if (result.trim().length > 30) return result.trim();
+      // Reject if output is less than 30% of input size (AI over-summarized)
+      if (result.trim().length > chunk.length * 0.3) return result.trim();
     } catch {}
   }
-  throw new Error('All providers failed to simplify content');
+  // If AI fails or over-compresses, return original chunk unchanged
+  return chunk;
+}
+
+async function runSimplify(title: string, content: string): Promise<string> {
+  const providers = getAvailableProviders();
+  if (providers.length === 0) throw new Error('No AI providers configured');
+
+  const CHUNK_SIZE = 5000;
+  const chunks = splitIntoChunks(content, CHUNK_SIZE);
+
+  const cleaned: string[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const result = await cleanChunk(title, chunks[i], i + 1, chunks.length);
+    cleaned.push(result);
+  }
+
+  return cleaned.join('\n\n');
 }
 
 /** Preview-simplify: clean content without saving (used from the edit form) */
