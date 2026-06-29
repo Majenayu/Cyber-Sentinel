@@ -2,6 +2,8 @@ import { Router } from 'express';
 import connectToDatabase from '../lib/mongodb';
 import Session from '../lib/models/Session';
 import { getChatResponse, streamChatResponse } from '../lib/groq';
+import { getBestAnswer } from '../lib/multi-ai';
+import { detectToolsInText } from './scrape';
 
 const router = Router();
 
@@ -150,6 +152,71 @@ router.post('/chat/enhance-prompt', async (req, res) => {
     const { enhancePrompt } = await import('../lib/groq');
     const enhanced = await enhancePrompt(prompt.trim());
     res.json({ enhanced });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/** Multi-AI best-answer endpoint — queries all configured providers, picks the best */
+router.post('/chat/sessions/:id/messages/best', async (req, res) => {
+  try {
+    await connectToDatabase();
+    const session = await Session.findById(req.params.id);
+    if (!session) { res.status(404).json({ error: 'Not found' }); return; }
+
+    const { content } = req.body;
+    const history = session.messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content }));
+
+    session.messages.push({ role: 'user', content, createdAt: new Date() } as any);
+    await session.save();
+
+    const { SYSTEM_PROMPT } = await import('../lib/groq');
+    const messages = [...history, { role: 'user', content }];
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const providerResults: Array<{ name: string; content: string; isBest?: boolean }> = [];
+
+    const { content: bestContent, provider, reason } = await getBestAnswer(
+      messages,
+      SYSTEM_PROMPT,
+      (name, content, isBest) => {
+        providerResults.push({ name, content, isBest });
+        res.write(`data: ${JSON.stringify({ type: 'provider_result', name, isBest })}\n\n`);
+      }
+    );
+
+    const toolCards = detectToolsInText(bestContent);
+
+    session.messages.push({ role: 'assistant', content: bestContent, createdAt: new Date() } as any);
+    await session.save();
+
+    const lastMsg = session.messages[session.messages.length - 1] as any;
+
+    res.write(`data: ${JSON.stringify({ type: 'answer', content: bestContent, provider, reason, toolCards })}\n\n`);
+    res.write(`data: ${JSON.stringify({ messageId: lastMsg._id.toString() })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (error: any) {
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    } else {
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
+    }
+  }
+});
+
+/** Tool card detection on arbitrary text */
+router.post('/chat/detect-tools', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) { res.status(400).json({ error: 'text required' }); return; }
+    res.json({ toolCards: detectToolsInText(text) });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

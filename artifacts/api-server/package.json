@@ -10,8 +10,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@mistralai/mistralai": "^2.3.0",
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
+    "cheerio": "^1.2.0",
+    "cohere-ai": "^8.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",

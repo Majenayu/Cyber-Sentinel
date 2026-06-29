@@ -1,0 +1,3 @@
+- [Multi-AI engine](multi-ai.md) — best-answer mode queries all providers in parallel, judge picks winner; SYSTEM_PROMPT must be exported from groq.ts
+- [KB URL ingestion](kb-scrape.md) — scrape route uses Cheerio; `sources[]` array field on KB entries (legacy `source` string still supported)
+- [Commands target substitution](commands-target.md) — {{target}}, TARGET_IP, TARGET_URL patterns auto-filled; predefined CATEGORIES array
