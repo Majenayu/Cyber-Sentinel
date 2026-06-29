@@ -65,6 +65,7 @@ channel = "stable-25_05"
 CLOUDFLARE_R2_URL = "https://a036e69c21e628f9926b890a16d1302c.r2.cloudflarestorage.com"
 CLOUDFLARE_AI_ACCOUNT_ID = "a036e69c21e628f9926b890a16d1302c"
 NODE_ENV = "development"
+SMTP_EMAIL = "pgayushraipc@gmail.com"
 
 [userenv.development]
 PORT = "5000"
