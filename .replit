@@ -49,7 +49,7 @@ args = "PORT=25629 BASE_PATH=/ pnpm --filter @workspace/cyber-sentinel run dev"
 waitForPort = 25629
 
 [agent]
-stack = "PNPM_WORKSPACE"
+stack = "BEST_EFFORT_FALLBACK"
 expertMode = true
 
 [postMerge]
