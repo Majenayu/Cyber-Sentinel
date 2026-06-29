@@ -67,7 +67,7 @@ router.get('/chat/sessions/:id/messages', async (req, res) => {
   }
 });
 
-/** Streaming endpoint — SSE */
+/** Streaming endpoint — tries Groq streaming first, falls back to multi-AI if rate-limited */
 router.post('/chat/sessions/:id/messages/stream', async (req, res) => {
   try {
     await connectToDatabase();
@@ -77,11 +77,9 @@ router.post('/chat/sessions/:id/messages/stream', async (req, res) => {
     const { content } = req.body;
     const history = session.messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content }));
 
-    // Save user message immediately
     session.messages.push({ role: 'user', content, createdAt: new Date() } as any);
     await session.save();
 
-    // SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
@@ -89,36 +87,53 @@ router.post('/chat/sessions/:id/messages/stream', async (req, res) => {
     res.flushHeaders();
 
     let fullContent = '';
+
+    // Try Groq streaming first
     try {
       fullContent = await streamChatResponse(content, history, (text) => {
         res.write(`data: ${JSON.stringify({ text })}\n\n`);
       });
     } catch (streamErr: any) {
-      res.write(`data: ${JSON.stringify({ error: streamErr.message })}\n\n`);
-      res.write('data: [DONE]\n\n');
-      res.end();
-      return;
+      // Groq failed (rate limit, network, etc.) — fall back to multi-AI best answer
+      res.write(`data: ${JSON.stringify({ text: '' })}\n\n`); // clear any partial
+      try {
+        const { SYSTEM_PROMPT } = await import('../lib/groq');
+        const messages = [...history, { role: 'user', content }];
+        const { content: bestContent, provider, reason } = await getBestAnswer(messages, SYSTEM_PROMPT);
+        fullContent = bestContent;
+        // Stream it word-by-word so the UI still animates
+        const words = bestContent.split(' ');
+        for (let i = 0; i < words.length; i++) {
+          const chunk = (i === 0 ? '' : ' ') + words[i];
+          res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+        }
+        res.write(`data: ${JSON.stringify({ provider, reason })}\n\n`);
+      } catch (fallbackErr: any) {
+        res.write(`data: ${JSON.stringify({ text: `\n\n⚠ All AI providers failed: ${fallbackErr.message}` })}\n\n`);
+      }
     }
 
-    // Save assistant message
-    session.messages.push({ role: 'assistant', content: fullContent, createdAt: new Date() } as any);
-    await session.save();
+    if (fullContent) {
+      session.messages.push({ role: 'assistant', content: fullContent, createdAt: new Date() } as any);
+      await session.save();
+    }
 
     const lastMsg = session.messages[session.messages.length - 1] as any;
-    res.write(`data: [DONE]\n\n`);
-    res.write(`data: ${JSON.stringify({ messageId: lastMsg._id.toString() })}\n\n`);
+    res.write('data: [DONE]\n\n');
+    res.write(`data: ${JSON.stringify({ messageId: lastMsg._id?.toString() ?? '' })}\n\n`);
     res.end();
   } catch (error: any) {
     if (!res.headersSent) {
       res.status(500).json({ error: error.message });
     } else {
-      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.write(`data: ${JSON.stringify({ text: `\n\n⚠ Error: ${error.message}` })}\n\n`);
+      res.write('data: [DONE]\n\n');
       res.end();
     }
   }
 });
 
-/** Non-streaming fallback */
+/** Non-streaming fallback — uses multi-AI getBestAnswer directly */
 router.post('/chat/sessions/:id/messages', async (req, res) => {
   try {
     await connectToDatabase();
@@ -129,17 +144,22 @@ router.post('/chat/sessions/:id/messages', async (req, res) => {
     const history = session.messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content }));
 
     session.messages.push({ role: 'user', content, createdAt: new Date() } as any);
-    const aiContent = await getChatResponse(content, history);
+
+    let aiContent: string;
+    try {
+      const { SYSTEM_PROMPT } = await import('../lib/groq');
+      const messages = [...history, { role: 'user', content }];
+      const { content: best } = await getBestAnswer(messages, SYSTEM_PROMPT);
+      aiContent = best;
+    } catch {
+      aiContent = await getChatResponse(content, history);
+    }
+
     session.messages.push({ role: 'assistant', content: aiContent, createdAt: new Date() } as any);
     await session.save();
 
     const lastMsg = session.messages[session.messages.length - 1] as any;
-    res.json({
-      id: lastMsg._id.toString(),
-      role: lastMsg.role,
-      content: lastMsg.content,
-      createdAt: lastMsg.createdAt,
-    });
+    res.json({ id: lastMsg._id.toString(), role: lastMsg.role, content: lastMsg.content, createdAt: lastMsg.createdAt });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -166,7 +186,7 @@ router.post('/chat/analyze-image', async (req, res) => {
     if (!apiKey) return res.status(503).json({ error: 'Gemini API key not configured' });
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

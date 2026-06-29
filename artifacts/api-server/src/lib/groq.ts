@@ -44,10 +44,10 @@ Everything else — explain it. If a platform name (Instagram, Twitter, etc.) ap
 If the user's Knowledge Base contains relevant notes, inject that context and prioritize it in your answer.`;
 
 function getGroqClient() {
-  if (!process.env.GROQ_API_KEY) {
-    throw new Error('GROQ_API_KEY not configured');
-  }
-  return new Groq({ apiKey: process.env.GROQ_API_KEY });
+  // Try GROQ_API_KEY first, fall back to GROQ_API_KEY_2 if rate limited
+  const key = process.env.GROQ_API_KEY ?? process.env.GROQ_API_KEY_2;
+  if (!key) throw new Error('No Groq API key configured');
+  return new Groq({ apiKey: key });
 }
 
 async function buildMessages(userMessage: string, history: any[] = []) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Database, Bot, Shield, Terminal, Trash2, Info, Keyboard, Activity, CheckCircle, XCircle, Loader2, Layers, Gauge, RefreshCw } from 'lucide-react';
+import { Settings, Database, Bot, Shield, Terminal, Trash2, Info, Keyboard, Activity, CheckCircle, XCircle, Loader2, Layers, Gauge, RefreshCw, Zap, Clock, WifiOff, Wifi } from 'lucide-react';
 
 interface HealthStatus {
   database: string;
@@ -300,6 +300,15 @@ function ProviderCard({ provider }: { provider: ProviderData }) {
   );
 }
 
+interface ProviderCheckResult {
+  name: string;
+  key: string;
+  ok: boolean;
+  latencyMs: number | null;
+  response?: string;
+  error?: string;
+}
+
 export default function SettingsPage() {
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
@@ -309,6 +318,8 @@ export default function SettingsPage() {
   const [dedupResult, setDedupResult] = useState<{ toolsRemoved: number; commandsRemoved: number } | null>(null);
   const [usage, setUsage] = useState<UsageData | null>(null);
   const [usageLoading, setUsageLoading] = useState(true);
+  const [providerChecking, setProviderChecking] = useState(false);
+  const [providerCheckResults, setProviderCheckResults] = useState<ProviderCheckResult[] | null>(null);
 
   const fetchUsage = () => {
     setUsageLoading(true);
@@ -316,6 +327,19 @@ export default function SettingsPage() {
       .then(r => r.json())
       .then(d => { setUsage(d); setUsageLoading(false); })
       .catch(() => setUsageLoading(false));
+  };
+
+  const runProviderHealthCheck = async () => {
+    setProviderChecking(true);
+    setProviderCheckResults(null);
+    try {
+      const res = await fetch('/api/health/providers/check', { method: 'POST' });
+      const data = await res.json();
+      setProviderCheckResults(data.results ?? []);
+    } catch (e: any) {
+      setProviderCheckResults([{ name: 'Error', key: 'error', ok: false, latencyMs: null, error: e.message }]);
+    }
+    setProviderChecking(false);
   };
 
   const runDeduplicate = async () => {
@@ -479,6 +503,77 @@ export default function SettingsPage() {
                 Live data is captured from response headers when AI Ops requests are made. Static limits shown are free-tier defaults.
               </p>
             </div>
+          </div>
+        </section>
+
+        {/* Provider Health Check */}
+        <section className="bg-card/50 border border-border rounded-lg overflow-hidden">
+          <div className="p-3 md:p-4 border-b border-border bg-black/20 font-bold flex items-center justify-between text-xs">
+            <span className="flex items-center gap-2"><Zap size={14} className="text-primary" /> PROVIDER HEALTH CHECK</span>
+            <button
+              onClick={runProviderHealthCheck}
+              disabled={providerChecking}
+              className="flex items-center gap-1.5 px-3 py-1 text-xs border border-primary/40 text-primary hover:bg-primary/10 rounded transition-colors disabled:opacity-40"
+            >
+              {providerChecking ? <Loader2 size={11} className="animate-spin" /> : <Wifi size={11} />}
+              {providerChecking ? 'Pinging all…' : 'Run Health Check'}
+            </button>
+          </div>
+          <div className="p-4 space-y-3">
+            {!providerCheckResults && !providerChecking && (
+              <p className="text-[11px] text-muted-foreground">
+                Click <span className="text-primary font-bold">Run Health Check</span> to ping every configured AI provider with a test message and see which ones are working, their latency, and any error details.
+              </p>
+            )}
+            {providerChecking && (
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 size={12} className="animate-spin text-primary" />
+                Pinging all providers in parallel — this may take up to 15 seconds…
+              </div>
+            )}
+            {providerCheckResults && (
+              <div className="space-y-2">
+                {providerCheckResults.length === 0 ? (
+                  <p className="text-xs text-yellow-400">No providers are configured. Add API keys to use AI features.</p>
+                ) : (
+                  providerCheckResults.map(r => (
+                    <div key={r.key} className={`flex items-start justify-between gap-3 rounded p-2.5 border ${r.ok ? 'border-green-400/30 bg-green-400/5' : 'border-red-400/30 bg-red-400/5'}`}>
+                      <div className="flex items-center gap-2 min-w-0">
+                        {r.ok
+                          ? <Wifi size={13} className="text-green-400 shrink-0" />
+                          : <WifiOff size={13} className="text-red-400 shrink-0" />
+                        }
+                        <div className="min-w-0">
+                          <span className={`text-xs font-bold ${r.ok ? 'text-green-400' : 'text-red-400'}`}>{r.name}</span>
+                          {r.ok && r.response && (
+                            <p className="text-[10px] text-muted-foreground/70 font-mono truncate mt-0.5">→ "{r.response}"</p>
+                          )}
+                          {!r.ok && r.error && (
+                            <p className="text-[10px] text-red-400/80 font-mono mt-0.5 break-all">{r.error}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.ok ? 'bg-green-400/20 text-green-400' : 'bg-red-400/20 text-red-400'}`}>
+                          {r.ok ? 'PASS' : 'FAIL'}
+                        </span>
+                        {r.latencyMs !== null && (
+                          <div className="flex items-center gap-1 justify-end mt-1 text-[10px] text-muted-foreground/60">
+                            <Clock size={9} /> {r.latencyMs}ms
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div className="flex items-center justify-between pt-1 text-[10px] text-muted-foreground/50">
+                  <span>{providerCheckResults.filter(r => r.ok).length}/{providerCheckResults.length} providers healthy</span>
+                  <button onClick={runProviderHealthCheck} className="hover:text-primary transition-colors flex items-center gap-1">
+                    <RefreshCw size={9} /> recheck
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
