@@ -11,6 +11,43 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "API Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "API Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/api-server run dev"
+waitForPort = 8080
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=25629 BASE_PATH=/ pnpm --filter @workspace/cyber-sentinel run dev"
+waitForPort = 25629
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
@@ -28,3 +65,6 @@ channel = "stable-25_05"
 CLOUDFLARE_R2_URL = "https://a036e69c21e628f9926b890a16d1302c.r2.cloudflarestorage.com"
 CLOUDFLARE_AI_ACCOUNT_ID = "a036e69c21e628f9926b890a16d1302c"
 NODE_ENV = "development"
+
+[userenv.development]
+PORT = "25629"
