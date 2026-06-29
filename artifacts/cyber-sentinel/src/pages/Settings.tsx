@@ -27,9 +27,41 @@ interface GroqSnapshot {
   capturedAt: number | null;
 }
 
+interface ProviderSnapshot {
+  limitRequestsPerMinute: number | null;
+  remainingRequestsPerMinute: number | null;
+  limitTokensPerMinute: number | null;
+  remainingTokensPerMinute: number | null;
+  limitRequestsPerDay: number | null;
+  remainingRequestsPerDay: number | null;
+  limitTokensPerDay: number | null;
+  remainingTokensPerDay: number | null;
+  capturedAt: number | null;
+}
+
+interface StaticLimits {
+  requestsPerMinute?: number;
+  tokensPerMinute?: number;
+  requestsPerDay?: number;
+  tokensPerDay?: number;
+  requestsPerMonth?: number;
+  tokensPerMonth?: number;
+  note?: string;
+}
+
+interface ProviderData {
+  key: string;
+  label: string;
+  model: string;
+  configured: boolean;
+  staticLimits: StaticLimits;
+  snapshot: ProviderSnapshot;
+}
+
 interface UsageData {
   mongo: MongoStats | null;
   groq: GroqSnapshot;
+  providers: ProviderData[];
   mongoError?: string;
 }
 
@@ -41,16 +73,18 @@ function formatBytes(bytes: number) {
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
 
+function fmtNum(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
+  return n.toLocaleString();
+}
+
 function ProgressBar({ value, max, label }: { value: number; max: number; label?: string }) {
   const used = max - value;
   const usedPct = max > 0 ? (used / max) * 100 : 0;
   const displayPct = Math.round(usedPct * 10) / 10;
   const barWidth = Math.max(usedPct, usedPct > 0 ? 1.5 : 0);
-
-  const barColor =
-    usedPct > 85 ? 'bg-red-400' :
-    usedPct > 60 ? 'bg-yellow-400' :
-    'bg-primary';
+  const barColor = usedPct > 85 ? 'bg-red-400' : usedPct > 60 ? 'bg-yellow-400' : 'bg-primary';
 
   return (
     <div className="space-y-1.5">
@@ -62,16 +96,44 @@ function ProgressBar({ value, max, label }: { value: number; max: number; label?
           </span>
         </div>
       )}
-      <div className="h-2.5 w-full bg-black/60 border border-border/60 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-          style={{ width: `${barWidth}%`, minWidth: usedPct > 0 ? '4px' : '0' }}
-        />
+      <div className="h-2 w-full bg-black/60 border border-border/60 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${barWidth}%`, minWidth: usedPct > 0 ? '4px' : '0' }} />
       </div>
       <div className="flex justify-between text-[10px]">
         <span className="text-muted-foreground/60">{value.toLocaleString()} remaining</span>
         <span className={usedPct > 85 ? 'text-red-400 font-bold' : 'text-primary font-mono'}>{displayPct}% used</span>
       </div>
+    </div>
+  );
+}
+
+function StaticLimitBar({ used, total, label }: { used?: number; total: number; label: string }) {
+  const pct = used != null && total > 0 ? (used / total) * 100 : 0;
+  const displayPct = pct < 0.1 ? (pct > 0 ? '<0.1' : '0') : String(Math.round(pct * 10) / 10);
+  const barColor = pct > 85 ? 'bg-red-400' : pct > 60 ? 'bg-yellow-400' : 'bg-primary/60';
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+        <span>{label}</span>
+        {used != null
+          ? <span className="text-foreground">{fmtNum(used)} remaining / {fmtNum(total)} limit</span>
+          : <span className="text-foreground/40">{fmtNum(total)} limit</span>
+        }
+      </div>
+      <div className="h-2 w-full bg-black/60 border border-border/60 rounded-full overflow-hidden">
+        {used != null
+          ? <div className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+              style={{ width: `${Math.max(pct, pct > 0 ? 1.5 : 0)}%`, minWidth: pct > 0 ? '4px' : '0' }} />
+          : <div className="h-full rounded-full bg-primary/20 w-full" />
+        }
+      </div>
+      {used != null && (
+        <div className="flex justify-end text-[10px]">
+          <span className={pct > 85 ? 'text-red-400 font-bold' : 'text-primary font-mono'}>{displayPct}% used</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -89,15 +151,127 @@ function BytesBar({ used, total, label }: { used: number; total: number; label: 
         <span className="text-foreground">{formatBytes(used)} / {formatBytes(total)}</span>
       </div>
       <div className="h-2.5 w-full bg-black/60 border border-border/60 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-          style={{ width: `${barWidth}%`, minWidth: pct > 0 ? '4px' : '0' }}
-        />
+        <div className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${barWidth}%`, minWidth: pct > 0 ? '4px' : '0' }} />
       </div>
       <div className="flex justify-between text-[10px]">
         <span className="text-muted-foreground/60">{formatBytes(total - used)} free</span>
         <span className={pct > 85 ? 'text-red-400 font-bold' : 'text-primary font-mono'}>{displayPct}% used</span>
       </div>
+    </div>
+  );
+}
+
+function ProviderCard({ provider }: { provider: ProviderData }) {
+  const { label, model, configured, staticLimits, snapshot } = provider;
+  const hasLive = snapshot.capturedAt !== null;
+  const liveReqMin = snapshot.limitRequestsPerMinute !== null && snapshot.remainingRequestsPerMinute !== null;
+  const liveTokMin = snapshot.limitTokensPerMinute !== null && snapshot.remainingTokensPerMinute !== null;
+  const liveReqDay = snapshot.limitRequestsPerDay !== null && snapshot.remainingRequestsPerDay !== null;
+  const liveTokDay = snapshot.limitTokensPerDay !== null && snapshot.remainingTokensPerDay !== null;
+
+  return (
+    <div className={`rounded-lg border p-3 space-y-3 ${configured ? 'border-border bg-black/20' : 'border-border/30 bg-black/10 opacity-50'}`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-foreground">{label}</span>
+            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${configured ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
+              {configured ? 'CONFIGURED' : 'NO KEY'}
+            </span>
+            {hasLive && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-green-400/20 text-green-400">LIVE</span>
+            )}
+          </div>
+          <p className="text-[10px] text-muted-foreground/60 mt-0.5 font-mono">{model}</p>
+        </div>
+      </div>
+
+      {configured && (
+        <div className="space-y-3">
+          {/* Live data — shown when captured from response headers */}
+          {liveReqMin && (
+            <ProgressBar
+              value={snapshot.remainingRequestsPerMinute!}
+              max={snapshot.limitRequestsPerMinute!}
+              label="Req / min (live)"
+            />
+          )}
+          {liveTokMin && (
+            <ProgressBar
+              value={snapshot.remainingTokensPerMinute!}
+              max={snapshot.limitTokensPerMinute!}
+              label="Tokens / min (live)"
+            />
+          )}
+          {liveReqDay && (
+            <ProgressBar
+              value={snapshot.remainingRequestsPerDay!}
+              max={snapshot.limitRequestsPerDay!}
+              label="Req / day (live)"
+            />
+          )}
+          {liveTokDay && (
+            <ProgressBar
+              value={snapshot.remainingTokensPerDay!}
+              max={snapshot.limitTokensPerDay!}
+              label="Tokens / day (live)"
+            />
+          )}
+
+          {/* Static known limits — shown when no live data yet */}
+          {!hasLive && (
+            <div className="space-y-3">
+              {staticLimits.requestsPerMinute && (
+                <StaticLimitBar total={staticLimits.requestsPerMinute} label="Req / min (free tier)" />
+              )}
+              {staticLimits.tokensPerMinute && (
+                <StaticLimitBar total={staticLimits.tokensPerMinute} label="Tokens / min (free tier)" />
+              )}
+              {staticLimits.requestsPerDay && (
+                <StaticLimitBar total={staticLimits.requestsPerDay} label="Req / day (free tier)" />
+              )}
+              {staticLimits.tokensPerDay && (
+                <StaticLimitBar total={staticLimits.tokensPerDay} label="Tokens / day (free tier)" />
+              )}
+              {(staticLimits as any).requestsPerMonth && (
+                <StaticLimitBar total={(staticLimits as any).requestsPerMonth} label="Req / month (free tier)" />
+              )}
+              {(staticLimits as any).tokensPerMonth && (
+                <StaticLimitBar total={(staticLimits as any).tokensPerMonth} label="Tokens / month (free tier)" />
+              )}
+              <p className="text-[10px] text-muted-foreground/40 italic">
+                Send a message in AI Ops to capture live usage data.
+              </p>
+            </div>
+          )}
+
+          {/* When live data exists, also show static limits dimly as reference */}
+          {hasLive && !liveReqMin && !liveTokMin && !liveReqDay && (
+            <div className="space-y-2">
+              {staticLimits.requestsPerMinute && (
+                <StaticLimitBar total={staticLimits.requestsPerMinute} label="Req / min (free tier)" />
+              )}
+              {staticLimits.tokensPerMinute && (
+                <StaticLimitBar total={staticLimits.tokensPerMinute} label="Tokens / min (free tier)" />
+              )}
+              {staticLimits.requestsPerDay && (
+                <StaticLimitBar total={staticLimits.requestsPerDay} label="Req / day (free tier)" />
+              )}
+            </div>
+          )}
+
+          {hasLive && (
+            <p className="text-[10px] text-muted-foreground/40">
+              Last captured: {new Date(snapshot.capturedAt!).toLocaleTimeString()}
+            </p>
+          )}
+
+          {staticLimits.note && (
+            <p className="text-[10px] text-muted-foreground/50 border-t border-border/20 pt-2">{staticLimits.note}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -164,9 +338,9 @@ export default function SettingsPage() {
     );
   };
 
-  const groq = usage?.groq;
-  const hasGroqData = groq?.capturedAt !== null && groq?.limitRequestsPerMinute !== null;
   const mongo = usage?.mongo;
+  const providers = usage?.providers ?? [];
+  const configuredCount = providers.filter(p => p.configured).length;
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8 font-mono">
@@ -213,7 +387,7 @@ export default function SettingsPage() {
             </button>
           </div>
 
-          <div className="p-4 space-y-5">
+          <div className="p-4 space-y-6">
             {/* MongoDB Storage */}
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
@@ -234,11 +408,8 @@ export default function SettingsPage() {
                   const total = mongo.fsTotalSize ?? ATLAS_FREE_LIMIT;
                   return (
                     <div className="space-y-4">
-                      <BytesBar
-                        used={totalUsed}
-                        total={total}
-                        label={mongo.fsTotalSize ? "Storage used" : "Storage used (vs 512 MB free tier limit)"}
-                      />
+                      <BytesBar used={totalUsed} total={total}
+                        label={mongo.fsTotalSize ? "Storage used" : "Storage used (vs 512 MB free tier limit)"} />
                       <BytesBar used={mongo.dataSize} total={total} label="Data size" />
                       <BytesBar used={mongo.indexSize} total={total} label="Index size" />
                       <div className="flex justify-between text-[10px] text-muted-foreground/60 border-t border-border/30 pt-2">
@@ -255,50 +426,34 @@ export default function SettingsPage() {
 
             <div className="border-t border-border/40" />
 
-            {/* Groq Rate Limits */}
+            {/* AI Providers */}
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                <Bot size={12} className="text-primary" /> Groq API Rate Limits
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  <Bot size={12} className="text-primary" /> AI Provider Limits
+                </div>
+                {!usageLoading && (
+                  <span className="text-[10px] text-muted-foreground">
+                    {configuredCount}/{providers.length} configured
+                  </span>
+                )}
               </div>
+
               {usageLoading ? (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 size={11} className="animate-spin" /> Loading rate limit data…
+                  <Loader2 size={11} className="animate-spin" /> Loading provider data…
                 </div>
-              ) : !hasGroqData ? (
-                <div className="text-xs text-muted-foreground space-y-1">
-                  <p>Rate limit data not yet captured.</p>
-                  <p className="text-[10px]">Send a message in AI Ops to populate live usage stats — Groq returns limits in response headers.</p>
-                </div>
+              ) : providers.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No provider data available.</p>
               ) : (
-                <div className="space-y-4">
-                  {groq!.limitRequestsPerMinute !== null && groq!.remainingRequestsPerMinute !== null && (
-                    <ProgressBar
-                      value={groq!.remainingRequestsPerMinute!}
-                      max={groq!.limitRequestsPerMinute!}
-                      label="Requests / minute"
-                    />
-                  )}
-                  {groq!.limitTokensPerMinute !== null && groq!.remainingTokensPerMinute !== null && (
-                    <ProgressBar
-                      value={groq!.remainingTokensPerMinute!}
-                      max={groq!.limitTokensPerMinute!}
-                      label="Tokens / minute"
-                    />
-                  )}
-                  {groq!.limitRequestsPerDay !== null && groq!.remainingRequestsPerDay !== null && (
-                    <ProgressBar
-                      value={groq!.remainingRequestsPerDay!}
-                      max={groq!.limitRequestsPerDay!}
-                      label="Requests / day"
-                    />
-                  )}
-                  {groq!.capturedAt && (
-                    <p className="text-[10px] text-muted-foreground/50">
-                      Last updated: {new Date(groq!.capturedAt).toLocaleTimeString()}
-                    </p>
-                  )}
+                <div className="grid grid-cols-1 gap-3">
+                  {providers.map(p => <ProviderCard key={p.key} provider={p} />)}
                 </div>
               )}
+
+              <p className="text-[10px] text-muted-foreground/40 pt-1">
+                Live data is captured from response headers when AI Ops requests are made. Static limits shown are free-tier defaults.
+              </p>
             </div>
           </div>
         </section>
@@ -311,15 +466,16 @@ export default function SettingsPage() {
           <div className="p-4 space-y-3 text-xs">
             {[
               ['Application', 'CyberSentinel v2.0'],
-              ['AI Model', 'Groq · LLaMA-3.3-70B-Versatile'],
+              ['AI Engine', 'Multi-provider · Best-answer mode'],
+              ['Providers', `Groq · Gemini · Mistral · Cohere · Together · Cloudflare · OpenRouter`],
               ['Mode', 'Streaming SSE · Knowledge-Augmented'],
               ['Frontend', 'React + Vite + TailwindCSS'],
               ['Backend', 'Express 5 + MongoDB + Mongoose'],
               ['Purpose', 'Personal pentesting operations hub'],
             ].map(([k, v]) => (
-              <div key={k} className="flex justify-between items-center border-b border-border pb-3 last:border-0 last:pb-0">
-                <span className="text-muted-foreground">{k}</span>
-                <span className="text-foreground font-mono">{v}</span>
+              <div key={k} className="flex justify-between items-start border-b border-border pb-3 last:border-0 last:pb-0">
+                <span className="text-muted-foreground shrink-0">{k}</span>
+                <span className="text-foreground font-mono text-right ml-4">{v}</span>
               </div>
             ))}
           </div>
