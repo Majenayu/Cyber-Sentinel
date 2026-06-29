@@ -20,7 +20,7 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pkill -f 'dist/index.mjs' 2>/dev/null; sleep 1; cd artifacts/api-server && pnpm run dev 2>&1 | pnpm exec pino-pretty"
+args = "cd artifacts/api-server && node --enable-source-maps ./dist/index.mjs 2>&1 | pnpm exec pino-pretty"
 waitForPort = 8080
 
 [[workflows.workflow]]
@@ -73,3 +73,7 @@ BASE_PATH = "/"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
