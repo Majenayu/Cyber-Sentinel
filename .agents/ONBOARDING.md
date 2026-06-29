@@ -102,14 +102,23 @@ These are backup copies with no `node_modules`. They are expected to fail and ca
 ## Known issues & fixes on fresh import (continued)
 
 ### Replit preview pane shows blank white page
-**Symptom:** App serves 200 at `localhost:5000`, screenshot tool shows the UI, but the `.replit.dev` preview iframe is blank.  
-**Cause:** Vite's HMR client (injected into every page) tries to open a WebSocket back to port 5000 directly. The Replit proxy only exposes HTTPS on port 443 — the raw port 5000 WebSocket is blocked, the Vite client never initialises, and React never mounts.  
-**Fix:** Add `hmr: { clientPort: 443 }` to `server` in `artifacts/cyber-sentinel/vite.config.ts`. This is already applied. Do not remove it.  
-**Four other `.replit` requirements for the preview:**
-1. `[[ports]]` block with `localPort = 5000` / `externalPort = 80` must be present.
-2. `runButton` must point to the webview workflow (`"artifacts/cyber-sentinel: web"`), not a parent parallel launcher.
-3. `[workflows.workflow.metadata]` must appear **before** `[[workflows.workflow.tasks]]` in each workflow block.
-4. `PORT = "5000"` in `[userenv.development]` must match the actual Vite port.
+**Symptom:** App serves 200 at `localhost`, screenshot tool shows the UI, but the `.replit.dev` preview iframe is blank.  
+**Cause:** Vite's HMR client tries to open a WebSocket back to the raw dev port. The Replit proxy only exposes HTTPS on port 443 — the WebSocket is blocked, the Vite client stalls, and React never mounts.  
+**Fix:** Already applied in `vite.config.ts`:
+```ts
+hmr: process.env.REPL_ID ? { clientPort: 443 } : true,
+```
+Do not remove this. The `REPL_ID` guard means it only applies behind the Replit proxy, not plain localhost.
+
+### Replit artifact system controls PORT — do not fight it
+**Critical:** The Replit artifact system permanently assigns `PORT=25629` to the `artifacts/cyber-sentinel` web artifact. This overrides **both** `[userenv.development]` settings and inline `PORT=5000` command prefixes. Always use port 25629 for the web workflow.
+
+**Required `.replit` configuration for the preview to work:**
+1. `[[ports]]` block: `localPort = 25629` / `externalPort = 80`
+2. `runButton = "artifacts/cyber-sentinel: web"` (not a parent parallel launcher)
+3. `[workflows.workflow.metadata]` must appear **before** `[[workflows.workflow.tasks]]` in each workflow block
+4. `waitForPort = 25629` on the Vite shell task
+5. `PORT = "25629"` in `[userenv.development]`
 
 ---
 

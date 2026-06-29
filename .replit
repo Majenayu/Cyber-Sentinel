@@ -37,7 +37,7 @@ args = "artifacts/api-server: API Server"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd artifacts/cyber-sentinel && pnpm run dev"
-waitForPort = 5000
+waitForPort = 25629
 
 [agent]
 stack = "BEST_EFFORT_FALLBACK"
@@ -58,5 +58,5 @@ CLOUDFLARE_AI_ACCOUNT_ID = "a036e69c21e628f9926b890a16d1302c"
 NODE_ENV = "development"
 
 [userenv.development]
-PORT = "5000"
+PORT = "25629"
 BASE_PATH = "/"

@@ -10,16 +10,23 @@ Artifact workflows (`artifacts/xxx: yyy`) inherit env vars from `[userenv.develo
 `.replit` defines `Start application` (PORT=25629) and `API Server` (API_PORT=8080). Artifact workflows `artifacts/cyber-sentinel: web` and `artifacts/api-server: API Server` use the same ports from env, causing conflicts when both sets run simultaneously.
 
 ## Replit Preview Blank Page (Vite HMR WebSocket)
-**Symptom:** `localhost:5000` returns 200 and screenshot tool shows the app, but `.replit.dev` preview is blank white.
-**Cause:** Vite injects an HMR client into every page that opens a WebSocket back to the raw dev port (5000). The Replit proxy only exposes port 443 (HTTPS) — the direct WebSocket to 5000 is blocked, the Vite client never initialises, React never mounts.
-**Fix:** `hmr: { clientPort: 443 }` in `server` block of `vite.config.ts`. Already applied — do not remove.
-
-**Why:** Without this, every page load through the Replit proxy produces a silent blank — the HTML loads fine but JS execution stalls waiting for the Vite client WebSocket that never connects.
-
-**How to apply:** Add to any Vite project deployed on Replit:
+**Symptom:** localhost returns 200, screenshot tool shows the app, but `.replit.dev` preview is blank white.
+**Cause:** Vite's HMR client tries to WebSocket back to the raw dev port. Replit proxy only exposes port 443 — the WebSocket is blocked, Vite client stalls, React never mounts.
+**Fix (already applied in vite.config.ts):**
 ```ts
-server: { hmr: { clientPort: 443 } }
+hmr: process.env.REPL_ID ? { clientPort: 443 } : true,
 ```
+The `REPL_ID` guard is required — without it, localhost access also tries port 443 and fails.
+
+## Artifact System Owns PORT — Do Not Override
+**Critical:** The Replit artifact system permanently injects `PORT=25629` into the `artifacts/cyber-sentinel` web workflow. This overrides BOTH `[userenv.development]` settings AND inline `PORT=5000` shell prefixes.
+**Rule:** Always use port 25629 for the web artifact. Never try to force port 5000.
+**Required .replit config:**
+- `[[ports]] localPort=25629, externalPort=80`
+- `waitForPort=25629` on the Vite task
+- `PORT="25629"` in `[userenv.development]`
+- `runButton` = the webview workflow name (not a parent parallel launcher)
+- `[workflows.workflow.metadata]` must come BEFORE `[[workflows.workflow.tasks]]` in each block
 
 ## The Fix Applied
 - `artifacts/api-server/src/index.ts`: uses `API_PORT ?? "8080"` — never use the frontend PORT as API port fallback.

@@ -74,9 +74,12 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
-    hmr: {
-      clientPort: 443,
-    },
+    // When running behind the Replit HTTPS proxy, the HMR WebSocket must
+    // connect on port 443 (the external HTTPS port). Skip this in plain
+    // localhost access (REPL_ID is undefined outside Replit environments).
+    hmr: process.env.REPL_ID
+      ? { clientPort: 443 }
+      : true,
     fs: {
       strict: true,
     },
