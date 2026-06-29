@@ -1,0 +1,159 @@
+sys.settings
+Configuration and system diagnostics.
+
+SYSTEM STATUS
+Core Database (MongoDB)
+ONLINE
+AI Module (Groq)
+ONLINE
+Encryption
+AES-256 ACTIVE
+USAGE & LIMITS
+
+refresh
+MongoDB Storage
+Storage used (vs 512 MB free tier limit)
+322.3 KB / 512.0 MB
+511.7 MB free
+<0.1% used
+Data size
+142.3 KB / 512.0 MB
+511.9 MB free
+<0.1% used
+Index size
+180.0 KB / 512.0 MB
+511.8 MB free
+<0.1% used
+22 documents · 4 collections
+256.0 KB on disk
+AI Provider Limits
+7/7 configured
+Groq
+CONFIGURED
+● ACTIVE
+llama-3.3-70b-versatile
+
+1
+calls
+✓ Queried 1 time this session
+last: 12:46:03 PM
+⚠ 429 {"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kw8yf7zsev993hbvxpkjrtbg` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 97227, Requested 5384. Please try again in 37m35.904s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens","code":"rate_limit_exceeded"}}
+Req / min (free tier)
+1k limit
+Tokens / min (free tier)
+12k limit
+Req / day (free tier)
+6k limit
+Free tier · llama-3.3-70b-versatile
+
+OpenRouter
+CONFIGURED
+● ACTIVE
+LIVE HEADERS
+deepseek-r1-0528:free
+
+1
+calls
+✓ Queried 1 time this session
+last: 12:46:03 PM
+⚠ OpenRouter OpenRouter: 404
+Req / min (free tier)
+20 limit
+Req / day (free tier)
+200 limit
+Headers captured: 12:46:04 PM
+
+Free tier · deepseek-r1-0528:free
+
+Gemini
+CONFIGURED
+● ACTIVE
+LIVE HEADERS
+gemini-1.5-flash
+
+1
+calls
+✓ Queried 1 time this session
+last: 12:46:03 PM
+⚠ Gemini: 404
+Req / min (free tier)
+15 limit
+Tokens / day (free tier)
+1.0M limit
+Headers captured: 12:46:04 PM
+
+Free tier · gemini-1.5-flash
+
+Mistral
+CONFIGURED
+● ACTIVE
+LIVE HEADERS
+mistral-small-latest
+
+1
+calls
+✓ Queried 1 time this session
+last: 12:46:03 PM
+⚠ Mistral: 401
+Req / min (free tier)
+60 limit
+Tokens / month (free tier)
+500k limit
+Headers captured: 12:46:04 PM
+
+Free tier · mistral-small-latest
+
+Cohere
+CONFIGURED
+● ACTIVE
+LIVE HEADERS
+command-r
+
+1
+calls
+✓ Queried 1 time this session
+last: 12:46:03 PM
+⚠ Cohere: 404
+Req / min (free tier)
+20 limit
+Req / month (free tier)
+1k limit
+Headers captured: 12:46:04 PM
+
+Trial key · command-r
+
+Together AI
+CONFIGURED
+● ACTIVE
+LIVE HEADERS
+Llama-3.3-70B-Instruct-Turbo-Free
+
+1
+calls
+✓ Queried 1 time this session
+last: 12:46:03 PM
+⚠ Together: 401
+Req / min (free tier)
+60 limit
+Headers captured: 12:46:04 PM
+
+Free tier · llama-3.3-70B-Instruct-Turbo-Free
+
+Cloudflare AI
+CONFIGURED
+● ACTIVE
+LIVE HEADERS
+llama-3.3-70b-fp8-fast
+
+1
+calls
+✓ Queried 1 time this session
+last: 12:46:03 PM
+⚠ Cloudflare: 401
+Req / day (free tier)
+10k limit
+Headers captured: 12:46:04 PM
+
+Workers AI free · llama-3.3-70b-fp8-fast
+
+Live data is captured from response headers when AI Ops requests are made. Static limits shown are free-tier defaults.
