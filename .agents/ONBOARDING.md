@@ -43,19 +43,33 @@ await setEnvVars({ environment: "development", values: { BASE_PATH: "/", PORT: "
 
 ## Step 4 — Start workflows
 
-The three main workflows are artifact-managed and start automatically:
-
 | Workflow name | Port | What it does |
 |---|---|---|
+| `artifacts/cyber-sentinel: web` | **5000** | React/Vite frontend (webview — Run button) |
 | `artifacts/api-server: API Server` | 8080 | Express API + MongoDB + AI |
-| `artifacts/cyber-sentinel: web` | 25629 | React/Vite frontend |
-| `artifacts/cyber-sentinel-mobile: expo` | auto | Expo mobile app |
 
-**Important:** After setting secrets, restart `artifacts/cyber-sentinel: web` so the Vite proxy picks up `CYBERSENTINEL_API_SECRET`:
+**Critical `.replit` requirements for the preview to work:**
+
+1. `[[ports]]` block mapping `localPort = 5000` → `externalPort = 80` must be present — this is what Replit's proxy reads to forward the iframe.
+2. `runButton` must point to `"artifacts/cyber-sentinel: web"` (the workflow with `outputType = "webview"`). Pointing it at a parent parallel-launcher workflow produces a blank preview pane.
+3. `[workflows.workflow.metadata]` must appear **before** `[[workflows.workflow.tasks]]` in each workflow block — TOML associates a subtable with the previous array-of-tables element, so ordering matters.
+4. `PORT = "5000"` in `[userenv.development]` must match the actual port — the proxy reads this env var.
+
+After setting secrets, restart both workflows:
 
 ```javascript
 await restartWorkflow({ workflowName: "artifacts/cyber-sentinel: web", timeout: 45 });
+await restartWorkflow({ workflowName: "artifacts/api-server: API Server", timeout: 60 });
 ```
+
+If `artifacts/api-server: API Server` fails with `EADDRINUSE: 8080`, a stale process is holding the port. Kill it via `/proc`:
+
+```bash
+cat /proc/net/tcp  # find the inode for local port 1F90 (hex for 8080)
+# then kill the owning PID from /proc/*/fd
+```
+
+Or simply restart the workflow a second time — the stale process usually exits between restarts.
 
 ---
 
