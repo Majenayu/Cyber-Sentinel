@@ -1,27 +1,35 @@
 import Groq from 'groq-sdk';
 import { updateFromHeaders } from './groq-ratelimit-cache';
-import { updateProviderHeaders } from './ai-limits-cache';
+import { updateProviderHeaders, recordProviderCall, recordProviderError } from './ai-limits-cache';
 
 export interface AIProvider {
   name: string;
+  providerKey: string;
   call: (messages: any[], systemPrompt: string) => Promise<string>;
 }
 
-function makeGroqProvider(apiKey: string, label: string): AIProvider {
+function makeGroqProvider(apiKey: string, label: string, key: string): AIProvider {
   return {
     name: label,
+    providerKey: key,
     async call(messages, systemPrompt) {
-      const client = new Groq({ apiKey });
-      const { data, response } = await client.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.7,
-        max_tokens: 2048,
-        messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      }).withResponse();
-      const headers = Object.fromEntries(response.headers.entries());
-      updateFromHeaders(headers);
-      updateProviderHeaders('groq', headers);
-      return data.choices[0]?.message?.content ?? '';
+      recordProviderCall(key);
+      try {
+        const client = new Groq({ apiKey });
+        const { data, response } = await client.chat.completions.create({
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.7,
+          max_tokens: 2048,
+          messages: [{ role: 'system', content: systemPrompt }, ...messages],
+        }).withResponse();
+        const headers = Object.fromEntries(response.headers.entries());
+        updateFromHeaders(headers);
+        updateProviderHeaders(key, headers);
+        return data.choices[0]?.message?.content ?? '';
+      } catch (e: any) {
+        recordProviderError(key, e.message);
+        throw e;
+      }
     },
   };
 }
@@ -29,27 +37,36 @@ function makeGroqProvider(apiKey: string, label: string): AIProvider {
 function makeOpenRouterProvider(apiKey: string, label: string): AIProvider {
   return {
     name: label,
+    providerKey: 'openrouter',
     async call(messages, systemPrompt) {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://cybersentinel.app',
-          'X-Title': 'CyberSentinel',
-        },
-        body: JSON.stringify({
-          model: 'deepseek/deepseek-r1-0528:free',
-          messages: [{ role: 'system', content: systemPrompt }, ...messages],
-          max_tokens: 2048,
-        }),
-      });
-      const headers: Record<string, string> = {};
-      res.headers.forEach((v, k) => { headers[k] = v; });
-      updateProviderHeaders('openrouter', headers);
-      if (!res.ok) throw new Error(`OpenRouter ${label}: ${res.status}`);
-      const data = await res.json();
-      return data.choices?.[0]?.message?.content ?? '';
+      recordProviderCall('openrouter');
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://cybersentinel.app',
+            'X-Title': 'CyberSentinel',
+          },
+          body: JSON.stringify({
+            model: 'deepseek/deepseek-r1-0528:free',
+            messages: [{ role: 'system', content: systemPrompt }, ...messages],
+            max_tokens: 2048,
+          }),
+        });
+        const headers: Record<string, string> = {};
+        res.headers.forEach((v, k) => { headers[k] = v; });
+        updateProviderHeaders('openrouter', headers);
+        if (!res.ok) throw new Error(`OpenRouter ${label}: ${res.status}`);
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content ?? '';
+        if (!content) throw new Error('OpenRouter returned empty content');
+        return content;
+      } catch (e: any) {
+        recordProviderError('openrouter', e.message);
+        throw e;
+      }
     },
   };
 }
@@ -57,29 +74,38 @@ function makeOpenRouterProvider(apiKey: string, label: string): AIProvider {
 function makeGeminiProvider(apiKey: string): AIProvider {
   return {
     name: 'Gemini',
+    providerKey: 'gemini',
     async call(messages, systemPrompt) {
-      const contents = messages.map((m: any) => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }],
-      }));
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            contents,
-            generationConfig: { maxOutputTokens: 2048, temperature: 0.7 },
-          }),
-        }
-      );
-      const headers: Record<string, string> = {};
-      res.headers.forEach((v, k) => { headers[k] = v; });
-      updateProviderHeaders('gemini', headers);
-      if (!res.ok) throw new Error(`Gemini: ${res.status}`);
-      const data = await res.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      recordProviderCall('gemini');
+      try {
+        const contents = messages.map((m: any) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }],
+        }));
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: systemPrompt }] },
+              contents,
+              generationConfig: { maxOutputTokens: 2048, temperature: 0.7 },
+            }),
+          }
+        );
+        const headers: Record<string, string> = {};
+        res.headers.forEach((v, k) => { headers[k] = v; });
+        updateProviderHeaders('gemini', headers);
+        if (!res.ok) throw new Error(`Gemini: ${res.status}`);
+        const data = await res.json();
+        const content = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+        if (!content) throw new Error('Gemini returned empty content');
+        return content;
+      } catch (e: any) {
+        recordProviderError('gemini', e.message);
+        throw e;
+      }
     },
   };
 }
@@ -87,22 +113,31 @@ function makeGeminiProvider(apiKey: string): AIProvider {
 function makeMistralProvider(apiKey: string): AIProvider {
   return {
     name: 'Mistral',
+    providerKey: 'mistral',
     async call(messages, systemPrompt) {
-      const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'mistral-small-latest',
-          messages: [{ role: 'system', content: systemPrompt }, ...messages],
-          max_tokens: 2048,
-        }),
-      });
-      const headers: Record<string, string> = {};
-      res.headers.forEach((v, k) => { headers[k] = v; });
-      updateProviderHeaders('mistral', headers);
-      if (!res.ok) throw new Error(`Mistral: ${res.status}`);
-      const data = await res.json();
-      return data.choices?.[0]?.message?.content ?? '';
+      recordProviderCall('mistral');
+      try {
+        const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'mistral-small-latest',
+            messages: [{ role: 'system', content: systemPrompt }, ...messages],
+            max_tokens: 2048,
+          }),
+        });
+        const headers: Record<string, string> = {};
+        res.headers.forEach((v, k) => { headers[k] = v; });
+        updateProviderHeaders('mistral', headers);
+        if (!res.ok) throw new Error(`Mistral: ${res.status}`);
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content ?? '';
+        if (!content) throw new Error('Mistral returned empty content');
+        return content;
+      } catch (e: any) {
+        recordProviderError('mistral', e.message);
+        throw e;
+      }
     },
   };
 }
@@ -110,29 +145,38 @@ function makeMistralProvider(apiKey: string): AIProvider {
 function makeCohereProvider(apiKey: string): AIProvider {
   return {
     name: 'Cohere',
+    providerKey: 'cohere',
     async call(messages, systemPrompt) {
-      const chatHistory = messages.slice(0, -1).map((m: any) => ({
-        role: m.role === 'assistant' ? 'CHATBOT' : 'USER',
-        message: m.content,
-      }));
-      const lastMsg = messages[messages.length - 1]?.content ?? '';
-      const res = await fetch('https://api.cohere.ai/v1/chat', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'command-r',
-          preamble: systemPrompt,
-          chat_history: chatHistory,
-          message: lastMsg,
-          max_tokens: 2048,
-        }),
-      });
-      const headers: Record<string, string> = {};
-      res.headers.forEach((v, k) => { headers[k] = v; });
-      updateProviderHeaders('cohere', headers);
-      if (!res.ok) throw new Error(`Cohere: ${res.status}`);
-      const data = await res.json();
-      return data.text ?? '';
+      recordProviderCall('cohere');
+      try {
+        const chatHistory = messages.slice(0, -1).map((m: any) => ({
+          role: m.role === 'assistant' ? 'CHATBOT' : 'USER',
+          message: m.content,
+        }));
+        const lastMsg = messages[messages.length - 1]?.content ?? '';
+        const res = await fetch('https://api.cohere.ai/v1/chat', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'command-r',
+            preamble: systemPrompt,
+            chat_history: chatHistory,
+            message: lastMsg,
+            max_tokens: 2048,
+          }),
+        });
+        const headers: Record<string, string> = {};
+        res.headers.forEach((v, k) => { headers[k] = v; });
+        updateProviderHeaders('cohere', headers);
+        if (!res.ok) throw new Error(`Cohere: ${res.status}`);
+        const data = await res.json();
+        const content = data.text ?? '';
+        if (!content) throw new Error('Cohere returned empty content');
+        return content;
+      } catch (e: any) {
+        recordProviderError('cohere', e.message);
+        throw e;
+      }
     },
   };
 }
@@ -140,22 +184,31 @@ function makeCohereProvider(apiKey: string): AIProvider {
 function makeTogetherProvider(apiKey: string): AIProvider {
   return {
     name: 'Together',
+    providerKey: 'together',
     async call(messages, systemPrompt) {
-      const res = await fetch('https://api.together.xyz/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo-Free',
-          messages: [{ role: 'system', content: systemPrompt }, ...messages],
-          max_tokens: 2048,
-        }),
-      });
-      const headers: Record<string, string> = {};
-      res.headers.forEach((v, k) => { headers[k] = v; });
-      updateProviderHeaders('together', headers);
-      if (!res.ok) throw new Error(`Together: ${res.status}`);
-      const data = await res.json();
-      return data.choices?.[0]?.message?.content ?? '';
+      recordProviderCall('together');
+      try {
+        const res = await fetch('https://api.together.xyz/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo-Free',
+            messages: [{ role: 'system', content: systemPrompt }, ...messages],
+            max_tokens: 2048,
+          }),
+        });
+        const headers: Record<string, string> = {};
+        res.headers.forEach((v, k) => { headers[k] = v; });
+        updateProviderHeaders('together', headers);
+        if (!res.ok) throw new Error(`Together: ${res.status}`);
+        const data = await res.json();
+        const content = data.choices?.[0]?.message?.content ?? '';
+        if (!content) throw new Error('Together returned empty content');
+        return content;
+      } catch (e: any) {
+        recordProviderError('together', e.message);
+        throw e;
+      }
     },
   };
 }
@@ -163,40 +216,53 @@ function makeTogetherProvider(apiKey: string): AIProvider {
 function makeCloudflareProvider(accountId: string, apiToken: string): AIProvider {
   return {
     name: 'Cloudflare',
+    providerKey: 'cloudflare',
     async call(messages, systemPrompt) {
-      const res = await fetch(
-        `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messages: [{ role: 'system', content: systemPrompt }, ...messages],
-            max_tokens: 2048,
-          }),
-        }
-      );
-      const headers: Record<string, string> = {};
-      res.headers.forEach((v, k) => { headers[k] = v; });
-      updateProviderHeaders('cloudflare', headers);
-      if (!res.ok) throw new Error(`Cloudflare: ${res.status}`);
-      const data = await res.json();
-      return data.result?.response ?? '';
+      recordProviderCall('cloudflare');
+      try {
+        const res = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.3-70b-instruct-fp8-fast`,
+          {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: [{ role: 'system', content: systemPrompt }, ...messages],
+              max_tokens: 2048,
+            }),
+          }
+        );
+        const headers: Record<string, string> = {};
+        res.headers.forEach((v, k) => { headers[k] = v; });
+        updateProviderHeaders('cloudflare', headers);
+        if (!res.ok) throw new Error(`Cloudflare: ${res.status}`);
+        const data = await res.json();
+        const content = data.result?.response ?? '';
+        if (!content) throw new Error('Cloudflare returned empty content');
+        return content;
+      } catch (e: any) {
+        recordProviderError('cloudflare', e.message);
+        throw e;
+      }
     },
   };
 }
 
 export function getAvailableProviders(): AIProvider[] {
   const providers: AIProvider[] = [];
-  if (process.env.GROQ_API_KEY) providers.push(makeGroqProvider(process.env.GROQ_API_KEY, 'Groq-1'));
-  if (process.env.GROQ_API_KEY_2) providers.push(makeGroqProvider(process.env.GROQ_API_KEY_2, 'Groq-2'));
-  if (process.env.OPENROUTER_API_KEY_1) providers.push(makeOpenRouterProvider(process.env.OPENROUTER_API_KEY_1, 'OpenRouter-1'));
-  if (process.env.OPENROUTER_API_KEY_2) providers.push(makeOpenRouterProvider(process.env.OPENROUTER_API_KEY_2, 'OpenRouter-2'));
+
+  if (process.env.GROQ_API_KEY) providers.push(makeGroqProvider(process.env.GROQ_API_KEY, 'Groq-1', 'groq'));
+  if (process.env.GROQ_API_KEY_2) providers.push(makeGroqProvider(process.env.GROQ_API_KEY_2, 'Groq-2', 'groq2'));
+  if (process.env.OPENROUTER_API_KEY_1) providers.push(makeOpenRouterProvider(process.env.OPENROUTER_API_KEY_1, 'OpenRouter'));
   if (process.env.GEMINI_API_KEY) providers.push(makeGeminiProvider(process.env.GEMINI_API_KEY));
   if (process.env.MISTRAL_API_KEY) providers.push(makeMistralProvider(process.env.MISTRAL_API_KEY));
   if (process.env.COHERE_API_KEY) providers.push(makeCohereProvider(process.env.COHERE_API_KEY));
   if (process.env.TOGETHER_API_KEY) providers.push(makeTogetherProvider(process.env.TOGETHER_API_KEY));
-  if (process.env.CLOUDFLARE_AI_ACCOUNT_ID && process.env.CLOUDFLARE_AI_API_TOKEN)
-    providers.push(makeCloudflareProvider(process.env.CLOUDFLARE_AI_ACCOUNT_ID, process.env.CLOUDFLARE_AI_API_TOKEN));
+
+  // Cloudflare: CLOUDFLARE_AI_ACCOUNT_ID or OTHER_SECRET_1 as fallback account ID
+  const cfAccountId = process.env.CLOUDFLARE_AI_ACCOUNT_ID ?? process.env.OTHER_SECRET_1;
+  const cfToken = process.env.CLOUDFLARE_AI_API_TOKEN;
+  if (cfAccountId && cfToken) providers.push(makeCloudflareProvider(cfAccountId, cfToken));
+
   return providers;
 }
 
@@ -264,7 +330,6 @@ export async function getBestEnhancedPrompt(roughPrompt: string): Promise<string
     try {
       const result = (await provider.call(messages, systemPrompt)).trim();
       if (result.length > 10 && result.length < 500) {
-        // If it looks like an answer (very long or has double newlines), take just first para
         if (result.includes('\n\n')) return result.split('\n\n')[0].trim();
         return result;
       }
@@ -287,6 +352,7 @@ export async function getBestAnswer(
     return { content, provider: providers[0].name, reason: 'Only available provider' };
   }
 
+  // Query ALL providers in parallel
   const results = await Promise.allSettled(
     providers.map(p => p.call(messages, systemPrompt).then(c => ({ name: p.name, content: c })))
   );
@@ -295,12 +361,20 @@ export async function getBestAnswer(
     .filter((r): r is PromiseFulfilledResult<{ name: string; content: string }> => r.status === 'fulfilled' && r.value.content.length > 20)
     .map(r => r.value);
 
+  // Log failures for debugging
+  results.forEach((r, i) => {
+    if (r.status === 'rejected') {
+      console.warn(`[multi-ai] ${providers[i].name} failed: ${r.reason}`);
+    }
+  });
+
   if (successful.length === 0) throw new Error('All AI providers failed');
   if (successful.length === 1) {
     onProviderResult?.(successful[0].name, successful[0].content, true);
     return { content: successful[0].content, provider: successful[0].name, reason: 'Only responding provider' };
   }
 
+  // Notify UI of all successful providers
   successful.forEach(r => onProviderResult?.(r.name, r.content, false));
 
   const userQuestion = messages[messages.length - 1]?.content ?? '';
@@ -315,6 +389,7 @@ export async function getBestAnswer(
   let reason = 'First response selected';
 
   try {
+    // Use Groq as judge (fastest) — falls back to first available
     const judgeProvider = providers.find(p => p.name.startsWith('Groq')) ?? providers[0];
     const judgeRaw = await judgeProvider.call(judgeMessages, JUDGE_PROMPT);
     const jsonMatch = judgeRaw.match(/\{[\s\S]*?\}/);
@@ -325,7 +400,9 @@ export async function getBestAnswer(
         reason = parsed.reason ?? reason;
       }
     }
-  } catch {}
+  } catch (e) {
+    console.warn('[multi-ai] Judge failed, using first response:', e);
+  }
 
   const winner = successful[winnerIdx];
   onProviderResult?.(winner.name, winner.content, true);

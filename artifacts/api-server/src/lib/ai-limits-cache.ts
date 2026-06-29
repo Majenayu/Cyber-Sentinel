@@ -8,6 +8,12 @@ export interface ProviderSnapshot {
   limitTokensPerDay: number | null;
   remainingTokensPerDay: number | null;
   capturedAt: number | null;
+  /** Total calls made to this provider since server start */
+  callsTotal: number;
+  /** Timestamp of the last successful call */
+  lastCalledAt: number | null;
+  /** Last error message, if the most recent call failed */
+  lastError: string | null;
 }
 
 export interface ProviderInfo {
@@ -34,6 +40,9 @@ const EMPTY_SNAPSHOT = (): ProviderSnapshot => ({
   limitTokensPerDay: null,
   remainingTokensPerDay: null,
   capturedAt: null,
+  callsTotal: 0,
+  lastCalledAt: null,
+  lastError: null,
 });
 
 const snapshots: Record<string, ProviderSnapshot> = {};
@@ -48,6 +57,20 @@ function h(headers: Record<string, string | string[] | undefined>, key: string):
   if (!v) return null;
   const n = parseInt(Array.isArray(v) ? v[0] : v, 10);
   return isNaN(n) ? null : n;
+}
+
+/** Call this BEFORE each provider request to increment the counter */
+export function recordProviderCall(provider: string) {
+  const snap = getSnap(provider);
+  snap.callsTotal += 1;
+  snap.lastCalledAt = Date.now();
+  snap.lastError = null;
+}
+
+/** Call this when a provider request fails */
+export function recordProviderError(provider: string, error: string) {
+  const snap = getSnap(provider);
+  snap.lastError = error;
 }
 
 export function updateProviderHeaders(

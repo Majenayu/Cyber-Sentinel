@@ -47,7 +47,7 @@ const PROVIDERS = [
     key: 'cloudflare',
     label: 'Cloudflare AI',
     model: 'llama-3.3-70b-fp8-fast',
-    configured: () => !!(process.env.CLOUDFLARE_AI_ACCOUNT_ID && process.env.CLOUDFLARE_AI_API_TOKEN),
+    configured: () => !!((process.env.CLOUDFLARE_AI_ACCOUNT_ID ?? process.env.OTHER_SECRET_1) && process.env.CLOUDFLARE_AI_API_TOKEN),
   },
 ];
 

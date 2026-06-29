@@ -37,6 +37,9 @@ interface ProviderSnapshot {
   limitTokensPerDay: number | null;
   remainingTokensPerDay: number | null;
   capturedAt: number | null;
+  callsTotal: number;
+  lastCalledAt: number | null;
+  lastError: string | null;
 }
 
 interface StaticLimits {
@@ -165,6 +168,7 @@ function BytesBar({ used, total, label }: { used: number; total: number; label: 
 function ProviderCard({ provider }: { provider: ProviderData }) {
   const { label, model, configured, staticLimits, snapshot } = provider;
   const hasLive = snapshot.capturedAt !== null;
+  const hasBeenCalled = (snapshot.callsTotal ?? 0) > 0;
   const liveReqMin = snapshot.limitRequestsPerMinute !== null && snapshot.remainingRequestsPerMinute !== null;
   const liveTokMin = snapshot.limitTokensPerMinute !== null && snapshot.remainingTokensPerMinute !== null;
   const liveReqDay = snapshot.limitRequestsPerDay !== null && snapshot.remainingRequestsPerDay !== null;
@@ -173,23 +177,57 @@ function ProviderCard({ provider }: { provider: ProviderData }) {
   return (
     <div className={`rounded-lg border p-3 space-y-3 ${configured ? 'border-border bg-black/20' : 'border-border/30 bg-black/10 opacity-50'}`}>
       <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-bold text-foreground">{label}</span>
             <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${configured ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'}`}>
               {configured ? 'CONFIGURED' : 'NO KEY'}
             </span>
+            {hasBeenCalled && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-green-400/20 text-green-400 flex items-center gap-1">
+                ● ACTIVE
+              </span>
+            )}
             {hasLive && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-green-400/20 text-green-400">LIVE</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-cyan-400/20 text-cyan-400">LIVE HEADERS</span>
             )}
           </div>
           <p className="text-[10px] text-muted-foreground/60 mt-0.5 font-mono">{model}</p>
         </div>
+
+        {/* Call counter badge */}
+        {configured && hasBeenCalled && (
+          <div className="text-right shrink-0 ml-2">
+            <div className="text-lg font-bold text-primary font-mono leading-none">{snapshot.callsTotal}</div>
+            <div className="text-[9px] text-muted-foreground/60">calls</div>
+          </div>
+        )}
       </div>
 
       {configured && (
         <div className="space-y-3">
-          {/* Live data — shown when captured from response headers */}
+          {/* Call activity row */}
+          {hasBeenCalled && (
+            <div className="flex items-center justify-between bg-primary/5 border border-primary/15 rounded px-2 py-1.5">
+              <span className="text-[10px] text-primary/80 font-mono">
+                ✓ Queried {snapshot.callsTotal} time{snapshot.callsTotal !== 1 ? 's' : ''} this session
+              </span>
+              {snapshot.lastCalledAt && (
+                <span className="text-[9px] text-muted-foreground/50">
+                  last: {new Date(snapshot.lastCalledAt).toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Error banner */}
+          {snapshot.lastError && (
+            <div className="flex items-center gap-1.5 bg-red-400/5 border border-red-400/20 rounded px-2 py-1.5">
+              <span className="text-[9px] text-red-400 font-mono truncate">⚠ {snapshot.lastError}</span>
+            </div>
+          )}
+
+          {/* Live header data — shown when captured from response headers */}
           {liveReqMin && (
             <ProgressBar
               value={snapshot.remainingRequestsPerMinute!}
@@ -219,51 +257,37 @@ function ProviderCard({ provider }: { provider: ProviderData }) {
             />
           )}
 
-          {/* Static known limits — shown when no live data yet */}
-          {!hasLive && (
-            <div className="space-y-3">
-              {staticLimits.requestsPerMinute && (
-                <StaticLimitBar total={staticLimits.requestsPerMinute} label="Req / min (free tier)" />
-              )}
-              {staticLimits.tokensPerMinute && (
-                <StaticLimitBar total={staticLimits.tokensPerMinute} label="Tokens / min (free tier)" />
-              )}
-              {staticLimits.requestsPerDay && (
-                <StaticLimitBar total={staticLimits.requestsPerDay} label="Req / day (free tier)" />
-              )}
-              {staticLimits.tokensPerDay && (
-                <StaticLimitBar total={staticLimits.tokensPerDay} label="Tokens / day (free tier)" />
-              )}
-              {(staticLimits as any).requestsPerMonth && (
-                <StaticLimitBar total={(staticLimits as any).requestsPerMonth} label="Req / month (free tier)" />
-              )}
-              {(staticLimits as any).tokensPerMonth && (
-                <StaticLimitBar total={(staticLimits as any).tokensPerMonth} label="Tokens / month (free tier)" />
-              )}
-              <p className="text-[10px] text-muted-foreground/40 italic">
-                Send a message in AI Ops to capture live usage data.
-              </p>
-            </div>
-          )}
+          {/* Static known limits */}
+          <div className="space-y-2">
+            {staticLimits.requestsPerMinute && (
+              <StaticLimitBar total={staticLimits.requestsPerMinute} label="Req / min (free tier)" />
+            )}
+            {staticLimits.tokensPerMinute && (
+              <StaticLimitBar total={staticLimits.tokensPerMinute} label="Tokens / min (free tier)" />
+            )}
+            {staticLimits.requestsPerDay && (
+              <StaticLimitBar total={staticLimits.requestsPerDay} label="Req / day (free tier)" />
+            )}
+            {staticLimits.tokensPerDay && (
+              <StaticLimitBar total={staticLimits.tokensPerDay} label="Tokens / day (free tier)" />
+            )}
+            {(staticLimits as any).requestsPerMonth && (
+              <StaticLimitBar total={(staticLimits as any).requestsPerMonth} label="Req / month (free tier)" />
+            )}
+            {(staticLimits as any).tokensPerMonth && (
+              <StaticLimitBar total={(staticLimits as any).tokensPerMonth} label="Tokens / month (free tier)" />
+            )}
+          </div>
 
-          {/* When live data exists, also show static limits dimly as reference */}
-          {hasLive && !liveReqMin && !liveTokMin && !liveReqDay && (
-            <div className="space-y-2">
-              {staticLimits.requestsPerMinute && (
-                <StaticLimitBar total={staticLimits.requestsPerMinute} label="Req / min (free tier)" />
-              )}
-              {staticLimits.tokensPerMinute && (
-                <StaticLimitBar total={staticLimits.tokensPerMinute} label="Tokens / min (free tier)" />
-              )}
-              {staticLimits.requestsPerDay && (
-                <StaticLimitBar total={staticLimits.requestsPerDay} label="Req / day (free tier)" />
-              )}
-            </div>
+          {!hasBeenCalled && !hasLive && (
+            <p className="text-[10px] text-muted-foreground/40 italic">
+              Not yet queried. Send a Best-AI message in AI Ops to activate.
+            </p>
           )}
 
           {hasLive && (
             <p className="text-[10px] text-muted-foreground/40">
-              Last captured: {new Date(snapshot.capturedAt!).toLocaleTimeString()}
+              Headers captured: {new Date(snapshot.capturedAt!).toLocaleTimeString()}
             </p>
           )}
 
