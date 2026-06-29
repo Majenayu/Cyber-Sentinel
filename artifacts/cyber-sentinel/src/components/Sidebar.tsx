@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
-import { Database, Wrench, FileCode, Bot, Settings, Activity } from 'lucide-react';
+import { Database, Wrench, FileCode, Bot, Settings, Activity, ShieldAlert } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -41,6 +41,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
     { href: '/vault', label: 'Knowledge Base', icon: Database },
     { href: '/tools', label: 'Tool Reference', icon: Wrench },
     { href: '/commands', label: 'Saved Commands', icon: FileCode },
+    { href: '/intrusions', label: 'Intrusion Log', icon: ShieldAlert },
   ];
 
   return (

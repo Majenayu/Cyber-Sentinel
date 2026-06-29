@@ -124,17 +124,39 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
     }
   }, [phase, authVisible]);
 
+  const logIntrusion = useCallback((attemptedId: string) => {
+    try {
+      fetch('/api/auth/intrusion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attemptedId,
+          platform: navigator.platform,
+          language: navigator.language,
+          screenResolution: `${screen.width}x${screen.height}`,
+          colorDepth: screen.colorDepth,
+          cores: navigator.hardwareConcurrency || 0,
+          memory: (navigator as any).deviceMemory || 0,
+          cookieEnabled: navigator.cookieEnabled,
+          doNotTrack: navigator.doNotTrack || 'Unspecified',
+          plugins: Array.from(navigator.plugins || []).slice(0, 10).map((p: any) => p.name),
+        }),
+      }).catch(() => {});
+    } catch { /* silent */ }
+  }, []);
+
   const handleSubmit = useCallback(() => {
     if (username === 'Majen') {
       setFading(true);
       setTimeout(onDone, 600);
     } else {
+      logIntrusion(username);
       setError('ACCESS DENIED // INVALID OPERATOR ID');
       setShake(true);
       setUsername('');
       setTimeout(() => { setShake(false); setError(''); }, 1300);
     }
-  }, [username, onDone]);
+  }, [username, onDone, logIntrusion]);
 
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') handleSubmit();
@@ -157,9 +179,11 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
           opacity: 1,
         }}
       />
-      {/* Center dark spot — makes UI text readable over the bright map */}
+      {/* Subtle center shadow only during auth to keep map visible */}
       <div className="absolute inset-0" style={{
-        background: 'radial-gradient(ellipse 65% 60% at 50% 52%, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.1) 70%, rgba(0,0,0,0) 100%)'
+        background: phase === 'auth'
+          ? 'radial-gradient(ellipse 70% 65% at 50% 52%, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.05) 80%, rgba(0,0,0,0) 100%)'
+          : 'radial-gradient(ellipse 65% 60% at 50% 52%, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.1) 70%, rgba(0,0,0,0) 100%)'
       }} />
 
       {/* Horizontal sweep scan line */}
@@ -312,9 +336,10 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
             <div
               className="relative p-6 space-y-5"
               style={{
-                border: `1px solid rgba(${rgb},0.55)`,
-                background: `rgba(0,0,0,0.7)`,
-                boxShadow: `0 0 40px rgba(${rgb},0.2), inset 0 0 40px rgba(${rgb},0.04)`,
+                border: `1px solid rgba(${rgb},0.7)`,
+                background: `rgba(0,0,0,0.45)`,
+                backdropFilter: 'blur(2px)',
+                boxShadow: `0 0 50px rgba(${rgb},0.25), inset 0 0 40px rgba(${rgb},0.06)`,
               }}
             >
               {/* Corner accents */}

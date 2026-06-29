@@ -10,6 +10,7 @@ import VaultPage from "@/pages/Vault";
 import ToolsPage from "@/pages/Tools";
 import CommandsPage from "@/pages/Commands";
 import SettingsPage from "@/pages/Settings";
+import IntrusionsPage from "@/pages/Intrusions";
 import Sidebar from "@/components/Sidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Menu } from "lucide-react";
@@ -63,6 +64,7 @@ function Layout() {
             <Route path="/tools" component={() => <ErrorBoundary fallbackTitle="Tool Reference failed to load"><ToolsPage /></ErrorBoundary>} />
             <Route path="/commands" component={() => <ErrorBoundary fallbackTitle="Commands failed to load"><CommandsPage /></ErrorBoundary>} />
             <Route path="/settings" component={() => <ErrorBoundary fallbackTitle="Settings failed to load"><SettingsPage /></ErrorBoundary>} />
+            <Route path="/intrusions" component={() => <ErrorBoundary fallbackTitle="Intrusion Log failed to load"><IntrusionsPage /></ErrorBoundary>} />
             <Route component={NotFound} />
           </Switch>
         </div>

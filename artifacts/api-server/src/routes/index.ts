@@ -8,6 +8,7 @@ import chatRouter from "./chat";
 import analyzeRouter from "./analyze";
 import usageRouter from "./usage";
 import scrapeRouter from "./scrape";
+import intrusionRouter from "./intrusion";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(chatRouter);
 router.use(analyzeRouter);
 router.use(usageRouter);
 router.use(scrapeRouter);
+router.use(intrusionRouter);
 
 export default router;
