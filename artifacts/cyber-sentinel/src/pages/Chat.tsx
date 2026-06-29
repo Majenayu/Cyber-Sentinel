@@ -34,6 +34,7 @@ interface Message {
   reason?: string;
   toolCards?: ToolCard[];
   attachments?: { name: string; summary: string }[];
+  judgeFallback?: boolean;
 }
 
 interface Session { id: string; title: string; createdAt: string; updatedAt: string; }
@@ -379,14 +380,62 @@ export default function ChatPage() {
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         setMessages(prev => prev.map(m =>
-          m.id === streamingId ? { ...m, content: 'System Error: Best-AI failed. Retrying with stream mode...', streaming: false } : m
+          m.id === streamingId ? { ...m, content: '', streaming: true, judgeFallback: true } : m
         ));
-        setTimeout(() => sendStream(text), 500);
+        setTimeout(() => sendStreamWithId(text, streamingId), 300);
         return;
       }
     } finally {
       setIsLoading(false);
       setProcessingProviders([]);
+      abortRef.current = null;
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  };
+
+  // sendStreamWithId reuses an existing message bubble (used when best-AI falls back)
+  const sendStreamWithId = async (text: string, existingId: string) => {
+    const abort = new AbortController();
+    abortRef.current = abort;
+    try {
+      const response = await fetch(`/api/chat/sessions/${currentSessionId}/messages/stream`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: text }), signal: abort.signal,
+      });
+      if (!response.ok || !response.body) throw new Error('Stream failed');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6);
+          if (payload === '[DONE]') continue;
+          try {
+            const parsed = JSON.parse(payload);
+            if (parsed.text) {
+              setMessages(prev => prev.map(m => m.id === existingId ? { ...m, content: m.content + parsed.text, streaming: true } : m));
+              scrollToBottom();
+            } else if (parsed.error) {
+              setMessages(prev => prev.map(m =>
+                m.id === existingId ? { ...m, content: `⚠ ${parsed.error}`, streaming: false, isError: true } : m
+              ));
+            }
+          } catch {}
+        }
+      }
+      setMessages(prev => prev.map(m => m.id === existingId ? { ...m, streaming: false } : m));
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        setMessages(prev => prev.map(m => m.id === existingId ? { ...m, content: 'System Error: Connection lost. Retry.', streaming: false, isError: true } : m));
+      }
+    } finally {
+      setIsLoading(false);
       abortRef.current = null;
       setTimeout(() => inputRef.current?.focus(), 50);
     }
@@ -656,6 +705,11 @@ export default function ChatPage() {
                     <span className="text-[10px] text-muted-foreground/40 uppercase">
                       {m.role === 'user' ? 'Operator' : 'Sentinel'}{m.streaming && ' • processing…'}
                     </span>
+                    {m.judgeFallback && !m.streaming && (
+                      <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border border-orange-400/30 bg-orange-400/5 text-orange-400/70" title="Best-AI judge failed; answered by fastest single provider">
+                        ⚡ stream fallback
+                      </span>
+                    )}
                     {m.provider && !m.streaming && <ProviderBadge provider={m.provider} reason={m.reason} />}
                     {m.role === 'assistant' && !m.streaming && m.content && (
                       <button onClick={() => openSaveModal(m.content)} className="opacity-0 group-hover/msg:opacity-100 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary border border-transparent hover:border-primary/30 rounded px-1.5 py-0.5 transition-all">

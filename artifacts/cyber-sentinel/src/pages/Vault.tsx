@@ -4,6 +4,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useSearch } from 'wouter';
 
 function cn(...inputs: (string | boolean | undefined | null)[]) {
   return twMerge(clsx(inputs));
@@ -244,6 +245,7 @@ function UrlIngestRow({ onScraped }: { onScraped: (data: { title: string; conten
 }
 
 export default function VaultPage() {
+  const search = useSearch();
   const [entries, setEntries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -253,11 +255,17 @@ export default function VaultPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState({ title: '', content: '', tags: '', sources: [''] });
   const [showList, setShowList] = useState(true);
-  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [activeTag, setActiveTag] = useState<string | null>(() => new URLSearchParams(search).get('tag'));
   const [showAnalyze, setShowAnalyze] = useState(false);
   const [isSimplifying, setIsSimplifying] = useState(false);
   const [simplifyingForm, setSimplifyingForm] = useState(false);
   const [viewMode, setViewMode] = useState<'original' | 'simplified'>('original');
+
+  // Sync activeTag when URL search param changes (e.g. navigating from Dashboard)
+  useEffect(() => {
+    const tag = new URLSearchParams(search).get('tag');
+    if (tag) setActiveTag(tag);
+  }, [search]);
 
   const fetchEntries = async (q?: string) => {
     const url = q ? `/api/knowledge?q=${encodeURIComponent(q)}` : '/api/knowledge';

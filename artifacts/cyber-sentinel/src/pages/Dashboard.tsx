@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Terminal, Database, Wrench, Bot, Activity, ShieldCheck, CheckCircle, XCircle, Loader2 } from 'lucide-react';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { useGetStats } from '@workspace/api-client-react';
 
 interface ProviderSnapshot {
@@ -19,10 +19,11 @@ interface HealthStatus {
 }
 
 export default function Dashboard() {
-  const { data: stats, isLoading } = useGetStats();
+  const { data: stats, isLoading } = useGetStats({ query: { refetchInterval: 30_000 } });
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [providers, setProviders] = useState<ProviderSnapshot[]>([]);
   const [healthLoading, setHealthLoading] = useState(true);
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     Promise.all([
@@ -81,9 +82,13 @@ export default function Dashboard() {
               {stats?.recentTags && stats.recentTags.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {stats.recentTags.map((tag: string) => (
-                    <span key={tag} className="px-2 py-1 bg-secondary text-secondary-foreground text-xs font-mono rounded border border-primary/20">
+                    <button
+                      key={tag}
+                      onClick={() => navigate(`/vault?tag=${encodeURIComponent(tag)}`)}
+                      className="px-2 py-1 bg-secondary text-secondary-foreground text-xs font-mono rounded border border-primary/20 hover:border-primary/60 hover:bg-primary/10 hover:text-primary transition-all cursor-pointer"
+                    >
                       #{tag}
-                    </span>
+                    </button>
                   ))}
                 </div>
               ) : (

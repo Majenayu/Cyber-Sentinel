@@ -84,6 +84,9 @@ export default function CommandsPage() {
     navigator.clipboard.writeText(target ? substituteTarget(text, target) : text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+    // Track usage (fire-and-forget)
+    fetch(`/api/commands/${id}/use`, { method: 'POST' }).catch(() => {});
+    setCommands(prev => prev.map(c => c.id === id ? { ...c, useCount: (c.useCount ?? 0) + 1, lastUsed: new Date().toISOString() } : c));
   };
 
   const printCheatsheet = () => {
@@ -218,7 +221,12 @@ export default function CommandsPage() {
                       {hasTarget && target && <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 border border-primary/30 rounded text-primary shrink-0">→ {target}</span>}
                       {hasTarget && !target && <span className="text-[10px] text-muted-foreground/40 flex items-center gap-0.5"><Target size={8} /> needs target</span>}
                     </div>
-                    <div className="flex gap-1 shrink-0">
+                    <div className="flex items-center gap-1 shrink-0">
+                      {cmd.useCount > 0 && (
+                        <span className="text-[9px] text-muted-foreground/40 font-mono" title={`Last used: ${cmd.lastUsed ? new Date(cmd.lastUsed).toLocaleDateString() : 'unknown'}`}>
+                          ×{cmd.useCount}
+                        </span>
+                      )}
                       <button onClick={() => handleCopy(cmd.id, displayCommand)} className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors" title="Copy command">
                         {copiedId === cmd.id ? <Check size={13} className="text-primary" /> : <Copy size={13} />}
                       </button>

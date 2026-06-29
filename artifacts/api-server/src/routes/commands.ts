@@ -15,6 +15,8 @@ router.get('/commands', async (req, res) => {
       description: c.description ?? null,
       category: c.category,
       createdAt: c.createdAt,
+      useCount: (c as any).useCount ?? 0,
+      lastUsed: (c as any).lastUsed ?? null,
     })));
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -52,6 +54,21 @@ router.patch('/commands/:id', async (req, res) => {
       category: cmd.category,
       createdAt: cmd.createdAt,
     });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/commands/:id/use', async (req, res) => {
+  try {
+    await connectToDatabase();
+    const cmd = await Command.findByIdAndUpdate(
+      req.params.id,
+      { $inc: { useCount: 1 }, $set: { lastUsed: new Date() } },
+      { new: true }
+    );
+    if (!cmd) { res.status(404).json({ error: 'Not found' }); return; }
+    res.json({ useCount: (cmd as any).useCount, lastUsed: (cmd as any).lastUsed });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

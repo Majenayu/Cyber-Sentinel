@@ -81,6 +81,10 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8080",
         changeOrigin: true,
+        // Forward API secret so the backend gate works when CYBERSENTINEL_API_SECRET is set
+        headers: process.env.CYBERSENTINEL_API_SECRET
+          ? { "x-api-key": process.env.CYBERSENTINEL_API_SECRET }
+          : {},
       },
     },
   },

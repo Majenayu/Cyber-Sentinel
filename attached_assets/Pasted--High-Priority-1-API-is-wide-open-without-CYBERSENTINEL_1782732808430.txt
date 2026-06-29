@@ -1,0 +1,25 @@
+🔴 High Priority
+1. API is wide open without CYBERSENTINEL_API_SECRET The backend only enforces a shared-secret gate if that env var is set. Since it isn't, every /api/* endpoint is publicly accessible. Set a strong secret:
+
+CYBERSENTINEL_API_SECRET=<random-string>
+
+2. Knowledge Vault is nearly empty (1 entry) The Tool Reference and Commands are seeded, but the Knowledge Base only has 1 entry. The POST /api/scrape/url endpoint exists — use it to bulk-ingest write-ups, HackTheBox walkthroughs, or documentation URLs to make AI Ops answers actually useful.
+
+🟡 Medium Priority
+3. "Best Answer" mode fallback is fragile When the judge LLM fails to pick a winner in /messages/best, it silently falls back to whichever provider responds first (usually fastest, not best). Add an explicit fallback label in the UI so you know when a judge failure happened.
+
+4. Dashboard stats are stale on load The 4 stat cards (Knowledge: 1, Tools: 9, Commands: 16, Sessions: 5) are fetched once and never refresh. Add refetchInterval: 30_000 to the TanStack Query call so they stay live.
+
+5. No POST route for Tools You can read and delete tools but can't add new ones from the UI — the API has no POST /api/tools. Creating tools requires direct DB access. Adding a simple "Add Tool" form would close this gap.
+
+6. Tag-based filtering is missing from the UI Tags exist on Knowledge entries (shown on the dashboard) but clicking #http or #curl does nothing. Wiring those tag chips to filter the Knowledge Vault list would make navigation much faster.
+
+🟢 Nice to Have
+7. Prompt Enhancement is hidden POST /api/chat/enhance-prompt rewrites casual questions into professional pentesting prompts — a killer feature — but there's no visible button for it in the chat UI. Surface it as a wand icon next to the input box.
+
+8. Command useCount / lastUsed tracking The Commands collection has no usage tracking. Adding a PATCH /api/commands/:id/use call on copy-to-clipboard would let you sort by "most used" or "recently used."
+
+9. Tool detail page is read-only GET /api/tools/:slug exists and returns full data including cheatsheets, but there's no UI page to view a single tool's full cheatsheet. A detail drawer or page per tool would be valuable.
+
+10. Mobile app parity The Expo mobile app likely doesn't have the AI Ops streaming chat or Knowledge Vault scraping UI. Those are the two highest-value features to port.
+
