@@ -10,7 +10,9 @@ Artifact workflows (`artifacts/xxx: yyy`) inherit env vars from `[userenv.develo
 `.replit` defines `Start application` (PORT=25629) and `API Server` (API_PORT=8080). Artifact workflows `artifacts/cyber-sentinel: web` and `artifacts/api-server: API Server` use the same ports from env, causing conflicts when both sets run simultaneously.
 
 ## The Fix Applied
-- `artifacts/api-server/src/index.ts`: Changed port fallback from `API_PORT ?? PORT ?? "8080"` to `API_PORT ?? "8080"` — never use the frontend PORT as API port fallback.
+- `artifacts/api-server/src/index.ts`: uses `API_PORT ?? "8080"` — never use the frontend PORT as API port fallback.
+- `[userenv.development] PORT` must be `"5000"` — Replit's preview proxy reads this to know which port to forward to the webview iframe. If it's set to anything else (e.g. 25629), the preview panel goes blank even though the server is healthy.
+- The web workflow command must NOT hardcode `PORT=5000` — it should inherit PORT from the environment so `.replit` and the command stay in sync.
 - When artifact workflows fail due to port conflict, remove the `.replit`-defined duplicate workflows (`Start application`, `API Server`) via `removeWorkflow()` to free ports, then restart the artifact workflows.
 
 ## API Secret — Dev vs Production

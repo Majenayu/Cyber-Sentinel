@@ -45,7 +45,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd artifacts/cyber-sentinel && PORT=5000 pnpm run dev"
+args = "cd artifacts/cyber-sentinel && pnpm run dev"
 waitForPort = 5000
 
 [agent]
@@ -67,5 +67,5 @@ CLOUDFLARE_AI_ACCOUNT_ID = "a036e69c21e628f9926b890a16d1302c"
 NODE_ENV = "development"
 
 [userenv.development]
-PORT = "25629"
+PORT = "5000"
 BASE_PATH = "/"

@@ -32,10 +32,12 @@ The following secrets must be set in the Replit Secrets panel before the app wil
 
 ```javascript
 // Run via CodeExecution
-await setEnvVars({ environment: "development", values: { BASE_PATH: "/" } });
+await setEnvVars({ environment: "development", values: { BASE_PATH: "/", PORT: "5000" } });
 ```
 
-`PORT` is already managed by Replit for each artifact workflow. `BASE_PATH` is required by `vite.config.ts` or Vite will throw on startup.
+- `PORT=5000` is **required** — Replit's preview proxy reads `[userenv.development] PORT` to know which port to forward to the iframe. The webview workflow must use port 5000, and this env var must match.
+- `BASE_PATH` is required by `vite.config.ts` or Vite will throw on startup.
+- The API server uses `API_PORT` (not `PORT`) to avoid conflict with the frontend's port slot.
 
 ---
 
