@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import Groq from 'groq-sdk';
 import connectToDatabase from '../lib/mongodb';
 import Knowledge from '../lib/models/Knowledge';
 import Tool from '../lib/models/Tool';
@@ -67,6 +68,56 @@ async function analyzeEntry(entry: { id: string; title: string; content: string 
   }
   return parsed;
 }
+
+/** POST /api/analyze/image — Groq vision analysis of an attached screenshot */
+router.post('/analyze/image', async (req, res) => {
+  try {
+    const { base64, mimeType } = req.body;
+    if (!base64 || !mimeType) return res.status(400).json({ error: 'base64 and mimeType required' });
+
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) return res.status(500).json({ error: 'GROQ_API_KEY not set' });
+
+    // Use native fetch so we control the exact JSON shape — the TS SDK doesn't type vision content yet
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.2-11b-vision-preview',
+        max_tokens: 700,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: { url: `data:${mimeType};base64,${base64}` },
+              },
+              {
+                type: 'text',
+                text: 'You are a cybersecurity expert analyzing this screenshot for a penetration tester. Extract all security-relevant information concisely and technically:\n- IP addresses, hostnames, ports, services\n- Error messages or stack traces revealing system info\n- Credentials, tokens, or sensitive data\n- Software versions or fingerprints\n- Network topology or config snippets\n- CTF flags or hints\nIf nothing security-relevant, briefly describe what is shown.',
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!groqRes.ok) {
+      const errText = await groqRes.text().catch(() => '');
+      return res.status(502).json({ error: `Groq vision error ${groqRes.status}: ${errText.slice(0, 200)}` });
+    }
+
+    const data = await groqRes.json();
+    const analysis = data.choices?.[0]?.message?.content ?? 'Could not analyze image.';
+    res.json({ analysis });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 router.post('/analyze/knowledge', async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');

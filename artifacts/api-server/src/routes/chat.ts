@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import Groq from 'groq-sdk';
 import connectToDatabase from '../lib/mongodb';
 import Session from '../lib/models/Session';
 import { getChatResponse, streamChatResponse, enhancePrompt } from '../lib/groq';
@@ -214,50 +213,6 @@ router.post('/chat/enhance-prompt', async (req, res) => {
   }
 });
 
-/** Image analysis — uses Groq vision model to analyze screenshots/images from a security perspective */
-router.post('/analyze/image', async (req, res) => {
-  try {
-    const { base64, mimeType, filename } = req.body;
-    if (!base64 || !mimeType) return res.status(400).json({ error: 'base64 and mimeType required' });
-
-    const apiKey = process.env.GROQ_API_KEY ?? process.env.GROQ_API_KEY_2;
-    if (!apiKey) return res.status(500).json({ error: 'No Groq API key configured' });
-
-    const groq = new Groq({ apiKey });
-    const completion = await groq.chat.completions.create({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      max_tokens: 600,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: { url: `data:${mimeType};base64,${base64}` },
-            },
-            {
-              type: 'text',
-              text: `You are a cybersecurity expert analyzing a screenshot or image for a penetration tester. Analyze this image and extract all security-relevant information. Focus on:
-- Any IP addresses, hostnames, ports, or services visible
-- Error messages, stack traces, or debug info that reveals system info
-- Network diagrams or topology
-- Credentials, tokens, or sensitive data visible
-- Configuration files or code snippets
-- Version numbers or software fingerprints
-- Any flags or hints if this is a CTF screenshot
-Be concise, bullet-pointed, and technical. If no security-relevant info, describe what the image shows briefly.`,
-            },
-          ],
-        },
-      ],
-    } as any);
-
-    const analysis = completion.choices[0]?.message?.content ?? 'Could not analyze image.';
-    res.json({ analysis });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
 
 /** Multi-AI best-answer endpoint */
 router.post('/chat/sessions/:id/messages/best', async (req, res) => {
