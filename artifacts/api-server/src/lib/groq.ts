@@ -1,6 +1,7 @@
 import Groq from 'groq-sdk';
 import connectToDatabase from './mongodb';
 import Knowledge from './models/Knowledge';
+import { updateFromHeaders } from './groq-ratelimit-cache';
 
 const SYSTEM_PROMPT = `You are CYBER SENTINEL — a red team AI assistant running in a private, single-user pentesting operations hub. You think and respond like an experienced offensive security professional (red teamer / penetration tester). Your user is a pentester working on CTF challenges, HackTheBox, TryHackMe, and authorized engagements.
 
@@ -85,12 +86,13 @@ export async function getChatResponse(userMessage: string, history: any[] = []) 
   try {
     const groq = getGroqClient();
     const messages = await buildMessages(userMessage, history);
-    const completion = await groq.chat.completions.create({
+    const { data: completion, response } = await groq.chat.completions.create({
       messages: messages as any,
       model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
       max_tokens: 2048,
-    });
+    }).withResponse();
+    updateFromHeaders(Object.fromEntries(response.headers.entries()));
     return completion.choices[0]?.message?.content ?? 'No response generated.';
   } catch (err: any) {
     return `Error: ${err.message}`;
@@ -132,13 +134,15 @@ export async function streamChatResponse(
   const groq = getGroqClient();
   const messages = await buildMessages(userMessage, history);
 
-  const stream = await groq.chat.completions.create({
+  const { data: stream, response } = await groq.chat.completions.create({
     messages: messages as any,
     model: 'llama-3.3-70b-versatile',
     temperature: 0.7,
     max_tokens: 2048,
     stream: true,
-  });
+  }).withResponse();
+
+  updateFromHeaders(Object.fromEntries(response.headers.entries()));
 
   let full = '';
   for await (const chunk of stream) {

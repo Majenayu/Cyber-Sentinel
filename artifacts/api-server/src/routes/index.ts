@@ -6,6 +6,7 @@ import commandsRouter from "./commands";
 import toolsRouter from "./tools";
 import chatRouter from "./chat";
 import analyzeRouter from "./analyze";
+import usageRouter from "./usage";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(commandsRouter);
 router.use(toolsRouter);
 router.use(chatRouter);
 router.use(analyzeRouter);
+router.use(usageRouter);
 
 export default router;

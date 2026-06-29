@@ -1,10 +1,99 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Database, Bot, Shield, Terminal, Trash2, Info, Keyboard, Activity, CheckCircle, XCircle, Loader2, Layers } from 'lucide-react';
+import { Settings, Database, Bot, Shield, Terminal, Trash2, Info, Keyboard, Activity, CheckCircle, XCircle, Loader2, Layers, Gauge, RefreshCw } from 'lucide-react';
 
 interface HealthStatus {
   database: string;
   ai: string;
   encryption: string;
+}
+
+interface MongoStats {
+  dataSize: number;
+  storageSize: number;
+  indexSize: number;
+  objects: number;
+  collections: number;
+  fsTotalSize: number | null;
+  fsUsedSize: number | null;
+}
+
+interface GroqSnapshot {
+  limitRequestsPerMinute: number | null;
+  remainingRequestsPerMinute: number | null;
+  limitTokensPerMinute: number | null;
+  remainingTokensPerMinute: number | null;
+  limitRequestsPerDay: number | null;
+  remainingRequestsPerDay: number | null;
+  capturedAt: number | null;
+}
+
+interface UsageData {
+  mongo: MongoStats | null;
+  groq: GroqSnapshot;
+  mongoError?: string;
+}
+
+function formatBytes(bytes: number) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+}
+
+function ProgressBar({ value, max, color = 'primary', label }: { value: number; max: number; color?: string; label?: string }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  const used = max - value;
+  const usedPct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
+
+  const barColor =
+    usedPct > 85 ? 'bg-red-400' :
+    usedPct > 60 ? 'bg-yellow-400' :
+    'bg-primary';
+
+  return (
+    <div className="space-y-1">
+      {label && (
+        <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+          <span>{label}</span>
+          <span className={usedPct > 85 ? 'text-red-400 font-bold' : 'text-foreground'}>
+            {used.toLocaleString()} used / {max.toLocaleString()} limit
+          </span>
+        </div>
+      )}
+      <div className="h-2 w-full bg-black/40 border border-border/50 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${usedPct}%` }}
+        />
+      </div>
+      <div className="flex justify-between text-[10px]">
+        <span className="text-muted-foreground/60">{value.toLocaleString()} remaining</span>
+        <span className={usedPct > 85 ? 'text-red-400 font-bold' : 'text-primary font-mono'}>{usedPct}% used</span>
+      </div>
+    </div>
+  );
+}
+
+function BytesBar({ used, total, label }: { used: number; total: number; label: string }) {
+  const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+  const barColor = pct > 85 ? 'bg-red-400' : pct > 60 ? 'bg-yellow-400' : 'bg-primary';
+
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between items-center text-[10px] text-muted-foreground">
+        <span>{label}</span>
+        <span className="text-foreground">{formatBytes(used)} / {formatBytes(total)}</span>
+      </div>
+      <div className="h-2 w-full bg-black/40 border border-border/50 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
+      </div>
+      <div className="flex justify-between text-[10px]">
+        <span className="text-muted-foreground/60">{formatBytes(total - used)} free</span>
+        <span className={pct > 85 ? 'text-red-400 font-bold' : 'text-primary font-mono'}>{pct}% used</span>
+      </div>
+    </div>
+  );
 }
 
 export default function SettingsPage() {
@@ -14,6 +103,16 @@ export default function SettingsPage() {
   const [cleared, setCleared] = useState(false);
   const [deduping, setDeduping] = useState(false);
   const [dedupResult, setDedupResult] = useState<{ toolsRemoved: number; commandsRemoved: number } | null>(null);
+  const [usage, setUsage] = useState<UsageData | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
+
+  const fetchUsage = () => {
+    setUsageLoading(true);
+    fetch('/api/health/usage')
+      .then(r => r.json())
+      .then(d => { setUsage(d); setUsageLoading(false); })
+      .catch(() => setUsageLoading(false));
+  };
 
   const runDeduplicate = async () => {
     setDeduping(true);
@@ -32,6 +131,7 @@ export default function SettingsPage() {
       .then(r => r.json())
       .then(d => { setHealth(d); setHealthLoading(false); })
       .catch(() => setHealthLoading(false));
+    fetchUsage();
   }, []);
 
   const clearSessions = async () => {
@@ -57,6 +157,10 @@ export default function SettingsPage() {
       </span>
     );
   };
+
+  const groq = usage?.groq;
+  const hasGroqData = groq?.capturedAt !== null && groq?.limitRequestsPerMinute !== null;
+  const mongo = usage?.mongo;
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8 font-mono">
@@ -85,6 +189,111 @@ export default function SettingsPage() {
                 <StatusDot value={val} />
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* Usage & Limits */}
+        <section className="bg-card/50 border border-border rounded-lg overflow-hidden">
+          <div className="p-3 md:p-4 border-b border-border bg-black/20 font-bold flex items-center justify-between text-xs">
+            <span className="flex items-center gap-2"><Gauge size={14} className="text-primary" /> USAGE &amp; LIMITS</span>
+            <button
+              onClick={fetchUsage}
+              disabled={usageLoading}
+              className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
+              title="Refresh"
+            >
+              <RefreshCw size={12} className={usageLoading ? 'animate-spin' : ''} />
+              <span className="text-[10px]">refresh</span>
+            </button>
+          </div>
+
+          <div className="p-4 space-y-5">
+            {/* MongoDB Storage */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                <Database size={12} className="text-primary" /> MongoDB Storage
+              </div>
+              {usageLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 size={11} className="animate-spin" /> Loading storage stats…
+                </div>
+              ) : usage?.mongoError ? (
+                <p className="text-xs text-red-400">{usage.mongoError}</p>
+              ) : mongo ? (
+                <div className="space-y-3">
+                  {mongo.fsTotalSize && mongo.fsUsedSize ? (
+                    <BytesBar used={mongo.fsUsedSize} total={mongo.fsTotalSize} label="Filesystem storage" />
+                  ) : null}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>Data size</span><span className="text-foreground">{formatBytes(mongo.dataSize)}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>Storage size (on disk)</span><span className="text-foreground">{formatBytes(mongo.storageSize)}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>Index size</span><span className="text-foreground">{formatBytes(mongo.indexSize)}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground border-t border-border/40 pt-1 mt-1">
+                      <span>Documents</span><span className="text-foreground font-bold">{mongo.objects.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>Collections</span><span className="text-foreground">{mongo.collections}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">No storage data available.</p>
+              )}
+            </div>
+
+            <div className="border-t border-border/40" />
+
+            {/* Groq Rate Limits */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                <Bot size={12} className="text-primary" /> Groq API Rate Limits
+              </div>
+              {usageLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 size={11} className="animate-spin" /> Loading rate limit data…
+                </div>
+              ) : !hasGroqData ? (
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>Rate limit data not yet captured.</p>
+                  <p className="text-[10px]">Send a message in AI Ops to populate live usage stats — Groq returns limits in response headers.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {groq!.limitRequestsPerMinute !== null && groq!.remainingRequestsPerMinute !== null && (
+                    <ProgressBar
+                      value={groq!.remainingRequestsPerMinute!}
+                      max={groq!.limitRequestsPerMinute!}
+                      label="Requests / minute"
+                    />
+                  )}
+                  {groq!.limitTokensPerMinute !== null && groq!.remainingTokensPerMinute !== null && (
+                    <ProgressBar
+                      value={groq!.remainingTokensPerMinute!}
+                      max={groq!.limitTokensPerMinute!}
+                      label="Tokens / minute"
+                    />
+                  )}
+                  {groq!.limitRequestsPerDay !== null && groq!.remainingRequestsPerDay !== null && (
+                    <ProgressBar
+                      value={groq!.remainingRequestsPerDay!}
+                      max={groq!.limitRequestsPerDay!}
+                      label="Requests / day"
+                    />
+                  )}
+                  {groq!.capturedAt && (
+                    <p className="text-[10px] text-muted-foreground/50">
+                      Last updated: {new Date(groq!.capturedAt).toLocaleTimeString()}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </section>
 
