@@ -20,8 +20,10 @@ router.get('/knowledge', async (req, res) => {
       id: e._id.toString(),
       title: e.title,
       content: e.content,
+      simplifiedContent: (e as any).simplifiedContent ?? null,
       tags: e.tags ?? [],
       source: e.source ?? null,
+      sources: (e as any).sources ?? [],
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
     })));
@@ -129,7 +131,7 @@ router.post('/knowledge/simplify-preview', async (req, res) => {
   }
 });
 
-/** Simplify an existing entry and save it */
+/** Simplify an existing entry — saves to simplifiedContent, original content untouched */
 router.post('/knowledge/:id/simplify', async (req, res) => {
   try {
     await connectToDatabase();
@@ -138,13 +140,14 @@ router.post('/knowledge/:id/simplify', async (req, res) => {
     const simplified = await runSimplify(entry.title, entry.content);
     const updated = await Knowledge.findByIdAndUpdate(
       req.params.id,
-      { $set: { content: simplified } },
+      { $set: { simplifiedContent: simplified } },
       { new: true }
     );
     res.json({
       id: updated!._id.toString(),
       title: updated!.title,
       content: updated!.content,
+      simplifiedContent: (updated as any).simplifiedContent ?? null,
       tags: updated!.tags ?? [],
       source: updated!.source ?? null,
       sources: (updated as any).sources ?? [],
@@ -184,8 +187,10 @@ router.get('/knowledge/:id', async (req, res) => {
       id: entry._id.toString(),
       title: entry.title,
       content: entry.content,
+      simplifiedContent: (entry as any).simplifiedContent ?? null,
       tags: entry.tags ?? [],
       source: entry.source ?? null,
+      sources: (entry as any).sources ?? [],
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
     });
@@ -203,8 +208,10 @@ router.patch('/knowledge/:id', async (req, res) => {
       id: entry._id.toString(),
       title: entry.title,
       content: entry.content,
+      simplifiedContent: (entry as any).simplifiedContent ?? null,
       tags: entry.tags ?? [],
       source: entry.source ?? null,
+      sources: (entry as any).sources ?? [],
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
     });

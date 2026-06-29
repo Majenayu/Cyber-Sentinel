@@ -225,6 +225,7 @@ export default function VaultPage() {
   const [showAnalyze, setShowAnalyze] = useState(false);
   const [isSimplifying, setIsSimplifying] = useState(false);
   const [simplifyingForm, setSimplifyingForm] = useState(false);
+  const [viewMode, setViewMode] = useState<'original' | 'simplified'>('original');
 
   const fetchEntries = async (q?: string) => {
     const url = q ? `/api/knowledge?q=${encodeURIComponent(q)}` : '/api/knowledge';
@@ -290,7 +291,7 @@ export default function VaultPage() {
   };
 
   const handleSelect = (id: string) => {
-    setSelectedId(id); setIsEditing(false); setIsCreating(false);
+    setSelectedId(id); setIsEditing(false); setIsCreating(false); setViewMode('original');
     if (window.innerWidth < 768) setShowList(false);
   };
 
@@ -319,7 +320,8 @@ export default function VaultPage() {
       const res = await fetch(`/api/knowledge/${selectedId}/simplify`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Simplify failed');
-      setEntries(prev => prev.map(e => e.id === selectedId ? { ...e, content: data.content } : e));
+      setEntries(prev => prev.map(e => e.id === selectedId ? { ...e, simplifiedContent: data.simplifiedContent } : e));
+      setViewMode('simplified');
     } catch (err: any) {
       alert(`Simplify failed: ${err.message}`);
     }
@@ -481,15 +483,28 @@ export default function VaultPage() {
                     );
                   })()}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                  {/* View toggle — only shown when simplified version exists */}
+                  {selectedEntry.simplifiedContent && (
+                    <div className="flex items-center rounded border border-border overflow-hidden text-[10px]">
+                      <button
+                        onClick={() => setViewMode('original')}
+                        className={cn('px-2.5 py-1.5 transition-colors', viewMode === 'original' ? 'bg-primary text-black font-bold' : 'text-muted-foreground hover:text-primary')}
+                      >Original</button>
+                      <button
+                        onClick={() => setViewMode('simplified')}
+                        className={cn('px-2.5 py-1.5 transition-colors border-l border-border', viewMode === 'simplified' ? 'bg-primary text-black font-bold' : 'text-muted-foreground hover:text-primary')}
+                      >Simplified</button>
+                    </div>
+                  )}
                   <button
                     onClick={handleSimplify}
                     disabled={isSimplifying}
-                    title="AI: clean & simplify content into readable language"
+                    title="AI: clean & simplify content — original is always preserved"
                     className="h-8 px-2.5 text-xs border border-primary/40 text-primary hover:bg-primary/10 rounded flex items-center gap-1.5 transition-colors disabled:opacity-40"
                   >
                     {isSimplifying ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
-                    {isSimplifying ? 'Simplifying…' : 'Simplify'}
+                    {isSimplifying ? 'Simplifying…' : selectedEntry.simplifiedContent ? 'Re-simplify' : 'Simplify'}
                   </button>
                   <button onClick={() => setIsEditing(true)} className="p-2 border border-border rounded text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"><Edit size={14} /></button>
                   <button onClick={() => handleDelete(selectedEntry.id)} className="p-2 border border-border rounded text-muted-foreground hover:text-destructive hover:border-destructive/50 transition-colors"><Trash2 size={14} /></button>
@@ -497,7 +512,19 @@ export default function VaultPage() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 md:p-8">
-              <div className="max-w-4xl mx-auto">{renderContent(selectedEntry.content)}</div>
+              {viewMode === 'simplified' && selectedEntry.simplifiedContent && (
+                <div className="max-w-4xl mx-auto mb-3 flex items-center gap-2 px-1">
+                  <span className="text-[10px] text-primary/60 border border-primary/20 bg-primary/5 px-2 py-0.5 rounded">AI Simplified View</span>
+                  <span className="text-[10px] text-muted-foreground/40">— original preserved, click Original to switch back</span>
+                </div>
+              )}
+              <div className="max-w-4xl mx-auto">
+                {renderContent(
+                  viewMode === 'simplified' && selectedEntry.simplifiedContent
+                    ? selectedEntry.simplifiedContent
+                    : selectedEntry.content
+                )}
+              </div>
             </div>
           </div>
         ) : (
