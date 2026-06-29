@@ -2,7 +2,7 @@ import { Router } from 'express';
 import connectToDatabase from '../lib/mongodb';
 import Session from '../lib/models/Session';
 import { getChatResponse, streamChatResponse } from '../lib/groq';
-import { getBestAnswer } from '../lib/multi-ai';
+import { getBestAnswer, getBestEnhancedPrompt } from '../lib/multi-ai';
 import { detectToolsInText } from './scrape';
 
 const router = Router();
@@ -149,9 +149,59 @@ router.post('/chat/enhance-prompt', async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt?.trim()) return res.status(400).json({ error: 'prompt required' });
-    const { enhancePrompt } = await import('../lib/groq');
-    const enhanced = await enhancePrompt(prompt.trim());
+    const enhanced = await getBestEnhancedPrompt(prompt.trim());
     res.json({ enhanced });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/** Analyze an image via Gemini Vision and return a text description for use as chat context */
+router.post('/chat/analyze-image', async (req, res) => {
+  try {
+    const { imageBase64, mimeType = 'image/png', fileName = 'image' } = req.body;
+    if (!imageBase64) return res.status(400).json({ error: 'imageBase64 required' });
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: 'Gemini API key not configured' });
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                text: `You are a cybersecurity expert. Analyze this image and describe EVERYTHING you see in precise technical detail. Focus on:
+- Error messages, stack traces, or logs (copy them verbatim)
+- Code snippets visible in the image
+- Terminal output, command results
+- Network traffic, packet data
+- Any security-relevant text, URLs, IP addresses, ports
+- Tool names and their output
+- Configuration files or settings visible
+Be thorough and exact — this analysis will be used to get cybersecurity help.`,
+              },
+              {
+                inline_data: { mime_type: mimeType, data: imageBase64 },
+              },
+            ],
+          }],
+          generationConfig: { maxOutputTokens: 1024, temperature: 0.1 },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const err = await response.text();
+      return res.status(502).json({ error: `Gemini Vision error: ${response.status}`, detail: err });
+    }
+
+    const data = await response.json();
+    const analysis = data.candidates?.[0]?.content?.parts?.[0]?.text ?? 'Could not analyze image.';
+    res.json({ analysis, fileName });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

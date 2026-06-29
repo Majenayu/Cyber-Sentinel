@@ -1,16 +1,11 @@
 import { Router } from 'express';
-import Groq from 'groq-sdk';
 import connectToDatabase from '../lib/mongodb';
 import Knowledge from '../lib/models/Knowledge';
 import Tool from '../lib/models/Tool';
 import Command from '../lib/models/Command';
+import { getBestJsonAnswer } from '../lib/multi-ai';
 
 const router = Router();
-
-function getGroqClient() {
-  if (!process.env.GROQ_API_KEY) throw new Error('GROQ_API_KEY not configured');
-  return new Groq({ apiKey: process.env.GROQ_API_KEY });
-}
 
 /** Canonical slug: lowercase, letters/digits only, separated by hyphens */
 function canonicalSlug(raw: string): string {
@@ -54,17 +49,11 @@ function buildPrompt(title: string, content: string): string {
   );
 }
 
-async function analyzeEntry(groq: Groq, entry: { id: string; title: string; content: string }) {
-  const completion = await groq.chat.completions.create({
-    model: 'llama-3.3-70b-versatile',
-    temperature: 0.1,
-    max_tokens: 3000,
-    messages: [{ role: 'user', content: buildPrompt(entry.title, entry.content) }],
-  });
-
-  const raw = completion.choices[0]?.message?.content?.trim() ?? '{}';
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  const jsonStr = jsonMatch ? jsonMatch[0] : '{}';
+async function analyzeEntry(entry: { id: string; title: string; content: string }) {
+  const jsonStr = await getBestJsonAnswer(
+    buildPrompt(entry.title, entry.content),
+    (parsed) => Array.isArray(parsed.tags),
+  );
 
   return JSON.parse(jsonStr) as {
     tags: string[];
@@ -86,7 +75,6 @@ router.post('/analyze/knowledge', async (req, res) => {
 
   try {
     await connectToDatabase();
-    const groq = getGroqClient();
 
     const entries = await Knowledge.find({}).lean();
 
@@ -109,7 +97,7 @@ router.post('/analyze/knowledge', async (req, res) => {
       send({ type: 'progress', current: i + 1, total: entries.length, title: entry.title });
 
       try {
-        const result = await analyzeEntry(groq, { id, title: entry.title, content: entry.content });
+        const result = await analyzeEntry({ id, title: entry.title, content: entry.content });
 
         // ONLY update tags — never touch the original content or title
         if ((result.tags ?? []).length > 0) {

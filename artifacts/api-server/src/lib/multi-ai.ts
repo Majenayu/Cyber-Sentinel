@@ -212,6 +212,67 @@ Criteria (in order of importance):
 
 Return ONLY a JSON object: {"winner": <0-indexed number of the best response>, "reason": "<one sentence why>"}`;
 
+/** Tries providers sequentially until one returns valid JSON matching the expected shape */
+export async function getBestJsonAnswer(
+  prompt: string,
+  validateJson: (parsed: any) => boolean = () => true,
+): Promise<string> {
+  const providers = getAvailableProviders();
+  if (providers.length === 0) throw new Error('No AI providers configured');
+
+  const messages = [{ role: 'user' as const, content: prompt }];
+  const systemPrompt = 'You are a helpful AI assistant. Respond with valid JSON only.';
+
+  for (const provider of providers) {
+    try {
+      const raw = await provider.call(messages, systemPrompt);
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) continue;
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (validateJson(parsed)) return jsonMatch[0];
+    } catch {}
+  }
+  throw new Error('No provider returned valid JSON');
+}
+
+/** Uses best available provider for a prompt enhancement task (short text output) */
+export async function getBestEnhancedPrompt(roughPrompt: string): Promise<string> {
+  const providers = getAvailableProviders();
+  if (providers.length === 0) throw new Error('No AI providers configured');
+
+  const systemPrompt = `TASK: Rewrite the user's vague pentesting prompt into a precise, expert-level question. OUTPUT RULES — you MUST follow these exactly:
+1. Output ONLY the rewritten prompt text. Nothing else.
+2. Do NOT answer the question. Do NOT explain. Do NOT add a preamble.
+3. Do NOT use quotes around the output.
+4. The output is a question or directive, not an answer.
+5. Make it specific: name the exact tool, ask for exact commands and flags, request both Linux and Windows where applicable, and ask for expected output.
+6. If it mentions a technique, include the full attack chain.
+7. Maximum 2-3 sentences. Dense and expert-level.`;
+
+  const messages = [
+    { role: 'assistant' as const, content: 'Understood. I will output ONLY the rewritten prompt text, nothing else.' },
+    { role: 'user' as const, content: `Original prompt: "${roughPrompt}"\n\nRewrite this into a precise pentesting question:` },
+  ];
+
+  // Try Groq first (fastest, most reliable for short tasks), then others
+  const ordered = [
+    ...providers.filter(p => p.name.startsWith('Groq')),
+    ...providers.filter(p => !p.name.startsWith('Groq')),
+  ];
+
+  for (const provider of ordered) {
+    try {
+      const result = (await provider.call(messages, systemPrompt)).trim();
+      if (result.length > 10 && result.length < 500) {
+        // If it looks like an answer (very long or has double newlines), take just first para
+        if (result.includes('\n\n')) return result.split('\n\n')[0].trim();
+        return result;
+      }
+    } catch {}
+  }
+  return roughPrompt;
+}
+
 export async function getBestAnswer(
   messages: any[],
   systemPrompt: string,

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Bot, User, Send, Plus, Trash2, MessageSquare, Terminal,
   Loader2, ChevronRight, ShieldAlert, ChevronLeft, BookmarkPlus, X, Save, Sparkles,
-  ExternalLink, Download, Flag, Zap, FileText, ChevronDown,
+  ExternalLink, Download, Flag, Zap, FileText, Paperclip, Image, FileCode, XCircle,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -13,6 +13,17 @@ function cn(...inputs: (string | boolean | undefined | null)[]) {
 
 interface ToolCard { tool: string; url: string; }
 
+interface AttachedFile {
+  name: string;
+  type: 'image' | 'text';
+  mimeType: string;
+  base64?: string;
+  textContent?: string;
+  analysis?: string;
+  analyzing?: boolean;
+  error?: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -21,7 +32,7 @@ interface Message {
   provider?: string;
   reason?: string;
   toolCards?: ToolCard[];
-  pinned?: boolean;
+  attachments?: { name: string; summary: string }[];
 }
 
 interface Session { id: string; title: string; createdAt: string; updatedAt: string; }
@@ -124,6 +135,32 @@ function ProviderBadge({ provider, reason }: { provider: string; reason?: string
   );
 }
 
+function AttachmentPreview({ files, onRemove }: { files: AttachedFile[]; onRemove: (i: number) => void }) {
+  if (!files.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 px-1 mb-2">
+      {files.map((f, i) => (
+        <div key={i} className={cn(
+          'flex items-center gap-1.5 px-2 py-1 rounded border text-[10px] font-mono max-w-[200px]',
+          f.error ? 'border-red-400/40 bg-red-400/5 text-red-400' :
+          f.analyzing ? 'border-yellow-400/40 bg-yellow-400/5 text-yellow-400' :
+          'border-primary/30 bg-primary/5 text-primary/80'
+        )}>
+          {f.type === 'image' ? <Image size={10} className="shrink-0" /> : <FileCode size={10} className="shrink-0" />}
+          <span className="truncate">{f.name}</span>
+          {f.analyzing && <Loader2 size={9} className="animate-spin shrink-0" />}
+          {f.error && <span className="text-red-400 shrink-0" title={f.error}>!</span>}
+          {!f.analyzing && (
+            <button onClick={() => onRemove(i)} className="ml-0.5 hover:text-red-400 shrink-0 transition-colors">
+              <XCircle size={10} />
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -140,8 +177,10 @@ export default function ChatPage() {
   const [useBestAI, setUseBestAI] = useState(true);
   const [showTemplates, setShowTemplates] = useState(false);
   const [processingProviders, setProcessingProviders] = useState<string[]>([]);
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -194,22 +233,104 @@ export default function ChatPage() {
     if (currentSessionId === id) setCurrentSessionId(updated.length > 0 ? updated[0].id : null);
   };
 
+  const handleFileAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+
+    for (const file of files) {
+      const isImage = file.type.startsWith('image/');
+      const isText = file.type.startsWith('text/') || file.name.endsWith('.txt') || file.name.endsWith('.log') || file.name.endsWith('.md');
+
+      if (!isImage && !isText) {
+        setAttachedFiles(prev => [...prev, { name: file.name, type: 'text', mimeType: file.type, error: 'Unsupported file type. Use images or text/log files.' }]);
+        continue;
+      }
+
+      const attached: AttachedFile = { name: file.name, type: isImage ? 'image' : 'text', mimeType: file.type, analyzing: isImage };
+      setAttachedFiles(prev => [...prev, attached]);
+      const idx = attachedFiles.length; // approximate index for update
+
+      if (isImage) {
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+          const dataUrl = ev.target?.result as string;
+          const base64 = dataUrl.split(',')[1];
+          try {
+            const res = await fetch('/api/chat/analyze-image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ imageBase64: base64, mimeType: file.type, fileName: file.name }),
+            });
+            const data = await res.json();
+            setAttachedFiles(prev => prev.map(f =>
+              f.name === file.name && f.analyzing
+                ? { ...f, analyzing: false, base64, analysis: data.analysis ?? data.error, error: res.ok ? undefined : data.error }
+                : f
+            ));
+          } catch (err: any) {
+            setAttachedFiles(prev => prev.map(f =>
+              f.name === file.name && f.analyzing
+                ? { ...f, analyzing: false, error: `Analysis failed: ${err.message}` }
+                : f
+            ));
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const text = ev.target?.result as string;
+          setAttachedFiles(prev => prev.map(f =>
+            f.name === file.name && !f.textContent
+              ? { ...f, textContent: text.slice(0, 8000) }
+              : f
+          ));
+        };
+        reader.readAsText(file);
+      }
+    }
+  };
+
+  const removeAttachment = (i: number) => {
+    setAttachedFiles(prev => prev.filter((_, idx) => idx !== i));
+  };
+
+  const buildMessageWithAttachments = (text: string): string => {
+    if (!attachedFiles.length) return text;
+    const parts: string[] = [text];
+    for (const f of attachedFiles) {
+      if (f.error) continue;
+      if (f.type === 'image' && f.analysis) {
+        parts.push(`\n\n---\n[Attached image: ${f.name}]\nGemini Vision Analysis:\n${f.analysis}`);
+      } else if (f.type === 'text' && f.textContent) {
+        parts.push(`\n\n---\n[Attached file: ${f.name}]\n\`\`\`\n${f.textContent}\n\`\`\``);
+      }
+    }
+    return parts.join('');
+  };
+
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = input.trim();
     if (!text || !currentSessionId || isLoading) return;
-    const finalText = ctfMode ? `[CTF MODE] ${text}` : text;
+
+    const hasAnalyzing = attachedFiles.some(f => f.analyzing);
+    if (hasAnalyzing) return;
+
+    const fullContent = buildMessageWithAttachments(ctfMode ? `[CTF MODE] ${text}` : text);
+    const attachmentSummaries = attachedFiles.filter(f => !f.error).map(f => ({ name: f.name, summary: f.analysis ? 'image analyzed' : 'text attached' }));
 
     const userMsgId = `user-${Date.now()}`;
-    setMessages(prev => [...prev, { id: userMsgId, role: 'user', content: text }]);
+    setMessages(prev => [...prev, { id: userMsgId, role: 'user', content: text, attachments: attachmentSummaries.length ? attachmentSummaries : undefined }]);
     setInput('');
+    setAttachedFiles([]);
     setIsLoading(true);
     setProcessingProviders([]);
 
     if (useBestAI) {
-      await sendBestAI(finalText);
+      await sendBestAI(fullContent);
     } else {
-      await sendStream(finalText);
+      await sendStream(fullContent);
     }
   };
 
@@ -367,10 +488,21 @@ export default function ChatPage() {
     setIsSaving(false);
   };
 
+  const hasAnalyzing = attachedFiles.some(f => f.analyzing);
   const selectedSession = sessions.find(s => s.id === currentSessionId);
 
   return (
     <div className="flex h-full overflow-hidden font-mono text-sm">
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept="image/*,.txt,.log,.md,.csv,.json,.xml,.html,.py,.sh,.ps1,.bat,.conf,.cfg,.yaml,.yml"
+        className="hidden"
+        onChange={handleFileAttach}
+      />
+
       {/* Save to Vault Modal */}
       {saveModal && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
@@ -450,15 +582,12 @@ export default function ChatPage() {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {saveSuccess && <span className="text-primary text-[10px] animate-pulse">✓ Saved</span>}
-            {/* CTF Mode toggle */}
-            <button onClick={() => setCtfMode(m => !m)} title="CTF Mode — tuned for capture-the-flag challenges" className={cn("hidden sm:flex items-center gap-1 px-2 py-1 text-[10px] rounded border transition-all", ctfMode ? "border-yellow-400/60 text-yellow-400 bg-yellow-400/10" : "border-border text-muted-foreground hover:border-primary/30 hover:text-primary")}>
+            <button onClick={() => setCtfMode(m => !m)} title="CTF Mode" className={cn("hidden sm:flex items-center gap-1 px-2 py-1 text-[10px] rounded border transition-all", ctfMode ? "border-yellow-400/60 text-yellow-400 bg-yellow-400/10" : "border-border text-muted-foreground hover:border-primary/30 hover:text-primary")}>
               <Flag size={9} /> CTF
             </button>
-            {/* Best AI toggle */}
-            <button onClick={() => setUseBestAI(m => !m)} title="Best-AI: queries all providers and picks the best answer" className={cn("hidden sm:flex items-center gap-1 px-2 py-1 text-[10px] rounded border transition-all", useBestAI ? "border-primary/60 text-primary bg-primary/10" : "border-border text-muted-foreground hover:border-primary/30 hover:text-primary")}>
+            <button onClick={() => setUseBestAI(m => !m)} title="Best-AI: queries all 7 providers and picks the best answer" className={cn("hidden sm:flex items-center gap-1 px-2 py-1 text-[10px] rounded border transition-all", useBestAI ? "border-primary/60 text-primary bg-primary/10" : "border-border text-muted-foreground hover:border-primary/30 hover:text-primary")}>
               <Zap size={9} /> {useBestAI ? 'BEST-AI' : 'SINGLE'}
             </button>
-            {/* Export */}
             {messages.length > 0 && (
               <button onClick={exportSession} title="Export session as Markdown" className="hidden sm:flex items-center gap-1 px-2 py-1 text-[10px] rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/30 transition-all">
                 <Download size={9} /> Export
@@ -512,6 +641,15 @@ export default function ChatPage() {
                 <div className={cn('flex flex-col gap-1 min-w-0', m.role === 'user' ? 'items-end max-w-[80%]' : 'items-start max-w-[92%] md:max-w-[85%]')}>
                   <div className={cn('p-3 rounded-lg border break-words w-full', m.role === 'user' ? 'bg-secondary/30 border-border text-foreground' : 'bg-black/40 border-primary/15 text-foreground/90')}>
                     <MessageContent content={m.content} streaming={m.streaming} />
+                    {m.attachments && m.attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-border/30">
+                        {m.attachments.map((a, i) => (
+                          <span key={i} className="flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded border border-primary/20 bg-primary/5 text-primary/50">
+                            <Paperclip size={7} /> {a.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     {m.toolCards && m.toolCards.length > 0 && !m.streaming && <ToolCards cards={m.toolCards} />}
                   </div>
                   <div className="flex items-center gap-2 px-1 flex-wrap">
@@ -532,7 +670,7 @@ export default function ChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input */}
+        {/* Input area */}
         <div className="p-3 md:p-4 border-t border-border bg-card/5 z-10 shrink-0">
           {ctfMode && (
             <div className="flex items-center gap-1.5 mb-2 px-1">
@@ -541,34 +679,78 @@ export default function ChatPage() {
               <button onClick={() => setCtfMode(false)} className="ml-auto text-[10px] text-muted-foreground hover:text-foreground"><X size={10} /></button>
             </div>
           )}
-          <form onSubmit={sendMessage} className="max-w-4xl mx-auto relative">
-            <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
-              <ChevronRight className="text-primary/60" size={13} />
+
+          {/* Attachment previews */}
+          <AttachmentPreview files={attachedFiles} onRemove={removeAttachment} />
+
+          <form onSubmit={sendMessage} className="max-w-4xl mx-auto">
+            <div className="relative flex items-center gap-1">
+              <div className="absolute left-3 flex items-center pointer-events-none z-10">
+                <ChevronRight className="text-primary/60" size={13} />
+              </div>
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                placeholder={
+                  hasAnalyzing ? 'Analyzing attachment…' :
+                  currentSessionId ? (useBestAI ? 'Enter directive… Best-AI picks the top answer' : 'Enter directive… ✨ to enhance') :
+                  'Create a session first…'
+                }
+                disabled={!currentSessionId || hasAnalyzing}
+                className="flex-1 bg-black/50 border border-border focus:border-primary/50 focus:ring-1 focus:ring-primary/20 rounded-lg pl-8 pr-3 py-2.5 text-xs md:text-sm focus:outline-none transition-all placeholder:text-muted-foreground/25 font-mono"
+              />
+              <div className="flex items-center gap-1 shrink-0">
+                {/* File attach button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!currentSessionId || isLoading}
+                  title="Attach screenshot, image, or text file for analysis"
+                  className={cn(
+                    "h-8 w-8 rounded border flex items-center justify-center transition-all",
+                    attachedFiles.length > 0
+                      ? "border-primary/60 text-primary bg-primary/10"
+                      : "border-border text-muted-foreground hover:border-primary/30 hover:text-primary disabled:opacity-30"
+                  )}
+                >
+                  <Paperclip size={13} />
+                </button>
+
+                {isLoading ? (
+                  <button type="button" onClick={stopStreaming} className="h-8 px-2 rounded border border-border text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all">stop</button>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={enhanceInput}
+                      disabled={!input.trim() || isEnhancing || isLoading}
+                      title="Enhance prompt — rewrites your query into a precise pentesting question"
+                      className={cn("h-8 px-2 rounded border text-[10px] flex items-center gap-1 transition-all",
+                        input.trim() && !isEnhancing ? "border-yellow-400/50 text-yellow-400 hover:bg-yellow-400/10" : "border-border text-muted-foreground/30 cursor-not-allowed"
+                      )}
+                    >
+                      {isEnhancing ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />} ✨
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={!input.trim() || !currentSessionId || hasAnalyzing}
+                      className="h-8 px-3 rounded bg-primary text-black text-[10px] font-bold hover:bg-primary/80 disabled:opacity-30 flex items-center gap-1 transition-all"
+                    >
+                      <Send size={10} /> Send
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-            <input
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder={currentSessionId ? (useBestAI ? 'Enter directive… Best-AI will pick the top answer' : 'Enter directive… hit ✨ to enhance') : 'Create a session first…'}
-              disabled={!currentSessionId}
-              className="w-full bg-black/50 border border-border focus:border-primary/50 focus:ring-1 focus:ring-primary/20 rounded-lg pl-8 pr-36 py-2.5 text-xs md:text-sm focus:outline-none transition-all placeholder:text-muted-foreground/25 font-mono"
-            />
-            <div className="absolute inset-y-0 right-2 flex items-center gap-1">
-              {isLoading ? (
-                <button type="button" onClick={stopStreaming} className="h-7 px-2 rounded border border-border text-[10px] text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all">stop</button>
-              ) : (
-                <>
-                  <button type="button" onClick={enhanceInput} disabled={!input.trim() || isEnhancing || isLoading} title="Enhance prompt"
-                    className={cn("h-7 px-2 rounded border text-[10px] flex items-center gap-1 transition-all", input.trim() && !isEnhancing ? "border-yellow-400/50 text-yellow-400 hover:bg-yellow-400/10" : "border-border text-muted-foreground/30 cursor-not-allowed")}>
-                    {isEnhancing ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />} ✨
-                  </button>
-                  <button type="submit" disabled={!input.trim() || !currentSessionId}
-                    className="h-7 px-3 rounded bg-primary text-black text-[10px] font-bold hover:bg-primary/80 disabled:opacity-30 flex items-center gap-1 transition-all">
-                    <Send size={10} /> Send
-                  </button>
-                </>
-              )}
-            </div>
+            {attachedFiles.length > 0 && (
+              <p className="text-[9px] text-muted-foreground/40 mt-1.5 px-1">
+                {attachedFiles.filter(f => f.analyzing).length > 0
+                  ? `Analyzing ${attachedFiles.filter(f => f.analyzing).length} file(s) with Gemini Vision…`
+                  : `${attachedFiles.filter(f => !f.error).length} file(s) attached — analysis will be included in your message.`
+                }
+              </p>
+            )}
           </form>
         </div>
       </div>

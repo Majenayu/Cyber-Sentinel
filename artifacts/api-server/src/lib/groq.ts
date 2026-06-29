@@ -104,25 +104,31 @@ export async function enhancePrompt(roughPrompt: string): Promise<string> {
   const groq = getGroqClient();
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
-    temperature: 0.4,
-    max_tokens: 300,
+    temperature: 0.2,
+    max_tokens: 200,
     messages: [
       {
         role: 'system',
-        content: `You are a prompt engineer specializing in pentesting AI queries. 
-Your job: take the user's rough, vague, or poorly-worded prompt and rewrite it into a precise, specific, expert-level pentesting question that will get the best possible answer from a red team AI.
-
-Rules:
-- Return ONLY the improved prompt — no explanation, no preamble, no quotes around it
-- Keep the user's original intent but make it specific: add the tool name, ask for exact commands, flags, OS variants, and expected output
-- If the prompt mentions a technique, ask for the full attack chain
-- If vague (e.g. "how to crack wifi"), specify: tool, attack type, steps, both Linux and Windows
-- Max 3 sentences. Dense and precise.`,
+        content: `TASK: Rewrite the user's vague pentesting prompt into a precise, expert-level question. OUTPUT RULES — you MUST follow these exactly:
+1. Output ONLY the rewritten prompt text. Nothing else.
+2. Do NOT answer the question. Do NOT explain. Do NOT add a preamble.
+3. Do NOT use quotes around the output.
+4. The output is a question or directive, not an answer.
+5. Make it specific: name the exact tool, ask for exact commands and flags, request both Linux and Windows where applicable, and ask for expected output.
+6. If it mentions a technique, include the full attack chain.
+7. Maximum 2-3 sentences. Dense and expert-level.`,
       },
-      { role: 'user', content: roughPrompt },
+      { role: 'assistant', content: 'Understood. I will output ONLY the rewritten prompt text, nothing else.' },
+      { role: 'user', content: `Original prompt: "${roughPrompt}"\n\nRewrite this into a precise pentesting question:` },
     ],
   });
-  return completion.choices[0]?.message?.content?.trim() ?? roughPrompt;
+  const result = completion.choices[0]?.message?.content?.trim() ?? roughPrompt;
+  // Safety: if model returned more than ~500 chars it probably answered — fall back
+  if (result.length > 500 || result.includes('\n\n')) {
+    const firstPara = result.split('\n\n')[0].trim();
+    return firstPara.length > 20 ? firstPara : roughPrompt;
+  }
+  return result;
 }
 
 /** Streaming — yields text chunks, returns full content when done */
