@@ -145,7 +145,7 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
       className="fixed inset-0 z-[9999] bg-black overflow-hidden font-mono"
       style={{ transition: 'opacity 0.6s ease', opacity: fading ? 0 : 1, pointerEvents: fading ? 'none' : 'all' }}
     >
-      {/* ── World map background image ── */}
+      {/* ── World map — full-screen dominant background ── */}
       <div
         className="absolute inset-0"
         style={{
@@ -153,23 +153,13 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          filter: 'brightness(0.7) grayscale(1)',
-          opacity: 0.85,
+          filter: 'brightness(1.35) saturate(2) contrast(1.1)',
+          opacity: 1,
         }}
       />
-      {/* Color tint layer — blends theme color onto the grayscale map */}
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundColor: color,
-          mixBlendMode: 'color',
-          opacity: 0.55,
-        }}
-      />
-
-      {/* Dark vignette overlay */}
+      {/* Center dark spot — makes UI text readable over the bright map */}
       <div className="absolute inset-0" style={{
-        background: `radial-gradient(ellipse 120% 80% at 50% 50%, rgba(0,0,0,0) 10%, rgba(0,0,0,0.65) 100%)`
+        background: 'radial-gradient(ellipse 65% 60% at 50% 52%, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.1) 70%, rgba(0,0,0,0) 100%)'
       }} />
 
       {/* Horizontal sweep scan line */}
