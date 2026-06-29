@@ -189,12 +189,43 @@ function makeCohereProvider(apiKey: string): AIProvider {
     async call(messages, systemPrompt) {
       recordProviderCall('cohere');
       try {
-        // Cohere v2 API (v1 /chat was deprecated)
+        // Try v1 first (trial keys), fall back to v2
+        const chatHistory = messages.slice(0, -1).map((m: any) => ({
+          role: m.role === 'assistant' ? 'CHATBOT' : 'USER',
+          message: m.content,
+        }));
+        const lastMessage = messages[messages.length - 1]?.content ?? '';
+
+        const v1Res = await fetch('https://api.cohere.ai/v1/chat', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'command-r',
+            message: lastMessage,
+            chat_history: chatHistory,
+            preamble: systemPrompt,
+            max_tokens: 2048,
+          }),
+        });
+
+        if (v1Res.ok) {
+          const headers: Record<string, string> = {};
+          v1Res.headers.forEach((v, k) => { headers[k] = v; });
+          updateProviderHeaders('cohere', headers);
+          const data = await v1Res.json();
+          const content = data.text ?? '';
+          if (content) return content;
+        }
+
+        // Fall back to v2 API
         const cohereMessages = [
           { role: 'system', content: systemPrompt },
           ...messages.map((m: any) => ({ role: m.role, content: m.content })),
         ];
-        const res = await fetch('https://api.cohere.com/v2/chat', {
+        const v2Res = await fetch('https://api.cohere.com/v2/chat', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${apiKey}`,
@@ -208,18 +239,14 @@ function makeCohereProvider(apiKey: string): AIProvider {
           }),
         });
         const headers: Record<string, string> = {};
-        res.headers.forEach((v, k) => { headers[k] = v; });
+        v2Res.headers.forEach((v, k) => { headers[k] = v; });
         updateProviderHeaders('cohere', headers);
-        if (!res.ok) {
-          const body = await res.text().catch(() => '');
-          throw new Error(`Cohere: ${res.status} ${body.slice(0, 100)}`);
+        if (!v2Res.ok) {
+          const body = await v2Res.text().catch(() => '');
+          throw new Error(`Cohere: ${v2Res.status} ${body.slice(0, 100)}`);
         }
-        const data = await res.json();
-        // v2 response shape: data.message.content[0].text
-        const content = data.message?.content?.[0]?.text
-          ?? data.text
-          ?? data.choices?.[0]?.message?.content
-          ?? '';
+        const data = await v2Res.json();
+        const content = data.message?.content?.[0]?.text ?? data.text ?? '';
         if (!content) throw new Error('Cohere: empty content');
         return content;
       } catch (e: any) {
@@ -323,20 +350,27 @@ function makeCloudflareProvider(accountId: string, apiToken: string): AIProvider
 }
 
 export function getAvailableProviders(): AIProvider[] {
+  // If ENABLED_PROVIDERS is set, only load those providers (comma-separated keys).
+  // e.g. ENABLED_PROVIDERS=groq,mistral,cohere
+  const enabledSet = process.env.ENABLED_PROVIDERS
+    ? new Set(process.env.ENABLED_PROVIDERS.split(',').map(s => s.trim().toLowerCase()))
+    : null;
+
+  const allow = (key: string) => !enabledSet || enabledSet.has(key);
+
   const providers: AIProvider[] = [];
 
-  if (process.env.GROQ_API_KEY) providers.push(makeGroqProvider(process.env.GROQ_API_KEY, 'Groq-1', 'groq'));
-  if (process.env.GROQ_API_KEY_2) providers.push(makeGroqProvider(process.env.GROQ_API_KEY_2, 'Groq-2', 'groq2'));
-  if (process.env.OPENROUTER_API_KEY_1) providers.push(makeOpenRouterProvider(process.env.OPENROUTER_API_KEY_1, 'OpenRouter'));
-  if (process.env.GEMINI_API_KEY) providers.push(makeGeminiProvider(process.env.GEMINI_API_KEY));
-  if (process.env.MISTRAL_API_KEY) providers.push(makeMistralProvider(process.env.MISTRAL_API_KEY));
-  if (process.env.COHERE_API_KEY) providers.push(makeCohereProvider(process.env.COHERE_API_KEY));
-  if (process.env.TOGETHER_API_KEY) providers.push(makeTogetherProvider(process.env.TOGETHER_API_KEY));
+  if (allow('groq') && process.env.GROQ_API_KEY) providers.push(makeGroqProvider(process.env.GROQ_API_KEY, 'Groq-1', 'groq'));
+  if (allow('groq2') && process.env.GROQ_API_KEY_2) providers.push(makeGroqProvider(process.env.GROQ_API_KEY_2, 'Groq-2', 'groq2'));
+  if (allow('openrouter') && process.env.OPENROUTER_API_KEY_1) providers.push(makeOpenRouterProvider(process.env.OPENROUTER_API_KEY_1, 'OpenRouter'));
+  if (allow('gemini') && process.env.GEMINI_API_KEY) providers.push(makeGeminiProvider(process.env.GEMINI_API_KEY));
+  if (allow('mistral') && process.env.MISTRAL_API_KEY) providers.push(makeMistralProvider(process.env.MISTRAL_API_KEY));
+  if (allow('cohere') && process.env.COHERE_API_KEY) providers.push(makeCohereProvider(process.env.COHERE_API_KEY));
+  if (allow('together') && process.env.TOGETHER_API_KEY) providers.push(makeTogetherProvider(process.env.TOGETHER_API_KEY));
 
-  // Cloudflare: CLOUDFLARE_AI_ACCOUNT_ID required; OTHER_SECRET_1 is not used as a fallback
   const cfAccountId = process.env.CLOUDFLARE_AI_ACCOUNT_ID;
   const cfToken = process.env.CLOUDFLARE_AI_API_TOKEN;
-  if (cfAccountId && cfToken) providers.push(makeCloudflareProvider(cfAccountId, cfToken));
+  if (allow('cloudflare') && cfAccountId && cfToken) providers.push(makeCloudflareProvider(cfAccountId, cfToken));
 
   return providers;
 }
