@@ -28,7 +28,7 @@ console.log(JSON.stringify(status));
 |---|---|---|
 | `MONGODB_URI` | ✅ Yes | MongoDB Atlas connection string (`mongodb+srv://...`) |
 | `GROQ_API_KEY` | ✅ Yes | Groq AI — primary LLM provider |
-| `MISTRAL_API_KEY` | ⬜ Optional | Mistral AI — secondary provider (Best-AI mode) |
+| `MISTRAL_API_KEY` | ⬜ Optional | Mistral AI — secondary provider (Best-AI mode). See format note below. |
 | `SESSION_SECRET` | ⬜ Optional | Signs session cookies |
 | `CYBERSENTINEL_API_SECRET` | ⬜ Optional | Locks the API — **production only**, dev ignores it |
 
@@ -42,6 +42,15 @@ return await requestSecrets({
 ```
 
 > ⚠️ Never ask users to paste secret values into chat. Always use `requestSecrets`.
+
+### Mistral API key format
+
+Mistral keys from [console.mistral.ai](https://console.mistral.ai) → **API Keys** → **Create new key** are plain alphanumeric strings — they do **not** start with `sk-`. If a key starts with `sk-` it is an OpenAI-format key and will always return `401 Unauthorized` from Mistral, even though the model name is correct.
+
+- ✅ Valid format: `AbCdEfGhIjKlMnOpQrStUvWxYz012345` (random hex/alphanumeric, no prefix)
+- ❌ Invalid: `sk-abc123...` — this is an OpenAI key, not Mistral
+
+**Model in use:** `mistral-small-latest` — this is the correct free-tier model. Do not change it to `open-mistral-7b` or `open-mixtral-8x7b`; those require a paid plan and return 401 on free accounts.
 
 ---
 
