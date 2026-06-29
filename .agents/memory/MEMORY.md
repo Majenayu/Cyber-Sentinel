@@ -4,3 +4,4 @@
 - [API client exports](api-client-exports.md) — customFetch must be explicitly exported from lib/api-client-react/src/index.ts to be available in mobile; mobile uses @ts-ignore on import due to tsconfig path gap
 - [SSE error contract](sse-error-contract.md) — all streaming error events must use { error: string } shape (not { text: "⚠..." }); Chat.tsx handles parsed.error with isError flag for red styling
 - [SSRF redirect fix](ssrf-scrape.md) — scrape.ts uses redirect:'manual' + per-hop validateScrapeUrl loop (max 5 hops); never use redirect:'follow'
+- [Artifact workflow port conflicts](artifact-workflow-ports.md) — artifact workflows inherit PORT from [userenv.development]; api-server must use API_PORT ?? "8080" not PORT fallback
