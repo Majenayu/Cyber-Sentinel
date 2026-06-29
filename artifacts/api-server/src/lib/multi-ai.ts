@@ -40,9 +40,9 @@ function makeOpenRouterProvider(apiKey: string, label: string): AIProvider {
   // Try multiple free models in order
   const MODELS = [
     'meta-llama/llama-3.1-8b-instruct:free',
-    'google/gemma-3-12b-it:free',
+    'google/gemma-2-9b-it:free',
     'deepseek/deepseek-r1-0528:free',
-    'qwen/qwen3-8b:free',
+    'microsoft/phi-4-reasoning-plus:free',
   ];
   return {
     name: label,
