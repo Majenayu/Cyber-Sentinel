@@ -14,7 +14,10 @@ Artifact workflows (`artifacts/xxx: yyy`) inherit env vars from `[userenv.develo
 - When artifact workflows fail due to port conflict, remove the `.replit`-defined duplicate workflows (`Start application`, `API Server`) via `removeWorkflow()` to free ports, then restart the artifact workflows.
 
 ## API Secret — Dev vs Production
-`CYBERSENTINEL_API_SECRET` is read in `app.ts` as `process.env.NODE_ENV === 'production' ? process.env.CYBERSENTINEL_API_SECRET : undefined`. The secret gate is disabled in development. Vite proxy `headers:{}` does NOT add upstream request headers — it adds response headers back to the browser. Use `configure + proxyReq` event if upstream header injection is ever needed.
+`CYBERSENTINEL_API_SECRET` is read in `app.ts` as `process.env.NODE_ENV === 'production' ? process.env.CYBERSENTINEL_API_SECRET : undefined`. The secret gate is disabled in development. Vite proxy `headers` object (inside the proxy target config) DOES inject upstream request headers — this is correct for forwarding `x-api-key` to the API server.
+
+## Production Port Fix (render.yaml)
+`render.yaml` sets `PORT=10000` but api-server uses `API_PORT`. The fix is to add `API_PORT=10000` alongside `PORT=10000` in render.yaml. Never make api-server use `PORT` as a fallback — the global PORT belongs to the Vite frontend workflow.
 
 ## configureWorkflow Limitation
 At 10/10 workflow limit, `configureWorkflow` cannot update even EXISTING workflows — it always throws "Workflow limit exceeded". The 4 `.migration-backup/*` artifact-managed workflows cannot be deleted either. The only escape is `removeWorkflow()` on non-artifact workflows.

@@ -99,9 +99,9 @@ lib/
   api-zod/             Generated Zod schemas
 ```
 
-- API server listens on `process.env.API_PORT ?? 8080`
+- API server listens on `process.env.API_PORT ?? 8080` — uses a dedicated var to avoid conflict with the global `PORT` env var that belongs to the Vite frontend workflow. **In production (Render/Railway), set `API_PORT` to match the platform-assigned port** (render.yaml already does this with `API_PORT=10000`).
 - Vite proxy: all `/api/*` requests from frontend → `http://localhost:8080`
-- Vite proxy forwards `x-api-key: $CYBERSENTINEL_API_SECRET` when set
+- Vite proxy forwards `x-api-key: $CYBERSENTINEL_API_SECRET` when the secret is set (implemented in vite.config.ts proxy headers)
 
 ---
 

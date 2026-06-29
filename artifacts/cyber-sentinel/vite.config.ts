@@ -81,6 +81,13 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8080",
         changeOrigin: true,
+        ...(process.env.CYBERSENTINEL_API_SECRET
+          ? {
+              headers: {
+                "x-api-key": process.env.CYBERSENTINEL_API_SECRET,
+              },
+            }
+          : {}),
       },
     },
   },
