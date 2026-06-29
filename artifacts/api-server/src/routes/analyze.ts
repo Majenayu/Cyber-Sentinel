@@ -14,56 +14,54 @@ function getGroqClient() {
 
 function buildPrompt(title: string, content: string): string {
   return (
-    'You are a senior penetration tester writing clean study notes for yourself.\n\n' +
+    'You are a senior penetration tester helping organize a personal knowledge base.\n\n' +
     'ENTRY TITLE: ' + title + '\n' +
-    'RAW CONTENT:\n' + content.slice(0, 4000) + '\n\n' +
-    'Respond ONLY with valid JSON (no markdown wrapper). Use exactly this structure:\n\n' +
+    'ENTRY CONTENT (first portion):\n' + content.slice(0, 6000) + '\n\n' +
+    'Your job is to EXTRACT metadata from this entry — do NOT rewrite or summarize the content.\n\n' +
+    'Respond ONLY with valid JSON. No markdown wrapper. Exactly this structure:\n\n' +
     '{\n' +
-    '  "cleanedTitle": "A clear specific title e.g. Nmap: Full Port Scan with Service Detection",\n' +
-    '  "cleanedContent": "Clean markdown rewrite. Remove all HTML, nav text, breadcrumbs, course junk, repeated lines. Keep all technical content. Use ## headings, bullet points, code blocks. Write so you can remember it quickly. Start with a ## Summary section (1-2 sentences).",\n' +
     '  "tags": ["lowercase-tag1", "tag2"],\n' +
     '  "tools": [\n' +
     '    {\n' +
     '      "name": "ToolName",\n' +
     '      "slug": "toolname",\n' +
     '      "category": "recon|web|password|exploitation|post-exploitation|network|other",\n' +
-    '      "description": "Plain English: what this tool does and WHY. Example: Nmap scans a target network to find open ports — like knocking on every door of a building to see which ones open.",\n' +
-    '      "cheatsheet": "Full markdown cheatsheet with these sections: ## What it does (2-3 plain English sentences), ## Real-world scenario (concrete example like: you have IP 10.10.10.5 and want to find open ports before attacking), ## Linux (bash code block with 2-3 useful examples and comments), ## Windows (PowerShell code block), ## Key flags explained (bullet list of the most important flags in plain English)",\n' +
-    '      "officialUrl": "https://example.com or null"\n' +
+    '      "description": "One or two plain-English sentences. What does this tool do and why would a pentester use it? Example style: Nmap is a network scanner that discovers open ports on a target — like knocking on every door of a building to see which ones are unlocked.",\n' +
+    '      "cheatsheet": "Write in clean markdown. Include these sections:\\n## What it does\\n2-3 plain English sentences explaining the tool.\\n\\n## Real-world scenario\\nA concrete example: you have target IP 10.10.10.5, what do you do with this tool?\\n\\n## Linux (bash)\\nCode block with 3-4 practical examples, each with a comment explaining what it does.\\n\\n## Windows (PowerShell)\\nCode block with equivalent Windows commands.\\n\\n## Key flags explained\\nBullet list of important flags in plain English — e.g. -sV: detect what software version is running on each port.",\n' +
+    '      "officialUrl": "url string or null"\n' +
     '    }\n' +
     '  ],\n' +
     '  "commands": [\n' +
     '    {\n' +
-    '      "title": "Short action title e.g. Full TCP port scan with service detection",\n' +
-    '      "command": "exact command string (Linux/bash)",\n' +
-    '      "description": "WHAT: what this command does in plain English. WHEN: a real pentesting scenario when you reach for this. EXAMPLE: brief example context or expected output.",\n' +
+    '      "title": "Short descriptive action title",\n' +
+    '      "command": "exact command string",\n' +
+    '      "description": "WHAT: what this command does in plain English. WHEN: the real scenario when you use it. EXAMPLE: a concrete example or expected result.",\n' +
     '      "category": "recon|web|password|exploitation|post-exploitation|network|other"\n' +
     '    }\n' +
     '  ]\n' +
     '}\n\n' +
-    'Rules:\n' +
-    '- cleanedContent: must be clean, readable markdown — no junk HTML, no repeated lines, no course navigation text\n' +
-    '- tags: 2-6 lowercase keywords\n' +
-    '- tools: ONLY if the entry is clearly about a named pentesting tool. Empty array if not.\n' +
-    '- commands: only real usable one-liners. Max 8. description MUST use WHAT/WHEN/EXAMPLE format.\n' +
-    '- Do not invent commands not present in the source. Do not hallucinate tool names.'
+    'STRICT RULES:\n' +
+    '- tags: 2-6 lowercase keywords that describe the topic of this entry\n' +
+    '- tools: ONLY if the entry clearly covers a specific named pentesting tool. Return [] if none.\n' +
+    '- commands: extract every real usable command or one-liner. Max 10. The description MUST use WHAT/WHEN/EXAMPLE format.\n' +
+    '- Do NOT invent commands that are not in the source text.\n' +
+    '- Do NOT return cleanedContent or cleanedTitle — only the fields listed above.'
   );
 }
 
 async function analyzeEntry(groq: Groq, entry: { id: string; title: string; content: string }) {
   const completion = await groq.chat.completions.create({
     model: 'llama-3.3-70b-versatile',
-    temperature: 0.2,
-    max_tokens: 4096,
+    temperature: 0.1,
+    max_tokens: 3000,
     messages: [{ role: 'user', content: buildPrompt(entry.title, entry.content) }],
   });
 
   const raw = completion.choices[0]?.message?.content?.trim() ?? '{}';
-  const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/, '').trim();
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  const jsonStr = jsonMatch ? jsonMatch[0] : '{}';
 
-  return JSON.parse(cleaned) as {
-    cleanedTitle: string;
-    cleanedContent: string;
+  return JSON.parse(jsonStr) as {
     tags: string[];
     tools: { name: string; slug: string; category: string; description: string; cheatsheet: string; officialUrl?: string }[];
     commands: { title: string; command: string; description: string; category: string }[];
@@ -108,29 +106,25 @@ router.post('/analyze/knowledge', async (req, res) => {
       try {
         const result = await analyzeEntry(groq, { id, title: entry.title, content: entry.content });
 
-        const mergedTags = Array.from(new Set([
-          ...(entry.tags ?? []),
-          ...(result.tags ?? []).map((t: string) => t.toLowerCase().trim()),
-        ]));
-
-        const updatePayload: any = { tags: mergedTags };
-        if (result.cleanedContent && result.cleanedContent.length > 50) {
-          updatePayload.content = result.cleanedContent;
-        }
-        if (result.cleanedTitle && result.cleanedTitle.length > 3) {
-          updatePayload.title = result.cleanedTitle;
+        // ONLY update tags — never touch the original content or title
+        if ((result.tags ?? []).length > 0) {
+          const mergedTags = Array.from(new Set([
+            ...(entry.tags ?? []),
+            ...result.tags.map((t: string) => t.toLowerCase().trim()).filter(Boolean),
+          ]));
+          await Knowledge.findByIdAndUpdate(id, { $set: { tags: mergedTags } });
+          totalTags += result.tags.length;
         }
 
-        await Knowledge.findByIdAndUpdate(id, { $set: updatePayload });
-        totalTags += (result.tags ?? []).length;
-
+        // Create Tool Reference entries (additive — won't delete existing tools)
         for (const tool of (result.tools ?? [])) {
           if (!tool.name || !tool.slug || !tool.cheatsheet) continue;
-          const existing = await Tool.findOne({ slug: tool.slug });
+          const slug = tool.slug.toLowerCase().replace(/\s+/g, '-');
+          const existing = await Tool.findOne({ slug });
           if (!existing) {
             await Tool.create({
               name: tool.name,
-              slug: tool.slug,
+              slug,
               category: tool.category ?? 'other',
               description: tool.description ?? '',
               cheatsheet: tool.cheatsheet,
@@ -138,12 +132,16 @@ router.post('/analyze/knowledge', async (req, res) => {
             });
             totalTools++;
           } else {
-            await Tool.findByIdAndUpdate(existing._id, {
-              $set: { description: tool.description, cheatsheet: tool.cheatsheet },
-            });
+            // Update description and cheatsheet if they exist (enrich existing tools)
+            if (tool.description) {
+              await Tool.findByIdAndUpdate(existing._id, {
+                $set: { description: tool.description, cheatsheet: tool.cheatsheet },
+              });
+            }
           }
         }
 
+        // Create Saved Commands (additive — won't overwrite existing)
         for (const cmd of (result.commands ?? [])) {
           if (!cmd.title || !cmd.command) continue;
           const existing = await Command.findOne({ command: cmd.command });
@@ -161,16 +159,16 @@ router.post('/analyze/knowledge', async (req, res) => {
         send({
           type: 'entry_done',
           id,
-          title: result.cleanedTitle || entry.title,
+          title: entry.title,
           tags: result.tags ?? [],
-          toolsAdded: (result.tools ?? []).length,
+          toolsAdded: totalTools,
           commandsAdded: (result.commands ?? []).length,
         });
       } catch (err: any) {
         send({ type: 'entry_error', title: entry.title, error: err.message });
       }
 
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, 600));
     }
 
     send({ type: 'done', totalTags, totalTools, totalCommands, errors: [] });
