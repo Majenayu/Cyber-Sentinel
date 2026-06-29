@@ -1,7 +1,69 @@
 import { Router } from 'express';
 import * as cheerio from 'cheerio';
+import { promises as dns } from 'dns';
+import { isIPv4, isIPv6 } from 'net';
 
 const router = Router();
+
+const PRIVATE_IPv4_RANGES = [
+  /^127\./,
+  /^10\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^192\.168\./,
+  /^169\.254\./,
+  /^0\./,
+  /^::1$/,
+  /^fc00:/i,
+  /^fe80:/i,
+  /^::$/,
+  /^100\.(6[4-9]|[7-9]\d|1([01]\d|2[0-7]))\./,
+  /^198\.(1[89])\./,
+  /^192\.0\.0\./,
+  /^192\.0\.2\./,
+  /^198\.51\.100\./,
+  /^203\.0\.113\./,
+  /^(22[4-9]|23\d|24\d|25[0-5])\./,
+];
+
+const ALLOWED_SCHEMES = ['http:', 'https:'];
+const ALLOWED_PORTS = [80, 443, 8080, 8443, 3000, 4000, 5000];
+
+async function isPrivateOrReserved(hostname: string): Promise<boolean> {
+  if (isIPv4(hostname) || isIPv6(hostname)) {
+    return PRIVATE_IPv4_RANGES.some(r => r.test(hostname));
+  }
+  try {
+    const { address } = await dns.lookup(hostname, { family: 4 });
+    return PRIVATE_IPv4_RANGES.some(r => r.test(address));
+  } catch {
+    return true;
+  }
+}
+
+async function validateScrapeUrl(rawUrl: string): Promise<{ ok: true; parsed: URL } | { ok: false; error: string }> {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return { ok: false, error: 'Invalid URL' };
+  }
+
+  if (!ALLOWED_SCHEMES.includes(parsed.protocol)) {
+    return { ok: false, error: 'Only http and https URLs are allowed' };
+  }
+
+  const port = parsed.port ? parseInt(parsed.port, 10) : parsed.protocol === 'https:' ? 443 : 80;
+  if (parsed.port && !ALLOWED_PORTS.includes(port)) {
+    return { ok: false, error: `Port ${port} is not allowed` };
+  }
+
+  const hostname = parsed.hostname.replace(/\[|\]/g, '');
+  if (await isPrivateOrReserved(hostname)) {
+    return { ok: false, error: 'URL resolves to a private or reserved address' };
+  }
+
+  return { ok: true, parsed };
+}
 
 const SECURITY_TOOLS: Record<string, string[]> = {
   nmap: ['nmap', 'network mapper'],
@@ -82,10 +144,9 @@ router.post('/scrape/url', async (req, res) => {
     return;
   }
 
-  try {
-    new URL(url);
-  } catch {
-    res.status(400).json({ error: 'Invalid URL' });
+  const validation = await validateScrapeUrl(url);
+  if (!validation.ok) {
+    res.status(400).json({ error: validation.error });
     return;
   }
 
@@ -93,7 +154,8 @@ router.post('/scrape/url', async (req, res) => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
-    const response = await fetch(url, {
+    const response = await fetch(validation.parsed.toString(), {
+      redirect: 'follow',
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; CyberSentinel/1.0)',
@@ -107,7 +169,28 @@ router.post('/scrape/url', async (req, res) => {
       return;
     }
 
+    // Validate redirect target isn't private
+    const finalUrl = response.url;
+    if (finalUrl && finalUrl !== validation.parsed.toString()) {
+      const redirectValidation = await validateScrapeUrl(finalUrl);
+      if (!redirectValidation.ok) {
+        res.status(400).json({ error: 'Redirect target not allowed' });
+        return;
+      }
+    }
+
+    // Cap response size at 2 MB
+    const contentLength = response.headers.get('content-length');
+    if (contentLength && parseInt(contentLength, 10) > 2 * 1024 * 1024) {
+      res.status(413).json({ error: 'Response too large (>2MB)' });
+      return;
+    }
+
     const html = await response.text();
+    if (html.length > 2 * 1024 * 1024) {
+      res.status(413).json({ error: 'Response too large (>2MB)' });
+      return;
+    }
     const $ = cheerio.load(html);
 
     $('script, style, nav, footer, header, aside, .nav, .footer, .header, .sidebar, .menu, .advertisement, .ad').remove();
