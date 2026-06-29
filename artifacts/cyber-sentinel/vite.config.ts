@@ -77,7 +77,7 @@ export default defineConfig({
     // When running behind the Replit HTTPS proxy, the HMR WebSocket must
     // connect on the external HTTPS port (443) using the public dev domain.
     // REPL_ID is undefined outside Replit environments.
-    hmr: process.env.REPL_ID ? false : true,
+    hmr: true,
     fs: {
       strict: true,
     },
