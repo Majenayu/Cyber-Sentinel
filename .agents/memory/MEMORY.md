@@ -6,3 +6,4 @@
 - [SSE error contract](sse-error-contract.md) — all streaming error events must use { error: string } shape (not { text: "⚠..." }); Chat.tsx handles parsed.error with isError flag for red styling
 - [SSRF redirect fix](ssrf-scrape.md) — scrape.ts uses redirect:'manual' + per-hop validateScrapeUrl loop (max 5 hops); never use redirect:'follow'
 - [Artifact workflow port conflicts](artifact-workflow-ports.md) — artifact workflows inherit PORT from [userenv.development]; api-server must use API_PORT ?? "8080" not PORT fallback
+- [Vision API / body size](vision-body-limit.md) — express.json() default 100kb limit silently drops base64 image bodies; must set limit:'20mb'; compress images client-side via Canvas before sending

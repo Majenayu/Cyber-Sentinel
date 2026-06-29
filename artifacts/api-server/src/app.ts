@@ -53,8 +53,8 @@ app.use(
     },
   }),
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '20mb' }));
+app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
 // Optional API secret guard — only enforced in production.
 // In development the API binds to localhost:8080 which is not externally reachable,

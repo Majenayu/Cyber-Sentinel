@@ -69,6 +69,52 @@ async function analyzeEntry(entry: { id: string; title: string; content: string 
   return parsed;
 }
 
+const VISION_PROMPT = `You are a cybersecurity expert analyzing this screenshot for a penetration tester.
+Read ALL visible text carefully and extract every security-relevant detail:
+- Exact IP addresses, hostnames, ports, services
+- SSH/RSA/PEM keys or any credential material — copy them verbatim
+- Error messages, stack traces, or debug output revealing system info
+- Software names and version numbers
+- CTF flags (format: flag{...}, HTB{...}, etc.)
+- File paths, usernames, environment variables
+- Any configuration snippets or network topology visible
+
+Respond with a concise, technical bullet list. Start directly with findings — no preamble.
+If you see a private key or credential, output it in full so the operator can use it.`;
+
+async function callGroqVision(apiKey: string, model: string, base64: string, mimeType: string): Promise<string> {
+  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1024,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64}` } },
+            { type: 'text', text: VISION_PROMPT },
+          ],
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`${model} returned ${response.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error(`${model} returned empty content`);
+  return content;
+}
+
 /** POST /api/analyze/image — Groq vision analysis of an attached screenshot */
 router.post('/analyze/image', async (req, res) => {
   try {
@@ -78,42 +124,22 @@ router.post('/analyze/image', async (req, res) => {
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'GROQ_API_KEY not set' });
 
-    // Use native fetch so we control the exact JSON shape — the TS SDK doesn't type vision content yet
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.2-11b-vision-preview',
-        max_tokens: 700,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'image_url',
-                image_url: { url: `data:${mimeType};base64,${base64}` },
-              },
-              {
-                type: 'text',
-                text: 'You are a cybersecurity expert analyzing this screenshot for a penetration tester. Extract all security-relevant information concisely and technically:\n- IP addresses, hostnames, ports, services\n- Error messages or stack traces revealing system info\n- Credentials, tokens, or sensitive data\n- Software versions or fingerprints\n- Network topology or config snippets\n- CTF flags or hints\nIf nothing security-relevant, briefly describe what is shown.',
-              },
-            ],
-          },
-        ],
-      }),
-    });
+    // Try primary model, fall back to secondary vision model
+    const models = ['llama-3.2-11b-vision-preview', 'llama-3.2-90b-vision-preview'];
+    let lastError = '';
 
-    if (!groqRes.ok) {
-      const errText = await groqRes.text().catch(() => '');
-      return res.status(502).json({ error: `Groq vision error ${groqRes.status}: ${errText.slice(0, 200)}` });
+    for (const model of models) {
+      try {
+        const analysis = await callGroqVision(apiKey, model, base64, mimeType);
+        return res.json({ analysis, model });
+      } catch (err: any) {
+        lastError = err.message;
+        // Try next model
+      }
     }
 
-    const data = await groqRes.json();
-    const analysis = data.choices?.[0]?.message?.content ?? 'Could not analyze image.';
-    res.json({ analysis });
+    // Both failed — return error with details so frontend can surface it
+    res.status(502).json({ error: `Vision analysis failed: ${lastError}` });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

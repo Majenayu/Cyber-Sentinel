@@ -256,31 +256,63 @@ export default function ChatPage() {
         const reader = new FileReader();
         reader.onload = async (ev) => {
           const dataUrl = ev.target?.result as string;
-          const base64 = dataUrl.split(',')[1];
+
+          // Compress/resize image via Canvas before sending (keeps base64 < 4MB)
+          const compressImage = (src: string, maxDim = 1280, quality = 0.88): Promise<{ base64: string; mimeType: string }> =>
+            new Promise((resolve) => {
+              const img = new Image();
+              img.onload = () => {
+                const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+                const w = Math.round(img.width * scale);
+                const h = Math.round(img.height * scale);
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d')!;
+                ctx.drawImage(img, 0, 0, w, h);
+                const compressed = canvas.toDataURL('image/jpeg', quality);
+                resolve({ base64: compressed.split(',')[1], mimeType: 'image/jpeg' });
+              };
+              img.onerror = () => resolve({ base64: src.split(',')[1], mimeType: file.type });
+              img.src = src;
+            });
+
+          const { base64, mimeType: compressedMime } = await compressImage(dataUrl);
+
           // Update with base64 while analysis runs
           setAttachedFiles(prev => prev.map(f =>
             f.name === file.name && f.analyzing
               ? { ...f, base64, analyzing: true }
               : f
           ));
+
           // Call AI vision analysis
           try {
             const res = await fetch('/api/analyze/image', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ base64, mimeType: file.type, filename: file.name }),
+              body: JSON.stringify({ base64, mimeType: compressedMime }),
             });
             const data = await res.json();
-            const analysis = res.ok ? (data.analysis ?? `[Image: ${file.name}]`) : `[Image: ${file.name}]`;
+            if (!res.ok) {
+              // Surface the actual error so user knows what failed
+              const errNote = `[Image attached — vision analysis failed: ${data.error ?? res.status}]`;
+              setAttachedFiles(prev => prev.map(f =>
+                f.name === file.name && f.analyzing
+                  ? { ...f, analyzing: false, analysis: errNote, error: data.error }
+                  : f
+              ));
+            } else {
+              const analysis = data.analysis ?? `[Image attached: ${file.name}]`;
+              setAttachedFiles(prev => prev.map(f =>
+                f.name === file.name && f.analyzing
+                  ? { ...f, analyzing: false, analysis }
+                  : f
+              ));
+            }
+          } catch (err: any) {
             setAttachedFiles(prev => prev.map(f =>
               f.name === file.name && f.analyzing
-                ? { ...f, analyzing: false, analysis }
-                : f
-            ));
-          } catch {
-            setAttachedFiles(prev => prev.map(f =>
-              f.name === file.name && f.analyzing
-                ? { ...f, analyzing: false, analysis: `[Image attached: ${file.name}]` }
+                ? { ...f, analyzing: false, analysis: `[Image attached: ${file.name}]`, error: err.message }
                 : f
             ));
           }
