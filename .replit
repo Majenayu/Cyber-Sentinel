@@ -12,41 +12,25 @@ env = { "CI" = "true" }
 runButton = "Project"
 
 [[workflows.workflow]]
-name = "artifacts/api-server: API Server"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd artifacts/api-server && node --enable-source-maps ./dist/index.mjs 2>&1 | pnpm exec pino-pretty"
-waitForPort = 8080
-
-[[workflows.workflow]]
-name = "artifacts/cyber-sentinel: web"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd artifacts/cyber-sentinel && pnpm run dev"
-waitForPort = 5000
-
-[[workflows.workflow]]
 name = "Project"
 mode = "parallel"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "artifacts/api-server: API Server"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
 
 [[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "artifacts/cyber-sentinel: web"
+task = "shell.exec"
+args = "pkill -f 'dist/index.mjs' 2>/dev/null; (cd artifacts/api-server && node --enable-source-maps ./dist/index.mjs 2>&1 | pnpm exec pino-pretty) & cd artifacts/cyber-sentinel && pnpm run dev"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [agent]
 stack = "BEST_EFFORT_FALLBACK"
@@ -73,7 +57,3 @@ BASE_PATH = "/"
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 8080
-externalPort = 8080
