@@ -3,7 +3,7 @@ import { Link, useLocation } from 'wouter';
 import { Database, Wrench, FileCode, Bot, Settings, Activity } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { useTheme, THEMES } from '@/contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext';
 
 function cn(...inputs: (string | boolean | undefined | null)[]) {
   return twMerge(clsx(inputs));
@@ -33,8 +33,7 @@ function SkullIcon({ size = 20 }: { size?: number }) {
 
 export default function Sidebar({ onNavigate }: SidebarProps) {
   const [pathname] = useLocation();
-  const { theme, setTheme } = useTheme();
-  const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
+  const { theme } = useTheme();
 
   const navItems = [
     { href: '/', label: 'Dashboard', icon: Activity },
@@ -81,31 +80,6 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
           <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
             Opsec: [READY]
           </span>
-        </div>
-
-        <div className="mb-3">
-          <p className="text-[9px] text-muted-foreground/60 uppercase tracking-widest mb-1.5 px-1">Theme</p>
-          <div className="grid grid-cols-6 gap-1 px-1">
-            {THEMES.map((t) => (
-              <button
-                key={t.id}
-                title={t.name}
-                onClick={() => setTheme(t.id)}
-                className={cn(
-                  "w-7 h-7 rounded-sm border transition-all duration-150 flex items-center justify-center",
-                  theme === t.id
-                    ? "border-white/60 scale-110 shadow-lg"
-                    : "border-transparent hover:border-white/30 hover:scale-105 opacity-70 hover:opacity-100"
-                )}
-                style={{ backgroundColor: t.color }}
-              >
-                {theme === t.id && (
-                  <span className="text-black/80 text-[8px] font-bold">✓</span>
-                )}
-              </button>
-            ))}
-          </div>
-          <p className="text-[9px] text-muted-foreground/50 px-1 mt-1">{currentTheme.name}</p>
         </div>
 
         <Link href="/settings">
