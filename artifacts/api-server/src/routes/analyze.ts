@@ -116,10 +116,10 @@ router.post('/analyze/knowledge', async (req, res) => {
           totalTags += result.tags.length;
         }
 
-        // Create Tool Reference entries (additive — won't delete existing tools)
+        // Create Tool Reference entries — deduplicate by slug, update description/cheatsheet if richer
         for (const tool of (result.tools ?? [])) {
           if (!tool.name || !tool.slug || !tool.cheatsheet) continue;
-          const slug = tool.slug.toLowerCase().replace(/\s+/g, '-');
+          const slug = tool.slug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
           const existing = await Tool.findOne({ slug });
           if (!existing) {
             await Tool.create({
@@ -132,27 +132,46 @@ router.post('/analyze/knowledge', async (req, res) => {
             });
             totalTools++;
           } else {
-            // Update description and cheatsheet if they exist (enrich existing tools)
-            if (tool.description) {
+            // Only update if new description/cheatsheet is longer (richer)
+            const shouldUpdate =
+              (tool.description && tool.description.length > (existing.description?.length ?? 0)) ||
+              (tool.cheatsheet && tool.cheatsheet.length > (existing.cheatsheet?.length ?? 0));
+            if (shouldUpdate) {
               await Tool.findByIdAndUpdate(existing._id, {
-                $set: { description: tool.description, cheatsheet: tool.cheatsheet },
+                $set: {
+                  description: tool.description || existing.description,
+                  cheatsheet: tool.cheatsheet.length > (existing.cheatsheet?.length ?? 0)
+                    ? tool.cheatsheet
+                    : existing.cheatsheet,
+                },
               });
             }
           }
         }
 
-        // Create Saved Commands (additive — won't overwrite existing)
+        // Create Saved Commands — deduplicate by normalised command string
         for (const cmd of (result.commands ?? [])) {
           if (!cmd.title || !cmd.command) continue;
-          const existing = await Command.findOne({ command: cmd.command });
+          // Normalise: collapse whitespace so "nmap  -sV" and "nmap -sV" are the same
+          const normalised = cmd.command.trim().replace(/\s+/g, ' ');
+          const existing = await Command.findOne({
+            command: { $regex: '^' + normalised.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', $options: 'i' },
+          });
           if (!existing) {
             await Command.create({
               title: cmd.title,
-              command: cmd.command,
+              command: normalised,
               description: cmd.description ?? null,
               category: cmd.category ?? 'other',
             });
             totalCommands++;
+          } else {
+            // Update description only if the new one is longer/richer
+            if (cmd.description && cmd.description.length > (existing.description?.length ?? 0)) {
+              await Command.findByIdAndUpdate(existing._id, {
+                $set: { description: cmd.description },
+              });
+            }
           }
         }
 

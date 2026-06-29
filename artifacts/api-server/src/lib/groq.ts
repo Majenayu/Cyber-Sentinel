@@ -64,9 +64,12 @@ async function buildMessages(userMessage: string, history: any[] = []) {
     }).limit(3);
 
     if (relevantKnowledge.length > 0) {
+      // Limit each entry to 1500 chars to avoid blowing past Groq's token budget
       context =
         '\n\nRelevant context from your Knowledge Vault:\n' +
-        relevantKnowledge.map(k => `--- ${k.title} ---\n${k.content}`).join('\n\n');
+        relevantKnowledge
+          .map(k => `--- ${k.title} ---\n${k.content.slice(0, 1500)}${k.content.length > 1500 ? '\n[…truncated]' : ''}`)
+          .join('\n\n');
     }
   }
 
