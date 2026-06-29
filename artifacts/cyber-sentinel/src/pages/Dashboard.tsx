@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Terminal, Database, Wrench, Bot, Activity, ShieldCheck, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useGetStats } from '@workspace/api-client-react';
+import MatrixRain from '@/components/MatrixRain';
 
 interface ProviderSnapshot {
   key: string;
@@ -56,8 +57,9 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8 font-mono">
-      <div className="max-w-6xl mx-auto space-y-6 md:space-y-8">
+    <div className="flex-1 overflow-y-auto p-4 md:p-8 font-mono relative">
+      <MatrixRain />
+      <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 relative z-10">
         <header className="space-y-1">
           <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
             <Terminal className="text-primary" size={24} />
