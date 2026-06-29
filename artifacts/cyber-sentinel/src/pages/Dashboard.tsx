@@ -3,7 +3,6 @@ import { Terminal, Database, Wrench, Bot, Activity, ShieldCheck, CheckCircle, XC
 import { Link, useLocation } from 'wouter';
 import { useGetStats } from '@workspace/api-client-react';
 import { useQuery } from '@tanstack/react-query';
-import Globe3D from '@/components/Globe3D';
 
 interface ProviderSnapshot { key: string; label: string; configured: boolean; }
 interface UsageData { providers: ProviderSnapshot[]; }
@@ -87,9 +86,6 @@ export default function Dashboard() {
             </div>
           </div>
         </Link>
-
-        {/* 3D Threat Globe */}
-        <Globe3D />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           <div className="bg-card/50 border border-border rounded-lg overflow-hidden">

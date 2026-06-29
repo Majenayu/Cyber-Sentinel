@@ -455,3 +455,14 @@
   pointer-events: none;
   opacity: 0.3;
 }
+
+/* ═══════════════════════════════════════════════
+   HIDE SCROLLBARS (still scrollable)
+   ═══════════════════════════════════════════════ */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
