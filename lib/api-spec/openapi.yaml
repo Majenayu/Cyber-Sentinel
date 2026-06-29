@@ -1,22 +1,30 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: CyberSentinel API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: stats
+    description: Dashboard statistics
+  - name: knowledge
+    description: Knowledge base entries
+  - name: commands
+    description: Saved commands
+  - name: tools
+    description: Tool reference
+  - name: chat
+    description: Chat sessions and messages
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +32,307 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Get dashboard statistics
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+
+  /knowledge:
+    get:
+      operationId: listKnowledge
+      tags: [knowledge]
+      summary: List knowledge entries
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of knowledge entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/KnowledgeEntry"
+    post:
+      operationId: createKnowledge
+      tags: [knowledge]
+      summary: Create knowledge entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnowledgeInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeEntry"
+
+  /knowledge/{id}:
+    get:
+      operationId: getKnowledge
+      tags: [knowledge]
+      summary: Get knowledge entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Knowledge entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeEntry"
+    patch:
+      operationId: updateKnowledge
+      tags: [knowledge]
+      summary: Update knowledge entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/KnowledgeUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/KnowledgeEntry"
+    delete:
+      operationId: deleteKnowledge
+      tags: [knowledge]
+      summary: Delete knowledge entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /commands:
+    get:
+      operationId: listCommands
+      tags: [commands]
+      summary: List saved commands
+      responses:
+        "200":
+          description: List of commands
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Command"
+    post:
+      operationId: createCommand
+      tags: [commands]
+      summary: Create command
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommandInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+
+  /commands/{id}:
+    patch:
+      operationId: updateCommand
+      tags: [commands]
+      summary: Update command
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommandUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Command"
+    delete:
+      operationId: deleteCommand
+      tags: [commands]
+      summary: Delete command
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /tools:
+    get:
+      operationId: listTools
+      tags: [tools]
+      summary: List tools
+      responses:
+        "200":
+          description: List of tools
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Tool"
+
+  /tools/{slug}:
+    get:
+      operationId: getTool
+      tags: [tools]
+      summary: Get tool by slug
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tool
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolDetail"
+
+  /chat/sessions:
+    get:
+      operationId: listSessions
+      tags: [chat]
+      summary: List chat sessions
+      responses:
+        "200":
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+    post:
+      operationId: createSession
+      tags: [chat]
+      summary: Create chat session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /chat/sessions/{id}:
+    delete:
+      operationId: deleteSession
+      tags: [chat]
+      summary: Delete chat session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /chat/sessions/{id}/messages:
+    get:
+      operationId: listMessages
+      tags: [chat]
+      summary: List messages in session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: sendMessage
+      tags: [chat]
+      summary: Send message to session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "200":
+          description: AI response message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +343,223 @@ components:
       required:
         - status
 
+    Stats:
+      type: object
+      properties:
+        totalKnowledgeEntries:
+          type: integer
+        totalChatSessions:
+          type: integer
+        totalCommands:
+          type: integer
+        totalTools:
+          type: integer
+        recentTags:
+          type: array
+          items:
+            type: string
+      required:
+        - totalKnowledgeEntries
+        - totalChatSessions
+        - totalCommands
+        - totalTools
+        - recentTags
+
+    KnowledgeEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        source:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - title
+        - content
+        - tags
+
+    KnowledgeInput:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        source:
+          type: ["string", "null"]
+      required:
+        - title
+        - content
+
+    KnowledgeUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        source:
+          type: ["string", "null"]
+
+    Command:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        command:
+          type: string
+        description:
+          type: ["string", "null"]
+        category:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - title
+        - command
+        - category
+
+    CommandInput:
+      type: object
+      properties:
+        title:
+          type: string
+        command:
+          type: string
+        description:
+          type: ["string", "null"]
+        category:
+          type: string
+      required:
+        - title
+        - command
+        - category
+
+    CommandUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        command:
+          type: string
+        description:
+          type: ["string", "null"]
+        category:
+          type: string
+
+    Tool:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        officialUrl:
+          type: ["string", "null"]
+      required:
+        - id
+        - name
+        - slug
+        - category
+        - description
+
+    ToolDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        cheatsheet:
+          type: string
+        officialUrl:
+          type: ["string", "null"]
+      required:
+        - id
+        - name
+        - slug
+        - category
+        - description
+        - cheatsheet
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - title
+
+    SessionInput:
+      type: object
+      properties:
+        title:
+          type: string
+      required:
+        - title
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - role
+        - content
+
+    MessageInput:
+      type: object
+      properties:
+        content:
+          type: string
+      required:
+        - content
