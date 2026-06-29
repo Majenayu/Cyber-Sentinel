@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'wouter';
-import { Terminal, Database, Wrench, FileCode, Bot, Settings, Activity } from 'lucide-react';
+import { Database, Wrench, FileCode, Bot, Settings, Activity } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useTheme, THEMES } from '@/contexts/ThemeContext';
 
 function cn(...inputs: (string | boolean | undefined | null)[]) {
   return twMerge(clsx(inputs));
@@ -12,11 +13,31 @@ interface SidebarProps {
   onNavigate?: () => void;
 }
 
+function SkullIcon({ size = 20 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="16" cy="13" rx="10" ry="10" fill="currentColor" opacity="0.9"/>
+      <ellipse cx="10.5" cy="21" rx="3.5" ry="2" fill="currentColor" opacity="0.9"/>
+      <ellipse cx="21.5" cy="21" rx="3.5" ry="2" fill="currentColor" opacity="0.9"/>
+      <rect x="10" y="20" width="12" height="6" rx="1.5" fill="currentColor" opacity="0.9"/>
+      <ellipse cx="16" cy="26" rx="5.5" ry="1.5" fill="currentColor" opacity="0.9"/>
+      <ellipse cx="12.5" cy="14" rx="3" ry="3.5" fill="black" opacity="0.85"/>
+      <ellipse cx="19.5" cy="14" rx="3" ry="3.5" fill="black" opacity="0.85"/>
+      <path d="M14.5 19.5 L17.5 19.5 L16.8 22 L15.2 22 Z" fill="black" opacity="0.7"/>
+      <rect x="11" y="23" width="2" height="2.5" rx="0.5" fill="black" opacity="0.7"/>
+      <rect x="14.5" y="23" width="3" height="3" rx="0.5" fill="black" opacity="0.7"/>
+      <rect x="19" y="23" width="2" height="2.5" rx="0.5" fill="black" opacity="0.7"/>
+    </svg>
+  );
+}
+
 export default function Sidebar({ onNavigate }: SidebarProps) {
   const [pathname] = useLocation();
+  const { theme, setTheme } = useTheme();
+  const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
 
   const navItems = [
-    { href: '/', label: 'Dashboard', icon: Terminal },
+    { href: '/', label: 'Dashboard', icon: Activity },
     { href: '/chat', label: 'AI Ops', icon: Bot },
     { href: '/vault', label: 'Knowledge Base', icon: Database },
     { href: '/tools', label: 'Tool Reference', icon: Wrench },
@@ -26,8 +47,8 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
   return (
     <div className="w-64 border-r border-border bg-card/50 flex flex-col h-screen shrink-0 font-mono">
       <div className="h-16 flex items-center px-6 border-b border-border">
-        <div className="flex items-center gap-2 text-primary font-bold tracking-tight">
-          <Terminal size={20} className="text-primary" />
+        <div className="flex items-center gap-2.5 text-primary font-bold tracking-tight">
+          <span className="text-primary"><SkullIcon size={22} /></span>
           <span className="text-lg">CyberSentinel_</span>
         </div>
       </div>
@@ -55,19 +76,45 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
       </nav>
 
       <div className="p-4 border-t border-border bg-black/20">
-        <div className="flex items-center gap-2 px-2 py-1 mb-4 rounded bg-primary/5 border border-primary/10">
+        <div className="flex items-center gap-2 px-2 py-1 mb-3 rounded bg-primary/5 border border-primary/10">
           <Activity size={12} className="text-primary animate-pulse" />
           <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
             Opsec: [READY]
           </span>
         </div>
+
+        <div className="mb-3">
+          <p className="text-[9px] text-muted-foreground/60 uppercase tracking-widest mb-1.5 px-1">Theme</p>
+          <div className="grid grid-cols-6 gap-1 px-1">
+            {THEMES.map((t) => (
+              <button
+                key={t.id}
+                title={t.name}
+                onClick={() => setTheme(t.id)}
+                className={cn(
+                  "w-7 h-7 rounded-sm border transition-all duration-150 flex items-center justify-center",
+                  theme === t.id
+                    ? "border-white/60 scale-110 shadow-lg"
+                    : "border-transparent hover:border-white/30 hover:scale-105 opacity-70 hover:opacity-100"
+                )}
+                style={{ backgroundColor: t.color }}
+              >
+                {theme === t.id && (
+                  <span className="text-black/80 text-[8px] font-bold">✓</span>
+                )}
+              </button>
+            ))}
+          </div>
+          <p className="text-[9px] text-muted-foreground/50 px-1 mt-1">{currentTheme.name}</p>
+        </div>
+
         <Link href="/settings">
           <div onClick={onNavigate} className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer">
             <Settings size={16} />
             <span>Settings</span>
           </div>
         </Link>
-        <div className="mt-4 text-[9px] text-muted-foreground/50 uppercase tracking-tighter text-center">
+        <div className="mt-3 text-[9px] text-muted-foreground/50 uppercase tracking-tighter text-center">
           V1.0.4-INTERNAL // BY DEEPMIND
         </div>
       </div>

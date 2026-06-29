@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192">
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="192" height="192" rx="34" fill="#060a06"/>
+
+  <!-- Code rain left -->
+  <text x="6" y="38"  fill="#00cc33" opacity="0.22" font-family="monospace" font-size="7">011</text>
+  <text x="6" y="52"  fill="#00cc33" opacity="0.18" font-family="monospace" font-size="7">100</text>
+  <text x="6" y="66"  fill="#00cc33" opacity="0.28" font-family="monospace" font-size="7">010</text>
+  <text x="6" y="80"  fill="#00cc33" opacity="0.15" font-family="monospace" font-size="7">111</text>
+  <text x="6" y="94"  fill="#00cc33" opacity="0.22" font-family="monospace" font-size="7">001</text>
+  <text x="6" y="108" fill="#00cc33" opacity="0.18" font-family="monospace" font-size="7">110</text>
+  <text x="6" y="122" fill="#00cc33" opacity="0.28" font-family="monospace" font-size="7">000</text>
+  <text x="6" y="136" fill="#00cc33" opacity="0.15" font-family="monospace" font-size="7">101</text>
+  <text x="6" y="150" fill="#00cc33" opacity="0.22" font-family="monospace" font-size="7">011</text>
+  <text x="6" y="164" fill="#00cc33" opacity="0.18" font-family="monospace" font-size="7">100</text>
+
+  <!-- Code rain right -->
+  <text x="170" y="38"  fill="#00cc33" opacity="0.22" font-family="monospace" font-size="7">110</text>
+  <text x="170" y="52"  fill="#00cc33" opacity="0.18" font-family="monospace" font-size="7">001</text>
+  <text x="170" y="66"  fill="#00cc33" opacity="0.28" font-family="monospace" font-size="7">101</text>
+  <text x="170" y="80"  fill="#00cc33" opacity="0.15" font-family="monospace" font-size="7">010</text>
+  <text x="170" y="94"  fill="#00cc33" opacity="0.22" font-family="monospace" font-size="7">111</text>
+  <text x="170" y="108" fill="#00cc33" opacity="0.18" font-family="monospace" font-size="7">000</text>
+  <text x="170" y="122" fill="#00cc33" opacity="0.28" font-family="monospace" font-size="7">100</text>
+  <text x="170" y="136" fill="#00cc33" opacity="0.15" font-family="monospace" font-size="7">011</text>
+  <text x="170" y="150" fill="#00cc33" opacity="0.22" font-family="monospace" font-size="7">110</text>
+  <text x="170" y="164" fill="#00cc33" opacity="0.18" font-family="monospace" font-size="7">001</text>
+
+  <!-- Bottom code -->
+  <text x="26" y="184" fill="#00cc33" opacity="0.30" font-family="monospace" font-size="7">0xDEAD::C0DE</text>
+
+  <!-- SKULL -->
+  <!-- Cranium -->
+  <ellipse cx="96" cy="82" rx="55" ry="55" fill="#00cc33" filter="url(#glow)"/>
+  <!-- Cheekbones -->
+  <ellipse cx="65" cy="118" rx="20" ry="11" fill="#00cc33"/>
+  <ellipse cx="127" cy="118" rx="20" ry="11" fill="#00cc33"/>
+  <!-- Jaw -->
+  <rect x="62" y="112" width="68" height="28" rx="5" fill="#00cc33"/>
+  <!-- Chin -->
+  <ellipse cx="96" cy="140" rx="30" ry="8" fill="#00cc33"/>
+
+  <!-- Left eye -->
+  <ellipse cx="77" cy="85" rx="16" ry="19" fill="#060a06"/>
+  <!-- Right eye -->
+  <ellipse cx="115" cy="85" rx="16" ry="19" fill="#060a06"/>
+
+  <!-- Nose -->
+  <path d="M90 106 L102 106 L98 117 L94 117 Z" fill="#060a06"/>
+  <ellipse cx="96" cy="107" rx="6" ry="3" fill="#060a06"/>
+
+  <!-- Teeth -->
+  <rect x="67" y="127" width="8" height="10" rx="2" fill="#060a06"/>
+  <rect x="79" y="127" width="8" height="12" rx="2" fill="#060a06"/>
+  <rect x="92" y="127" width="8" height="13" rx="2" fill="#060a06"/>
+  <rect x="105" y="127" width="8" height="12" rx="2" fill="#060a06"/>
+  <rect x="117" y="127" width="8" height="10" rx="2" fill="#060a06"/>
+
+  <!-- Outline glow -->
+  <ellipse cx="96" cy="82" rx="56" ry="56" fill="none" stroke="#00ff44" stroke-width="0.8" opacity="0.35"/>
+</svg>

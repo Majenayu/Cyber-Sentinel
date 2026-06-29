@@ -49,6 +49,9 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* ═══════════════════════════════════════════════
+   DEFAULT THEME — Matrix Green
+   ═══════════════════════════════════════════════ */
 :root {
   --background: 220 15% 4%;
   --foreground: 120 10% 85%;
@@ -82,6 +85,325 @@
   --app-font-mono: 'JetBrains Mono', Menlo, monospace;
 }
 
+/* ═══════════════════════════════════════════════
+   THEME — Blood Red
+   ═══════════════════════════════════════════════ */
+:root[data-theme="blood-red"] {
+  --background: 0 20% 4%;
+  --foreground: 0 8% 85%;
+  --card: 0 15% 6%;
+  --card-foreground: 0 8% 85%;
+  --card-border: 0 30% 12%;
+  --popover: 0 15% 6%;
+  --popover-foreground: 0 8% 85%;
+  --popover-border: 0 30% 12%;
+  --border: 0 30% 12%;
+  --input: 0 25% 14%;
+  --primary: 0 100% 48%;
+  --primary-foreground: 0 0% 98%;
+  --primary-border: hsl(0 100% 38%);
+  --secondary: 0 25% 12%;
+  --secondary-foreground: 0 100% 48%;
+  --secondary-border: hsl(0 25% 10%);
+  --accent: 0 30% 10%;
+  --accent-foreground: 0 100% 48%;
+  --accent-border: hsl(0 30% 8%);
+  --muted: 0 15% 8%;
+  --muted-foreground: 0 5% 50%;
+  --muted-border: hsl(0 15% 6%);
+  --ring: 0 100% 48%;
+}
+
+/* ═══════════════════════════════════════════════
+   THEME — Cyber Blue
+   ═══════════════════════════════════════════════ */
+:root[data-theme="cyber-blue"] {
+  --background: 220 20% 4%;
+  --foreground: 210 10% 85%;
+  --card: 220 18% 6%;
+  --card-foreground: 210 10% 85%;
+  --card-border: 210 30% 12%;
+  --popover: 220 18% 6%;
+  --popover-foreground: 210 10% 85%;
+  --popover-border: 210 30% 12%;
+  --border: 210 30% 12%;
+  --input: 210 25% 14%;
+  --primary: 210 100% 55%;
+  --primary-foreground: 220 20% 4%;
+  --primary-border: hsl(210 100% 44%);
+  --secondary: 210 25% 12%;
+  --secondary-foreground: 210 100% 55%;
+  --secondary-border: hsl(210 25% 10%);
+  --accent: 210 30% 10%;
+  --accent-foreground: 210 100% 55%;
+  --accent-border: hsl(210 30% 8%);
+  --muted: 220 18% 8%;
+  --muted-foreground: 210 5% 50%;
+  --muted-border: hsl(220 18% 6%);
+  --ring: 210 100% 55%;
+}
+
+/* ═══════════════════════════════════════════════
+   THEME — Purple Haze
+   ═══════════════════════════════════════════════ */
+:root[data-theme="purple-haze"] {
+  --background: 270 18% 4%;
+  --foreground: 270 8% 85%;
+  --card: 270 15% 6%;
+  --card-foreground: 270 8% 85%;
+  --card-border: 270 28% 12%;
+  --popover: 270 15% 6%;
+  --popover-foreground: 270 8% 85%;
+  --popover-border: 270 28% 12%;
+  --border: 270 28% 12%;
+  --input: 270 22% 14%;
+  --primary: 270 100% 65%;
+  --primary-foreground: 270 20% 4%;
+  --primary-border: hsl(270 100% 52%);
+  --secondary: 270 22% 12%;
+  --secondary-foreground: 270 100% 65%;
+  --secondary-border: hsl(270 22% 10%);
+  --accent: 270 28% 10%;
+  --accent-foreground: 270 100% 65%;
+  --accent-border: hsl(270 28% 8%);
+  --muted: 270 15% 8%;
+  --muted-foreground: 270 5% 50%;
+  --muted-border: hsl(270 15% 6%);
+  --ring: 270 100% 65%;
+}
+
+/* ═══════════════════════════════════════════════
+   THEME — Orange Hack
+   ═══════════════════════════════════════════════ */
+:root[data-theme="orange-hack"] {
+  --background: 20 18% 4%;
+  --foreground: 25 10% 85%;
+  --card: 20 16% 6%;
+  --card-foreground: 25 10% 85%;
+  --card-border: 25 28% 12%;
+  --popover: 20 16% 6%;
+  --popover-foreground: 25 10% 85%;
+  --popover-border: 25 28% 12%;
+  --border: 25 28% 12%;
+  --input: 25 22% 14%;
+  --primary: 25 100% 55%;
+  --primary-foreground: 20 20% 4%;
+  --primary-border: hsl(25 100% 44%);
+  --secondary: 25 22% 12%;
+  --secondary-foreground: 25 100% 55%;
+  --secondary-border: hsl(25 22% 10%);
+  --accent: 25 28% 10%;
+  --accent-foreground: 25 100% 55%;
+  --accent-border: hsl(25 28% 8%);
+  --muted: 20 16% 8%;
+  --muted-foreground: 25 5% 50%;
+  --muted-border: hsl(20 16% 6%);
+  --ring: 25 100% 55%;
+}
+
+/* ═══════════════════════════════════════════════
+   THEME — Toxic Yellow
+   ═══════════════════════════════════════════════ */
+:root[data-theme="toxic-yellow"] {
+  --background: 70 15% 4%;
+  --foreground: 65 10% 85%;
+  --card: 70 12% 6%;
+  --card-foreground: 65 10% 85%;
+  --card-border: 65 30% 12%;
+  --popover: 70 12% 6%;
+  --popover-foreground: 65 10% 85%;
+  --popover-border: 65 30% 12%;
+  --border: 65 30% 12%;
+  --input: 65 24% 14%;
+  --primary: 65 100% 48%;
+  --primary-foreground: 70 20% 4%;
+  --primary-border: hsl(65 100% 38%);
+  --secondary: 65 24% 12%;
+  --secondary-foreground: 65 100% 48%;
+  --secondary-border: hsl(65 24% 10%);
+  --accent: 65 30% 10%;
+  --accent-foreground: 65 100% 48%;
+  --accent-border: hsl(65 30% 8%);
+  --muted: 70 12% 8%;
+  --muted-foreground: 65 5% 50%;
+  --muted-border: hsl(70 12% 6%);
+  --ring: 65 100% 48%;
+}
+
+/* ═══════════════════════════════════════════════
+   THEME — Neon Pink
+   ═══════════════════════════════════════════════ */
+:root[data-theme="neon-pink"] {
+  --background: 330 18% 4%;
+  --foreground: 320 8% 85%;
+  --card: 330 15% 6%;
+  --card-foreground: 320 8% 85%;
+  --card-border: 320 28% 12%;
+  --popover: 330 15% 6%;
+  --popover-foreground: 320 8% 85%;
+  --popover-border: 320 28% 12%;
+  --border: 320 28% 12%;
+  --input: 320 22% 14%;
+  --primary: 320 100% 60%;
+  --primary-foreground: 330 20% 4%;
+  --primary-border: hsl(320 100% 48%);
+  --secondary: 320 22% 12%;
+  --secondary-foreground: 320 100% 60%;
+  --secondary-border: hsl(320 22% 10%);
+  --accent: 320 28% 10%;
+  --accent-foreground: 320 100% 60%;
+  --accent-border: hsl(320 28% 8%);
+  --muted: 330 15% 8%;
+  --muted-foreground: 320 5% 50%;
+  --muted-border: hsl(330 15% 6%);
+  --ring: 320 100% 60%;
+}
+
+/* ═══════════════════════════════════════════════
+   THEME — Aqua Teal
+   ═══════════════════════════════════════════════ */
+:root[data-theme="aqua-teal"] {
+  --background: 185 20% 4%;
+  --foreground: 180 10% 85%;
+  --card: 185 18% 6%;
+  --card-foreground: 180 10% 85%;
+  --card-border: 180 30% 12%;
+  --popover: 185 18% 6%;
+  --popover-foreground: 180 10% 85%;
+  --popover-border: 180 30% 12%;
+  --border: 180 30% 12%;
+  --input: 180 24% 14%;
+  --primary: 180 100% 40%;
+  --primary-foreground: 185 20% 4%;
+  --primary-border: hsl(180 100% 32%);
+  --secondary: 180 24% 12%;
+  --secondary-foreground: 180 100% 40%;
+  --secondary-border: hsl(180 24% 10%);
+  --accent: 180 30% 10%;
+  --accent-foreground: 180 100% 40%;
+  --accent-border: hsl(180 30% 8%);
+  --muted: 185 18% 8%;
+  --muted-foreground: 180 5% 50%;
+  --muted-border: hsl(185 18% 6%);
+  --ring: 180 100% 40%;
+}
+
+/* ═══════════════════════════════════════════════
+   THEME — Gold Rush
+   ═══════════════════════════════════════════════ */
+:root[data-theme="gold-rush"] {
+  --background: 40 18% 4%;
+  --foreground: 45 10% 85%;
+  --card: 40 16% 6%;
+  --card-foreground: 45 10% 85%;
+  --card-border: 45 30% 12%;
+  --popover: 40 16% 6%;
+  --popover-foreground: 45 10% 85%;
+  --popover-border: 45 30% 12%;
+  --border: 45 30% 12%;
+  --input: 45 24% 14%;
+  --primary: 45 100% 50%;
+  --primary-foreground: 40 20% 4%;
+  --primary-border: hsl(45 100% 40%);
+  --secondary: 45 24% 12%;
+  --secondary-foreground: 45 100% 50%;
+  --secondary-border: hsl(45 24% 10%);
+  --accent: 45 30% 10%;
+  --accent-foreground: 45 100% 50%;
+  --accent-border: hsl(45 30% 8%);
+  --muted: 40 16% 8%;
+  --muted-foreground: 45 5% 50%;
+  --muted-border: hsl(40 16% 6%);
+  --ring: 45 100% 50%;
+}
+
+/* ═══════════════════════════════════════════════
+   THEME — Ice White
+   ═══════════════════════════════════════════════ */
+:root[data-theme="ice-white"] {
+  --background: 210 18% 5%;
+  --foreground: 200 5% 88%;
+  --card: 210 15% 7%;
+  --card-foreground: 200 5% 88%;
+  --card-border: 200 15% 14%;
+  --popover: 210 15% 7%;
+  --popover-foreground: 200 5% 88%;
+  --popover-border: 200 15% 14%;
+  --border: 200 15% 14%;
+  --input: 200 12% 16%;
+  --primary: 200 25% 82%;
+  --primary-foreground: 210 20% 6%;
+  --primary-border: hsl(200 25% 65%);
+  --secondary: 200 12% 14%;
+  --secondary-foreground: 200 25% 82%;
+  --secondary-border: hsl(200 12% 11%);
+  --accent: 200 15% 11%;
+  --accent-foreground: 200 25% 82%;
+  --accent-border: hsl(200 15% 9%);
+  --muted: 210 15% 9%;
+  --muted-foreground: 200 5% 52%;
+  --muted-border: hsl(210 15% 7%);
+  --ring: 200 25% 82%;
+}
+
+/* ═══════════════════════════════════════════════
+   THEME — Crimson Code
+   ═══════════════════════════════════════════════ */
+:root[data-theme="crimson"] {
+  --background: 348 18% 4%;
+  --foreground: 348 8% 85%;
+  --card: 348 15% 6%;
+  --card-foreground: 348 8% 85%;
+  --card-border: 348 28% 12%;
+  --popover: 348 15% 6%;
+  --popover-foreground: 348 8% 85%;
+  --popover-border: 348 28% 12%;
+  --border: 348 28% 12%;
+  --input: 348 22% 14%;
+  --primary: 348 90% 50%;
+  --primary-foreground: 348 20% 4%;
+  --primary-border: hsl(348 90% 40%);
+  --secondary: 348 22% 12%;
+  --secondary-foreground: 348 90% 50%;
+  --secondary-border: hsl(348 22% 10%);
+  --accent: 348 28% 10%;
+  --accent-foreground: 348 90% 50%;
+  --accent-border: hsl(348 28% 8%);
+  --muted: 348 15% 8%;
+  --muted-foreground: 348 5% 50%;
+  --muted-border: hsl(348 15% 6%);
+  --ring: 348 90% 50%;
+}
+
+/* ═══════════════════════════════════════════════
+   THEME — Royal Blue
+   ═══════════════════════════════════════════════ */
+:root[data-theme="royal-blue"] {
+  --background: 230 20% 4%;
+  --foreground: 225 8% 85%;
+  --card: 230 18% 6%;
+  --card-foreground: 225 8% 85%;
+  --card-border: 225 28% 12%;
+  --popover: 230 18% 6%;
+  --popover-foreground: 225 8% 85%;
+  --popover-border: 225 28% 12%;
+  --border: 225 28% 12%;
+  --input: 225 22% 14%;
+  --primary: 225 90% 60%;
+  --primary-foreground: 230 20% 4%;
+  --primary-border: hsl(225 90% 48%);
+  --secondary: 225 22% 12%;
+  --secondary-foreground: 225 90% 60%;
+  --secondary-border: hsl(225 22% 10%);
+  --accent: 225 28% 10%;
+  --accent-foreground: 225 90% 60%;
+  --accent-border: hsl(225 28% 8%);
+  --muted: 230 18% 8%;
+  --muted-foreground: 225 5% 50%;
+  --muted-border: hsl(230 18% 6%);
+  --ring: 225 90% 60%;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -109,7 +431,7 @@
 
 .terminal-accent {
   color: hsl(var(--primary));
-  text-shadow: 0 0 10px hsla(120, 100%, 40%, 0.3);
+  text-shadow: 0 0 10px hsl(var(--primary) / 0.3);
 }
 
 .scanline-overlay {

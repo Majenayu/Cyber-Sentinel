@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Database, Bot, Shield, Terminal, Trash2, Info, Keyboard, Activity, CheckCircle, XCircle, Loader2, Layers, Gauge, RefreshCw, Zap, Clock, WifiOff, Wifi } from 'lucide-react';
+import { Settings, Database, Bot, Shield, Terminal, Trash2, Info, Keyboard, Activity, CheckCircle, XCircle, Loader2, Layers, Gauge, RefreshCw, Zap, Clock, WifiOff, Wifi, Palette } from 'lucide-react';
+import { useTheme, THEMES } from '@/contexts/ThemeContext';
 
 interface HealthStatus {
   database: string;
@@ -310,6 +311,8 @@ interface ProviderCheckResult {
 }
 
 export default function SettingsPage() {
+  const { theme, setTheme } = useTheme();
+  const currentTheme = THEMES.find(t => t.id === theme) || THEMES[0];
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [healthLoading, setHealthLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
@@ -597,6 +600,42 @@ export default function SettingsPage() {
                 <span className="text-foreground font-mono text-right ml-4">{v}</span>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* Theme */}
+        <section className="bg-card/50 border border-border rounded-lg overflow-hidden">
+          <div className="p-3 md:p-4 border-b border-border bg-black/20 font-bold flex items-center gap-2 text-xs">
+            <Palette size={14} className="text-primary" /> APPEARANCE — COLOR THEME
+          </div>
+          <div className="p-4">
+            <p className="text-[10px] text-muted-foreground mb-3">
+              Active: <span className="text-primary font-bold">{currentTheme.name}</span>
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {THEMES.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTheme(t.id)}
+                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded border text-xs font-mono transition-all duration-150 text-left ${
+                    theme === t.id
+                      ? 'border-current bg-black/40'
+                      : 'border-border hover:border-border/80 hover:bg-secondary/50 text-muted-foreground'
+                  }`}
+                  style={theme === t.id ? { borderColor: t.color, color: t.color } : {}}
+                >
+                  <span
+                    className="w-4 h-4 rounded-sm shrink-0 border border-white/10 shadow-inner"
+                    style={{ backgroundColor: t.color }}
+                  />
+                  <span className="truncate">{t.name}</span>
+                  {theme === t.id && <span className="ml-auto shrink-0">✓</span>}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground/50 mt-3">
+              Theme is saved automatically and persists across sessions.
+            </p>
           </div>
         </section>
 

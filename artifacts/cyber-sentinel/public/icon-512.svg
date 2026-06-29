@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softglow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="90" fill="#060a06"/>
+
+  <!-- Matrix code columns - left side -->
+  <text x="18" y="60"  fill="#00cc33" opacity="0.25" font-family="monospace" font-size="11" letter-spacing="1">01101</text>
+  <text x="18" y="75"  fill="#00cc33" opacity="0.18" font-family="monospace" font-size="11" letter-spacing="1">10010</text>
+  <text x="18" y="90"  fill="#00cc33" opacity="0.30" font-family="monospace" font-size="11" letter-spacing="1">11100</text>
+  <text x="18" y="105" fill="#00cc33" opacity="0.15" font-family="monospace" font-size="11" letter-spacing="1">01011</text>
+  <text x="18" y="120" fill="#00cc33" opacity="0.22" font-family="monospace" font-size="11" letter-spacing="1">10110</text>
+  <text x="18" y="135" fill="#00cc33" opacity="0.28" font-family="monospace" font-size="11" letter-spacing="1">00111</text>
+  <text x="18" y="150" fill="#00cc33" opacity="0.18" font-family="monospace" font-size="11" letter-spacing="1">11001</text>
+  <text x="18" y="165" fill="#00cc33" opacity="0.25" font-family="monospace" font-size="11" letter-spacing="1">01110</text>
+  <text x="18" y="180" fill="#00cc33" opacity="0.20" font-family="monospace" font-size="11" letter-spacing="1">10001</text>
+  <text x="18" y="195" fill="#00cc33" opacity="0.30" font-family="monospace" font-size="11" letter-spacing="1">11010</text>
+  <text x="18" y="210" fill="#00cc33" opacity="0.15" font-family="monospace" font-size="11" letter-spacing="1">00101</text>
+  <text x="18" y="225" fill="#00cc33" opacity="0.22" font-family="monospace" font-size="11" letter-spacing="1">10100</text>
+  <text x="18" y="240" fill="#00cc33" opacity="0.18" font-family="monospace" font-size="11" letter-spacing="1">01001</text>
+  <text x="18" y="255" fill="#00cc33" opacity="0.28" font-family="monospace" font-size="11" letter-spacing="1">11110</text>
+  <text x="18" y="270" fill="#00cc33" opacity="0.20" font-family="monospace" font-size="11" letter-spacing="1">00011</text>
+  <text x="18" y="285" fill="#00cc33" opacity="0.15" font-family="monospace" font-size="11" letter-spacing="1">10111</text>
+  <text x="18" y="300" fill="#00cc33" opacity="0.25" font-family="monospace" font-size="11" letter-spacing="1">01100</text>
+  <text x="18" y="315" fill="#00cc33" opacity="0.18" font-family="monospace" font-size="11" letter-spacing="1">11011</text>
+  <text x="18" y="330" fill="#00cc33" opacity="0.30" font-family="monospace" font-size="11" letter-spacing="1">00110</text>
+  <text x="18" y="345" fill="#00cc33" opacity="0.22" font-family="monospace" font-size="11" letter-spacing="1">10000</text>
+  <text x="18" y="360" fill="#00cc33" opacity="0.15" font-family="monospace" font-size="11" letter-spacing="1">01111</text>
+  <text x="18" y="375" fill="#00cc33" opacity="0.20" font-family="monospace" font-size="11" letter-spacing="1">11101</text>
+  <text x="18" y="390" fill="#00cc33" opacity="0.28" font-family="monospace" font-size="11" letter-spacing="1">00001</text>
+  <text x="18" y="405" fill="#00cc33" opacity="0.18" font-family="monospace" font-size="11" letter-spacing="1">10011</text>
+  <text x="18" y="420" fill="#00cc33" opacity="0.25" font-family="monospace" font-size="11" letter-spacing="1">01010</text>
+  <text x="18" y="435" fill="#00cc33" opacity="0.15" font-family="monospace" font-size="11" letter-spacing="1">11111</text>
+  <text x="18" y="450" fill="#00cc33" opacity="0.22" font-family="monospace" font-size="11" letter-spacing="1">00000</text>
+
+  <!-- Matrix code columns - right side -->
+  <text x="448" y="60"  fill="#00cc33" opacity="0.25" font-family="monospace" font-size="11" letter-spacing="1">10011</text>
+  <text x="448" y="75"  fill="#00cc33" opacity="0.18" font-family="monospace" font-size="11" letter-spacing="1">01100</text>
+  <text x="448" y="90"  fill="#00cc33" opacity="0.30" font-family="monospace" font-size="11" letter-spacing="1">11010</text>
+  <text x="448" y="105" fill="#00cc33" opacity="0.15" font-family="monospace" font-size="11" letter-spacing="1">00101</text>
+  <text x="448" y="120" fill="#00cc33" opacity="0.22" font-family="monospace" font-size="11" letter-spacing="1">10110</text>
+  <text x="448" y="135" fill="#00cc33" opacity="0.28" font-family="monospace" font-size="11" letter-spacing="1">01001</text>
+  <text x="448" y="150" fill="#00cc33" opacity="0.18" font-family="monospace" font-size="11" letter-spacing="1">11100</text>
+  <text x="448" y="165" fill="#00cc33" opacity="0.25" font-family="monospace" font-size="11" letter-spacing="1">00010</text>
+  <text x="448" y="180" fill="#00cc33" opacity="0.20" font-family="monospace" font-size="11" letter-spacing="1">10111</text>
+  <text x="448" y="195" fill="#00cc33" opacity="0.30" font-family="monospace" font-size="11" letter-spacing="1">01110</text>
+  <text x="448" y="210" fill="#00cc33" opacity="0.15" font-family="monospace" font-size="11" letter-spacing="1">11001</text>
+  <text x="448" y="225" fill="#00cc33" opacity="0.22" font-family="monospace" font-size="11" letter-spacing="1">00100</text>
+  <text x="448" y="240" fill="#00cc33" opacity="0.18" font-family="monospace" font-size="11" letter-spacing="1">10001</text>
+  <text x="448" y="255" fill="#00cc33" opacity="0.28" font-family="monospace" font-size="11" letter-spacing="1">01011</text>
+  <text x="448" y="270" fill="#00cc33" opacity="0.20" font-family="monospace" font-size="11" letter-spacing="1">11110</text>
+  <text x="448" y="285" fill="#00cc33" opacity="0.15" font-family="monospace" font-size="11" letter-spacing="1">00111</text>
+  <text x="448" y="300" fill="#00cc33" opacity="0.25" font-family="monospace" font-size="11" letter-spacing="1">10100</text>
+  <text x="448" y="315" fill="#00cc33" opacity="0.18" font-family="monospace" font-size="11" letter-spacing="1">01101</text>
+  <text x="448" y="330" fill="#00cc33" opacity="0.30" font-family="monospace" font-size="11" letter-spacing="1">11011</text>
+  <text x="448" y="345" fill="#00cc33" opacity="0.22" font-family="monospace" font-size="11" letter-spacing="1">00110</text>
+  <text x="448" y="360" fill="#00cc33" opacity="0.15" font-family="monospace" font-size="11" letter-spacing="1">10000</text>
+  <text x="448" y="375" fill="#00cc33" opacity="0.20" font-family="monospace" font-size="11" letter-spacing="1">01111</text>
+  <text x="448" y="390" fill="#00cc33" opacity="0.28" font-family="monospace" font-size="11" letter-spacing="1">11101</text>
+  <text x="448" y="405" fill="#00cc33" opacity="0.18" font-family="monospace" font-size="11" letter-spacing="1">00001</text>
+  <text x="448" y="420" fill="#00cc33" opacity="0.25" font-family="monospace" font-size="11" letter-spacing="1">10010</text>
+  <text x="448" y="435" fill="#00cc33" opacity="0.15" font-family="monospace" font-size="11" letter-spacing="1">01000</text>
+  <text x="448" y="450" fill="#00cc33" opacity="0.22" font-family="monospace" font-size="11" letter-spacing="1">11111</text>
+
+  <!-- Bottom code line -->
+  <text x="60" y="485" fill="#00cc33" opacity="0.35" font-family="monospace" font-size="10" letter-spacing="2">0xDEAD :: 0xC0DE :: 0xFF</text>
+
+  <!-- SKULL - Cranium (main dome) -->
+  <ellipse cx="256" cy="205" rx="145" ry="145" fill="#00cc33" filter="url(#glow)"/>
+
+  <!-- Cranium highlight -->
+  <ellipse cx="226" cy="165" rx="55" ry="38" fill="#00ff44" opacity="0.18"/>
+
+  <!-- Cheekbones -->
+  <ellipse cx="175" cy="318" rx="52" ry="28" fill="#00cc33"/>
+  <ellipse cx="337" cy="318" rx="52" ry="28" fill="#00cc33"/>
+
+  <!-- Jaw -->
+  <rect x="166" y="300" width="180" height="75" rx="12" fill="#00cc33"/>
+
+  <!-- Chin -->
+  <ellipse cx="256" cy="375" rx="80" ry="22" fill="#00cc33"/>
+
+  <!-- LEFT EYE SOCKET -->
+  <ellipse cx="204" cy="220" rx="42" ry="50" fill="#060a06"/>
+  <!-- Eye inner glow -->
+  <ellipse cx="204" cy="220" rx="28" ry="34" fill="#001a00" opacity="0.8"/>
+  <ellipse cx="198" cy="212" rx="8" ry="10" fill="#00cc33" opacity="0.15"/>
+
+  <!-- RIGHT EYE SOCKET -->
+  <ellipse cx="308" cy="220" rx="42" ry="50" fill="#060a06"/>
+  <!-- Eye inner glow -->
+  <ellipse cx="308" cy="220" rx="28" ry="34" fill="#001a00" opacity="0.8"/>
+  <ellipse cx="302" cy="212" rx="8" ry="10" fill="#00cc33" opacity="0.15"/>
+
+  <!-- NOSE CAVITY -->
+  <path d="M242 282 L270 282 L260 308 L252 308 Z" fill="#060a06"/>
+  <ellipse cx="256" cy="284" rx="16" ry="8" fill="#060a06"/>
+
+  <!-- TEETH -->
+  <rect x="183" y="340" width="22" height="28" rx="5" fill="#060a06"/>
+  <rect x="213" y="340" width="22" height="32" rx="5" fill="#060a06"/>
+  <rect x="245" y="340" width="22" height="34" rx="5" fill="#060a06"/>
+  <rect x="277" y="340" width="22" height="32" rx="5" fill="#060a06"/>
+  <rect x="307" y="340" width="22" height="28" rx="5" fill="#060a06"/>
+
+  <!-- TEETH DIVIDERS (gaps) -->
+  <rect x="206" y="340" width="6" height="28" rx="1" fill="#060a06" opacity="0.8"/>
+  <rect x="236" y="340" width="8" height="32" rx="1" fill="#060a06" opacity="0.8"/>
+  <rect x="268" y="340" width="8" height="32" rx="1" fill="#060a06" opacity="0.8"/>
+  <rect x="300" y="340" width="6" height="28" rx="1" fill="#060a06" opacity="0.8"/>
+
+  <!-- SKULL outline glow -->
+  <ellipse cx="256" cy="205" rx="146" ry="146" fill="none" stroke="#00ff44" stroke-width="1.5" opacity="0.4"/>
+
+  <!-- Code text on skull forehead -->
+  <text x="220" y="170" fill="#060a06" font-family="monospace" font-size="11" font-weight="bold" opacity="0.6">0xDEAD</text>
+  <text x="225" y="185" fill="#060a06" font-family="monospace" font-size="10" opacity="0.4">C0D3</text>
+</svg>
