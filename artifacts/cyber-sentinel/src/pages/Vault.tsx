@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Plus, FileText, Trash2, Edit, Save, X, ExternalLink, Loader2, ChevronLeft, Tag } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, Plus, FileText, Trash2, Edit, Save, X, ExternalLink, Loader2, ChevronLeft, Tag, Sparkles, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -38,6 +38,249 @@ function renderContent(content: string) {
   });
 }
 
+interface AnalyzeEvent {
+  type: string;
+  total?: number;
+  current?: number;
+  title?: string;
+  tags?: string[];
+  toolsAdded?: number;
+  commandsAdded?: number;
+  totalTags?: number;
+  totalTools?: number;
+  totalCommands?: number;
+  errors?: string[];
+  message?: string;
+  error?: string;
+  id?: string;
+}
+
+interface EntryResult {
+  title: string;
+  tags: string[];
+  toolsAdded: number;
+  commandsAdded: number;
+  error?: string;
+}
+
+function AnalyzeModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
+  const [current, setCurrent] = useState(0);
+  const [currentTitle, setCurrentTitle] = useState('');
+  const [results, setResults] = useState<EntryResult[]>([]);
+  const [summary, setSummary] = useState<{ tags: number; tools: number; commands: number } | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const start = async () => {
+    setRunning(true);
+    setDone(false);
+    setError(null);
+    setResults([]);
+    setSummary(null);
+    setCurrent(0);
+    setTotal(0);
+
+    abortRef.current = new AbortController();
+
+    try {
+      const res = await fetch('/api/analyze/knowledge', {
+        method: 'POST',
+        signal: abortRef.current.signal,
+      });
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done: streamDone, value } = await reader.read();
+        if (streamDone) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event: AnalyzeEvent = JSON.parse(line.slice(6));
+            if (event.type === 'start') {
+              setTotal(event.total ?? 0);
+            } else if (event.type === 'progress') {
+              setCurrent(event.current ?? 0);
+              setCurrentTitle(event.title ?? '');
+            } else if (event.type === 'entry_done') {
+              setResults(prev => [...prev, {
+                title: event.title!,
+                tags: event.tags ?? [],
+                toolsAdded: event.toolsAdded ?? 0,
+                commandsAdded: event.commandsAdded ?? 0,
+              }]);
+            } else if (event.type === 'entry_error') {
+              setResults(prev => [...prev, {
+                title: event.title!,
+                tags: [],
+                toolsAdded: 0,
+                commandsAdded: 0,
+                error: event.error,
+              }]);
+            } else if (event.type === 'done') {
+              setSummary({ tags: event.totalTags ?? 0, tools: event.totalTools ?? 0, commands: event.totalCommands ?? 0 });
+              setDone(true);
+              setRunning(false);
+              onDone();
+            } else if (event.type === 'error') {
+              setError(event.message ?? 'Unknown error');
+              setRunning(false);
+            }
+          } catch {}
+        }
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        setError(err.message);
+      }
+      setRunning(false);
+    }
+  };
+
+  const stop = () => {
+    abortRef.current?.abort();
+    setRunning(false);
+  };
+
+  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+      <div className="bg-card border border-border rounded-lg w-full max-w-lg font-mono shadow-2xl shadow-primary/10 flex flex-col max-h-[85vh]">
+        <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-primary" />
+            <span className="font-bold text-sm text-primary">AI.ANALYZE_VAULT</span>
+          </div>
+          {!running && <button onClick={onClose} className="text-muted-foreground hover:text-primary transition-colors"><X size={16} /></button>}
+        </div>
+
+        <div className="p-4 space-y-4 overflow-y-auto flex-1">
+          {!running && !done && !error && (
+            <div className="space-y-3 text-xs text-muted-foreground">
+              <p>The AI will scan every entry in your Knowledge Vault and automatically:</p>
+              <ul className="space-y-1 pl-3 border-l border-primary/30">
+                <li className="text-primary/80">→ Add relevant tags to each entry</li>
+                <li className="text-primary/80">→ Extract Tool References (with cheatsheets)</li>
+                <li className="text-primary/80">→ Extract Saved Commands</li>
+              </ul>
+              <p className="text-[10px] text-muted-foreground/60">Existing tags are preserved. Duplicate tools/commands are skipped. Takes ~10s per entry.</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="flex items-start gap-2 text-destructive text-xs p-3 border border-destructive/30 rounded bg-destructive/10">
+              <AlertCircle size={14} className="shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {(running || done) && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span>{running ? `Processing: ${currentTitle || '...'}` : 'Complete'}</span>
+                  <span>{current}/{total} — {pct}%</span>
+                </div>
+                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all duration-300"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+
+              {done && summary && (
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'Tags Added', value: summary.tags },
+                    { label: 'Tools Created', value: summary.tools },
+                    { label: 'Commands Saved', value: summary.commands },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="bg-black/40 border border-primary/20 rounded p-3 text-center">
+                      <div className="text-xl font-bold text-primary">{value}</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">{label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {results.length > 0 && (
+                <div>
+                  <button
+                    onClick={() => setShowDetails(d => !d)}
+                    className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {showDetails ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                    {showDetails ? 'Hide' : 'Show'} details ({results.length} entries)
+                  </button>
+                  {showDetails && (
+                    <div className="mt-2 space-y-1 max-h-48 overflow-y-auto pr-1">
+                      {results.map((r, i) => (
+                        <div key={i} className={cn(
+                          "flex items-start gap-2 text-[10px] p-2 rounded border",
+                          r.error ? "border-destructive/20 bg-destructive/5" : "border-border/50 bg-black/20"
+                        )}>
+                          {r.error
+                            ? <AlertCircle size={10} className="text-destructive shrink-0 mt-0.5" />
+                            : <CheckCircle size={10} className="text-primary shrink-0 mt-0.5" />
+                          }
+                          <div className="min-w-0">
+                            <div className="truncate text-foreground/80">{r.title}</div>
+                            {r.error
+                              ? <div className="text-destructive/70">{r.error}</div>
+                              : <div className="text-muted-foreground">
+                                  {r.tags.length > 0 && `tags: ${r.tags.slice(0, 4).join(', ')}${r.tags.length > 4 ? '…' : ''}`}
+                                  {r.toolsAdded > 0 && ` · ${r.toolsAdded} tool(s)`}
+                                  {r.commandsAdded > 0 && ` · ${r.commandsAdded} cmd(s)`}
+                                </div>
+                            }
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-t border-border shrink-0 flex gap-2 justify-end">
+          {!running && !done && (
+            <>
+              <button onClick={onClose} className="px-3 py-1.5 text-xs rounded hover:bg-secondary transition-colors">Cancel</button>
+              <button onClick={start} className="px-4 py-1.5 text-xs font-bold bg-primary text-black rounded hover:bg-primary/80 flex items-center gap-1.5 transition-colors">
+                <Sparkles size={12} /> Run Analysis
+              </button>
+            </>
+          )}
+          {running && (
+            <button onClick={stop} className="px-3 py-1.5 text-xs border border-destructive/50 text-destructive rounded hover:bg-destructive/10 transition-colors">
+              Stop
+            </button>
+          )}
+          {done && (
+            <button onClick={onClose} className="px-4 py-1.5 text-xs font-bold bg-primary text-black rounded hover:bg-primary/80 transition-colors">
+              Done
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function VaultPage() {
   const [entries, setEntries] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +292,7 @@ export default function VaultPage() {
   const [formData, setFormData] = useState({ title: '', content: '', source: '', tags: '' });
   const [showList, setShowList] = useState(true);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [showAnalyze, setShowAnalyze] = useState(false);
 
   const fetchEntries = async (q?: string) => {
     const url = q ? `/api/knowledge?q=${encodeURIComponent(q)}` : '/api/knowledge';
@@ -71,14 +315,10 @@ export default function VaultPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Collect all unique tags from all entries
   const allTags = Array.from(new Set(entries.flatMap(e => e.tags ?? []))).sort();
-
-  // Filter entries by active tag (client-side)
   const visibleEntries = activeTag
     ? entries.filter(e => (e.tags ?? []).includes(activeTag))
     : entries;
-
   const selectedEntry = entries.find(e => e.id === selectedId);
 
   useEffect(() => {
@@ -130,6 +370,13 @@ export default function VaultPage() {
 
   return (
     <div className="flex h-full overflow-hidden font-mono">
+      {showAnalyze && (
+        <AnalyzeModal
+          onClose={() => setShowAnalyze(false)}
+          onDone={() => fetchEntries()}
+        />
+      )}
+
       {/* List panel */}
       <div className={cn(
         "border-r border-border bg-card/30 flex flex-col shrink-0 transition-all",
@@ -139,17 +386,25 @@ export default function VaultPage() {
         <div className="p-3 md:p-4 border-b border-border space-y-2.5">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold flex items-center gap-2 text-xs md:text-sm"><FileText size={16} className="text-primary" /> Knowledge</h2>
-            <button onClick={() => { setIsCreating(true); setIsEditing(false); setSelectedId(null); setShowList(false); }}
-              className="h-7 px-2 text-xs border border-primary/50 text-primary hover:bg-primary/20 rounded flex items-center gap-1 transition-colors">
-              <Plus size={12} /> New
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowAnalyze(true)}
+                title="AI: auto-tag, extract tools & commands"
+                className="h-7 px-2 text-xs border border-primary/40 text-primary hover:bg-primary/20 rounded flex items-center gap-1 transition-colors"
+              >
+                <Sparkles size={11} /> AI
+              </button>
+              <button onClick={() => { setIsCreating(true); setIsEditing(false); setSelectedId(null); setShowList(false); }}
+                className="h-7 px-2 text-xs border border-primary/50 text-primary hover:bg-primary/20 rounded flex items-center gap-1 transition-colors">
+                <Plus size={12} /> New
+              </button>
+            </div>
           </div>
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
             <input placeholder="Search..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-8 pr-3 py-2 bg-black/50 border border-border rounded text-xs focus:outline-none focus:border-primary" />
           </div>
-          {/* Tag filter bar */}
           {allTags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
               {activeTag && (
@@ -180,7 +435,7 @@ export default function VaultPage() {
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {isLoading ? <div className="p-4 text-center text-xs text-muted-foreground">Loading...</div>
             : visibleEntries.length === 0
-              ? <div className="p-4 text-center text-xs text-muted-foreground">
+              ? <div className="p-4 text-center text-xs text-muted-foreground space-y-2">
                   {activeTag ? `No entries tagged #${activeTag}.` : 'No entries. Create your first record.'}
                 </div>
               : visibleEntries.map(entry => (
@@ -198,12 +453,10 @@ export default function VaultPage() {
               </div>
             ))}
         </div>
-        {allTags.length > 0 && (
-          <div className="p-2 border-t border-border text-[10px] text-muted-foreground/50 text-center">
-            {visibleEntries.length} / {entries.length} entries
-            {activeTag && ` · #${activeTag}`}
-          </div>
-        )}
+        <div className="p-2 border-t border-border text-[10px] text-muted-foreground/50 text-center">
+          {visibleEntries.length} / {entries.length} entries
+          {activeTag && ` · #${activeTag}`}
+        </div>
       </div>
 
       {/* Detail/edit panel */}
@@ -285,9 +538,18 @@ export default function VaultPage() {
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col gap-3 opacity-40">
+          <div className="flex-1 flex items-center justify-center text-muted-foreground flex-col gap-4 opacity-60 p-8 text-center">
             <FileText size={40} />
             <p className="text-xs">Select an entry or create a new one.</p>
+            {entries.length > 0 && (
+              <button
+                onClick={() => setShowAnalyze(true)}
+                className="flex items-center gap-2 px-4 py-2 text-xs border border-primary/40 text-primary hover:bg-primary/10 rounded transition-colors"
+              >
+                <Sparkles size={13} />
+                Auto-tag & extract tools/commands with AI
+              </button>
+            )}
           </div>
         )}
       </div>
