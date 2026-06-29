@@ -379,10 +379,13 @@ export default function ChatPage() {
       setMessages(prev => prev.map(m => m.id === streamingId ? { ...m, streaming: false } : m));
     } catch (err: any) {
       if (err.name !== 'AbortError') {
+        // Keep isLoading=true — sendStreamWithId will set it false when done
         setMessages(prev => prev.map(m =>
           m.id === streamingId ? { ...m, content: '', streaming: true, judgeFallback: true } : m
         ));
-        setTimeout(() => sendStreamWithId(text, streamingId), 300);
+        setProcessingProviders([]);
+        abortRef.current = null;
+        await sendStreamWithId(text, streamingId);
         return;
       }
     } finally {

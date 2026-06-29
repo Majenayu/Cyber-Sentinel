@@ -264,7 +264,7 @@ export default function VaultPage() {
   // Sync activeTag when URL search param changes (e.g. navigating from Dashboard)
   useEffect(() => {
     const tag = new URLSearchParams(search).get('tag');
-    if (tag) setActiveTag(tag);
+    setActiveTag(tag ?? null);
   }, [search]);
 
   const fetchEntries = async (q?: string) => {
