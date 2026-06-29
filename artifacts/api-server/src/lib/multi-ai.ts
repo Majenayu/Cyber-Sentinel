@@ -8,43 +8,67 @@ export interface AIProvider {
   call: (messages: any[], systemPrompt: string) => Promise<string>;
 }
 
+const GROQ_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+  'llama3-70b-8192',
+  'llama3-8b-8192',
+];
+
 function makeGroqProvider(apiKey: string, label: string, key: string): AIProvider {
   return {
     name: label,
     providerKey: key,
     async call(messages, systemPrompt) {
       recordProviderCall(key);
-      try {
-        const client = new Groq({ apiKey });
-        const { data, response } = await client.chat.completions.create({
-          model: 'llama-3.3-70b-versatile',
-          temperature: 0.7,
-          max_tokens: 2048,
-          messages: [{ role: 'system', content: systemPrompt }, ...messages],
-        }).withResponse();
-        const headers = Object.fromEntries(response.headers.entries());
-        updateFromHeaders(headers);
-        updateProviderHeaders(key, headers);
-        const content = data.choices[0]?.message?.content ?? '';
-        if (!content) throw new Error('Empty response');
-        return content;
-      } catch (e: any) {
-        recordProviderError(key, e.message?.slice(0, 120) ?? 'Unknown error');
-        throw e;
+      let lastErr: Error = new Error('No Groq model succeeded');
+      for (const model of GROQ_MODELS) {
+        try {
+          const client = new Groq({ apiKey });
+          const { data, response } = await client.chat.completions.create({
+            model,
+            temperature: 0.7,
+            max_tokens: 2048,
+            messages: [{ role: 'system', content: systemPrompt }, ...messages],
+          }).withResponse();
+          const headers = Object.fromEntries(response.headers.entries());
+          updateFromHeaders(headers);
+          updateProviderHeaders(key, headers);
+          const content = data.choices[0]?.message?.content ?? '';
+          if (!content) throw new Error('Empty response');
+          return content;
+        } catch (e: any) {
+          const msg: string = e.message ?? '';
+          lastErr = e;
+          // On rate-limit (429) or daily token limit, try next model
+          if (e.status === 429 || msg.includes('429') || msg.includes('Rate limit') || msg.includes('TPD') || msg.includes('TPM')) {
+            continue;
+          }
+          // On auth errors or other fatal errors, stop immediately
+          if (e.status === 401 || e.status === 403) {
+            recordProviderError(key, msg.slice(0, 120));
+            throw e;
+          }
+          // On other errors, try next model
+          continue;
+        }
       }
+      recordProviderError(key, lastErr.message?.slice(0, 120) ?? 'Unknown error');
+      throw lastErr;
     },
   };
 }
 
-
 function makeMistralProvider(apiKey: string): AIProvider {
-  const MODELS = ['mistral-small-latest', 'open-mistral-7b', 'open-mixtral-8x7b'];
+  // Only mistral-small-latest is available on free tier
+  // open-mistral-7b and open-mixtral-8x7b require paid access (returns 401)
+  const MODELS = ['mistral-small-latest'];
   return {
     name: 'Mistral',
     providerKey: 'mistral',
     async call(messages, systemPrompt) {
       recordProviderCall('mistral');
-      let lastErr: Error = new Error('No model succeeded');
+      let lastErr: Error = new Error('No Mistral model succeeded');
       for (const model of MODELS) {
         try {
           const res = await fetch('https://api.mistral.ai/v1/chat/completions', {
@@ -61,12 +85,14 @@ function makeMistralProvider(apiKey: string): AIProvider {
           updateProviderHeaders('mistral', headers);
           if (!res.ok) {
             const body = await res.text().catch(() => '');
-            lastErr = new Error(`Mistral ${model}: ${res.status} ${body.slice(0, 100)}`);
+            lastErr = new Error(`Mistral ${model}: ${res.status} ${body.slice(0, 120)}`);
+            // 401/403 = bad key or no access, don't retry other models
+            if (res.status === 401 || res.status === 403) break;
             continue;
           }
           const data = await res.json();
           const content = data.choices?.[0]?.message?.content ?? '';
-          if (!content) { lastErr = new Error(`Mistral ${model}: empty`); continue; }
+          if (!content) { lastErr = new Error(`Mistral ${model}: empty response`); continue; }
           return content;
         } catch (e: any) {
           lastErr = e;
@@ -165,13 +191,10 @@ CRITICAL OUTPUT RULES — violating any rule makes your response invalid:
 
   const isValidReframe = (text: string): boolean => {
     if (text.length < 15 || text.length > 500) return false;
-    // Reject if it looks like an answer (contains code fences, numbered steps, or is very long)
     if (text.includes('```')) return false;
-    if (/^\d+\.\s/.test(text)) return false; // starts with "1. "
-    // Reject if it's a multi-paragraph answer
+    if (/^\d+\.\s/.test(text)) return false;
     const paragraphs = text.split(/\n\n+/).filter(p => p.trim().length > 0);
     if (paragraphs.length > 2) return false;
-    // Reject if it contains common answer phrases
     const answerPhrases = ['here is', 'here\'s', 'to answer', 'in order to', 'the following', 'step 1', 'first,', 'firstly'];
     const lower = text.toLowerCase();
     if (answerPhrases.some(p => lower.startsWith(p))) return false;
@@ -187,9 +210,7 @@ CRITICAL OUTPUT RULES — violating any rule makes your response invalid:
       provider.call(messages, systemPrompt)
         .then(result => {
           if (settled) return;
-          // Strip any leading label the AI might have prepended ("Rewritten: ", "Enhanced: ", etc.)
           let text = result.trim().replace(/^(rewritten|enhanced|sanitized|here is|output|question)\s*:\s*/i, '').trim();
-          // Strip surrounding quotes if the AI wrapped it
           if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
             text = text.slice(1, -1).trim();
           }
@@ -239,13 +260,12 @@ export async function getBestAnswer(
     }
   });
 
-  if (successful.length === 0) throw new Error('All AI providers failed — check API keys in Settings');
+  if (successful.length === 0) throw new Error('All AI providers failed — check API keys and rate limits');
   if (successful.length === 1) {
     onProviderResult?.(successful[0].name, successful[0].content, true);
     return { content: successful[0].content, provider: successful[0].name, reason: 'Only responding provider' };
   }
 
-  // Notify UI of all responding providers
   successful.forEach(r => onProviderResult?.(r.name, r.content, false));
 
   const userQuestion = messages[messages.length - 1]?.content ?? '';
@@ -260,7 +280,6 @@ export async function getBestAnswer(
   let reason = 'First response selected';
 
   try {
-    // Use Groq-2 as judge if Groq-1 is rate-limited, else use first Groq available
     const judgeProvider =
       providers.find(p => p.name === 'Groq-2') ??
       providers.find(p => p.name.startsWith('Groq')) ??

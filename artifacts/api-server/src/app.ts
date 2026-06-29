@@ -1,4 +1,4 @@
-import express, { type Express } from "express";
+import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import path from "path";
@@ -9,6 +9,30 @@ import { logger } from "./lib/logger";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app: Express = express();
+
+// CORS — in production, lock to the RENDER_EXTERNAL_URL or ALLOWED_ORIGIN env var
+const allowedOrigins: string[] = [];
+if (process.env.ALLOWED_ORIGIN) {
+  allowedOrigins.push(...process.env.ALLOWED_ORIGIN.split(',').map(o => o.trim()));
+}
+if (process.env.RENDER_EXTERNAL_URL) {
+  allowedOrigins.push(process.env.RENDER_EXTERNAL_URL.replace(/\/$/, ''));
+}
+
+app.use(
+  cors(
+    allowedOrigins.length > 0
+      ? {
+          origin: (origin, callback) => {
+            // Allow same-origin requests (no origin = server-to-server or curl)
+            if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+            callback(new Error(`CORS: origin ${origin} not allowed`));
+          },
+          credentials: true,
+        }
+      : undefined // dev: wide-open
+  )
+);
 
 app.use(
   pinoHttp({
@@ -29,9 +53,25 @@ app.use(
     },
   }),
 );
-app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Optional API secret guard — set CYBERSENTINEL_API_SECRET to enable
+const API_SECRET = process.env.CYBERSENTINEL_API_SECRET;
+if (API_SECRET) {
+  app.use('/api', (req: Request, res: Response, next: NextFunction) => {
+    // Always allow health checks without auth
+    if (req.path === '/healthz' || req.path === '/health/status') return next();
+    const provided =
+      req.headers['x-api-key'] ??
+      req.headers['authorization']?.replace(/^bearer\s+/i, '');
+    if (provided !== API_SECRET) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    next();
+  });
+}
 
 app.use("/api", router);
 

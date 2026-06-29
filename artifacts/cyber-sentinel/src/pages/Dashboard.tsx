@@ -3,22 +3,36 @@ import { Terminal, Database, Wrench, Bot, Activity, ShieldCheck, CheckCircle, XC
 import { Link } from 'wouter';
 import { useGetStats } from '@workspace/api-client-react';
 
+interface ProviderSnapshot {
+  key: string;
+  label: string;
+  configured: boolean;
+}
+
+interface UsageData {
+  providers: ProviderSnapshot[];
+}
+
 interface HealthStatus {
   database: string;
-  ai: string;
   encryption: string;
 }
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useGetStats();
   const [health, setHealth] = useState<HealthStatus | null>(null);
+  const [providers, setProviders] = useState<ProviderSnapshot[]>([]);
   const [healthLoading, setHealthLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/health/status')
-      .then(r => r.json())
-      .then(d => { setHealth(d); setHealthLoading(false); })
-      .catch(() => setHealthLoading(false));
+    Promise.all([
+      fetch('/api/health/status').then(r => r.json()).catch(() => null),
+      fetch('/api/health/usage').then(r => r.json()).catch(() => null),
+    ]).then(([status, usage]: [any, UsageData | null]) => {
+      if (status) setHealth({ database: status.database, encryption: status.encryption });
+      if (usage?.providers) setProviders(usage.providers);
+      setHealthLoading(false);
+    });
   }, []);
 
   if (isLoading) {
@@ -29,12 +43,12 @@ export default function Dashboard() {
     );
   }
 
-  const StatusValue = ({ value }: { value: string | undefined }) => {
+  const StatusValue = ({ value, ok }: { value: string | undefined; ok?: boolean }) => {
     if (healthLoading || value === undefined) return <Loader2 size={12} className="animate-spin text-muted-foreground" />;
-    const ok = value === 'ONLINE' || value === 'AES-256 ACTIVE';
+    const isOk = ok ?? (value === 'ONLINE' || value === 'AES-256 ACTIVE');
     return (
-      <span className={`flex items-center gap-1.5 font-bold text-xs md:text-sm ${ok ? 'text-primary' : 'text-red-400'}`}>
-        {ok ? <CheckCircle size={12} /> : <XCircle size={12} />}
+      <span className={`flex items-center gap-1.5 font-bold text-xs md:text-sm ${isOk ? 'text-primary' : 'text-red-400'}`}>
+        {isOk ? <CheckCircle size={12} /> : <XCircle size={12} />}
         {value}
       </span>
     );
@@ -83,16 +97,31 @@ export default function Dashboard() {
               <Activity className="text-primary" size={16} /> System Status
             </div>
             <div className="p-4 md:p-5 space-y-3 md:space-y-4 font-mono text-xs md:text-sm">
-              {([
-                ['Core Database', health?.database],
-                ['AI Module (Groq)', health?.ai],
-                ['Encryption', health?.encryption],
-              ] as [string, string | undefined][]).map(([label, val]) => (
-                <div key={label} className="flex justify-between items-center border-b border-border pb-3 last:border-0 last:pb-0">
-                  <span className="text-muted-foreground">{label}</span>
-                  <StatusValue value={val} />
+              <div className="flex justify-between items-center border-b border-border pb-3">
+                <span className="text-muted-foreground">Core Database</span>
+                <StatusValue value={health?.database} />
+              </div>
+              {healthLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground text-xs pb-3 border-b border-border">
+                  <Loader2 size={12} className="animate-spin" /> Loading AI providers...
                 </div>
-              ))}
+              ) : providers.length === 0 ? (
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <span className="text-muted-foreground">AI Module</span>
+                  <StatusValue value="NO PROVIDERS" ok={false} />
+                </div>
+              ) : (
+                providers.map(p => (
+                  <div key={p.key} className="flex justify-between items-center border-b border-border pb-3 last:border-0 last:pb-0">
+                    <span className="text-muted-foreground">AI — {p.label}</span>
+                    <StatusValue value={p.configured ? 'ONLINE' : 'NO_KEY'} ok={p.configured} />
+                  </div>
+                ))
+              )}
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Encryption</span>
+                <StatusValue value={health?.encryption} />
+              </div>
             </div>
           </div>
         </div>

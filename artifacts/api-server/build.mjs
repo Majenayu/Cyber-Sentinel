@@ -100,6 +100,11 @@ async function buildAll() {
       "puppeteer",
       "puppeteer-core",
       "electron",
+      // AI SDK packages — pure HTTP, no native bindings, but large and slow to bundle
+      "groq-sdk",
+      "@mistralai/mistralai",
+      "cohere-ai",
+      "@google/generative-ai",
     ],
     sourcemap: "linked",
     plugins: [
