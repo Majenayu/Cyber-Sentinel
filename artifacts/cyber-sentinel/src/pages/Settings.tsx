@@ -41,10 +41,11 @@ function formatBytes(bytes: number) {
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
 
-function ProgressBar({ value, max, color = 'primary', label }: { value: number; max: number; color?: string; label?: string }) {
-  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+function ProgressBar({ value, max, label }: { value: number; max: number; label?: string }) {
   const used = max - value;
-  const usedPct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
+  const usedPct = max > 0 ? (used / max) * 100 : 0;
+  const displayPct = Math.round(usedPct * 10) / 10;
+  const barWidth = Math.max(usedPct, usedPct > 0 ? 1.5 : 0);
 
   const barColor =
     usedPct > 85 ? 'bg-red-400' :
@@ -52,7 +53,7 @@ function ProgressBar({ value, max, color = 'primary', label }: { value: number; 
     'bg-primary';
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       {label && (
         <div className="flex justify-between items-center text-[10px] text-muted-foreground">
           <span>{label}</span>
@@ -61,36 +62,41 @@ function ProgressBar({ value, max, color = 'primary', label }: { value: number; 
           </span>
         </div>
       )}
-      <div className="h-2 w-full bg-black/40 border border-border/50 rounded-full overflow-hidden">
+      <div className="h-2.5 w-full bg-black/60 border border-border/60 rounded-full overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-          style={{ width: `${usedPct}%` }}
+          style={{ width: `${barWidth}%`, minWidth: usedPct > 0 ? '4px' : '0' }}
         />
       </div>
       <div className="flex justify-between text-[10px]">
         <span className="text-muted-foreground/60">{value.toLocaleString()} remaining</span>
-        <span className={usedPct > 85 ? 'text-red-400 font-bold' : 'text-primary font-mono'}>{usedPct}% used</span>
+        <span className={usedPct > 85 ? 'text-red-400 font-bold' : 'text-primary font-mono'}>{displayPct}% used</span>
       </div>
     </div>
   );
 }
 
 function BytesBar({ used, total, label }: { used: number; total: number; label: string }) {
-  const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+  const pct = total > 0 ? (used / total) * 100 : 0;
+  const displayPct = pct < 0.1 ? '<0.1' : String(Math.round(pct * 10) / 10);
+  const barWidth = Math.max(pct, pct > 0 ? 1.5 : 0);
   const barColor = pct > 85 ? 'bg-red-400' : pct > 60 ? 'bg-yellow-400' : 'bg-primary';
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <div className="flex justify-between items-center text-[10px] text-muted-foreground">
         <span>{label}</span>
         <span className="text-foreground">{formatBytes(used)} / {formatBytes(total)}</span>
       </div>
-      <div className="h-2 w-full bg-black/40 border border-border/50 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
+      <div className="h-2.5 w-full bg-black/60 border border-border/60 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${barWidth}%`, minWidth: pct > 0 ? '4px' : '0' }}
+        />
       </div>
       <div className="flex justify-between text-[10px]">
         <span className="text-muted-foreground/60">{formatBytes(total - used)} free</span>
-        <span className={pct > 85 ? 'text-red-400 font-bold' : 'text-primary font-mono'}>{pct}% used</span>
+        <span className={pct > 85 ? 'text-red-400 font-bold' : 'text-primary font-mono'}>{displayPct}% used</span>
       </div>
     </div>
   );
@@ -220,28 +226,28 @@ export default function SettingsPage() {
               ) : usage?.mongoError ? (
                 <p className="text-xs text-red-400">{usage.mongoError}</p>
               ) : mongo ? (
-                <div className="space-y-3">
-                  {mongo.fsTotalSize && mongo.fsUsedSize ? (
-                    <BytesBar used={mongo.fsUsedSize} total={mongo.fsTotalSize} label="Filesystem storage" />
-                  ) : null}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>Data size</span><span className="text-foreground">{formatBytes(mongo.dataSize)}</span>
+                (() => {
+                  const ATLAS_FREE_LIMIT = 512 * 1024 * 1024;
+                  const totalUsed = mongo.fsTotalSize && mongo.fsUsedSize
+                    ? mongo.fsUsedSize
+                    : mongo.dataSize + mongo.indexSize;
+                  const total = mongo.fsTotalSize ?? ATLAS_FREE_LIMIT;
+                  return (
+                    <div className="space-y-4">
+                      <BytesBar
+                        used={totalUsed}
+                        total={total}
+                        label={mongo.fsTotalSize ? "Storage used" : "Storage used (vs 512 MB free tier limit)"}
+                      />
+                      <BytesBar used={mongo.dataSize} total={total} label="Data size" />
+                      <BytesBar used={mongo.indexSize} total={total} label="Index size" />
+                      <div className="flex justify-between text-[10px] text-muted-foreground/60 border-t border-border/30 pt-2">
+                        <span>{mongo.objects.toLocaleString()} documents · {mongo.collections} collections</span>
+                        <span>{formatBytes(mongo.storageSize)} on disk</span>
+                      </div>
                     </div>
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>Storage size (on disk)</span><span className="text-foreground">{formatBytes(mongo.storageSize)}</span>
-                    </div>
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>Index size</span><span className="text-foreground">{formatBytes(mongo.indexSize)}</span>
-                    </div>
-                    <div className="flex justify-between text-[10px] text-muted-foreground border-t border-border/40 pt-1 mt-1">
-                      <span>Documents</span><span className="text-foreground font-bold">{mongo.objects.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-[10px] text-muted-foreground">
-                      <span>Collections</span><span className="text-foreground">{mongo.collections}</span>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()
               ) : (
                 <p className="text-xs text-muted-foreground">No storage data available.</p>
               )}
