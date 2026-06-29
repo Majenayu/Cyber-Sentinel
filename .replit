@@ -32,7 +32,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pkill -f 'dist/index.mjs' 2>/dev/null; sleep 1; (cd artifacts/api-server && pnpm run dev 2>&1 | pnpm exec pino-pretty) & cd artifacts/cyber-sentinel && pnpm run dev"
+args = "cd artifacts/cyber-sentinel && pnpm run dev"
 waitForPort = 5000
 
 [[workflows.workflow]]
@@ -69,3 +69,7 @@ NODE_ENV = "development"
 [userenv.development]
 PORT = "5000"
 BASE_PATH = "/"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
