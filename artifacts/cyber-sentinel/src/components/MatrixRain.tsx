@@ -48,17 +48,16 @@ export default function MatrixRain() {
     let drops: number[] = [];
 
     function resize() {
-      const parent = canvas!.parentElement;
-      if (!parent) return;
-      canvas!.width = parent.offsetWidth;
-      canvas!.height = parent.offsetHeight;
+      canvas!.width = window.innerWidth;
+      canvas!.height = window.innerHeight;
       cols = Math.floor(canvas!.width / FONT_SIZE);
       drops = Array.from({ length: cols }, () => Math.random() * -50);
     }
 
     resize();
+    window.addEventListener('resize', resize);
     const ro = new ResizeObserver(resize);
-    ro.observe(canvas.parentElement!);
+    if (canvas.parentElement) ro.observe(canvas.parentElement);
 
     // Parse hex color to rgb
     function hexToRgb(hex: string) {
@@ -129,14 +128,15 @@ export default function MatrixRain() {
     return () => {
       cancelAnimationFrame(animId);
       ro.disconnect();
+      window.removeEventListener('resize', resize);
     };
   }, [themeColor]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 w-full h-full pointer-events-none"
-      style={{ opacity: 0.18 }}
+      className="fixed inset-0 w-full h-full pointer-events-none"
+      style={{ opacity: 0.15, zIndex: 0 }}
     />
   );
 }

@@ -2,7 +2,7 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import ChatPage from "@/pages/Chat";
@@ -14,6 +14,8 @@ import Sidebar from "@/components/Sidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Menu } from "lucide-react";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import MatrixRain from "@/components/MatrixRain";
+import HackerLoader from "@/components/HackerLoader";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +25,7 @@ function Layout() {
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden dark">
       <div className="scanline-overlay" />
+      <MatrixRain />
 
       {sidebarOpen && (
         <div
@@ -39,7 +42,7 @@ function Layout() {
         <Sidebar onNavigate={() => setSidebarOpen(false)} />
       </div>
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative min-w-0">
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative min-w-0 z-10">
         <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-primary/0 via-primary/50 to-primary/0" />
 
         <div className="md:hidden flex items-center gap-3 px-4 h-14 border-b border-border bg-card/50 shrink-0 z-20">
@@ -69,10 +72,14 @@ function Layout() {
 }
 
 function App() {
+  const [loaded, setLoaded] = useState(false);
+  const handleDone = useCallback(() => setLoaded(true), []);
+
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
+          {!loaded && <HackerLoader onDone={handleDone} />}
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Layout />
           </WouterRouter>
