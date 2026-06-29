@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Terminal, Database, Wrench, Bot, Activity, ShieldCheck, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Terminal, Database, Wrench, Bot, Activity, ShieldCheck, CheckCircle, XCircle, Loader2, ShieldAlert } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
 import { useGetStats } from '@workspace/api-client-react';
+import { useQuery } from '@tanstack/react-query';
+import ThreatMap from '@/components/ThreatMap';
 
 interface ProviderSnapshot {
   key: string;
@@ -24,6 +26,17 @@ export default function Dashboard() {
   const [providers, setProviders] = useState<ProviderSnapshot[]>([]);
   const [healthLoading, setHealthLoading] = useState(true);
   const [, navigate] = useLocation();
+
+  const { data: intrusions = [] } = useQuery<any[]>({
+    queryKey: ['intrusions'],
+    queryFn: async () => {
+      const r = await fetch('/api/auth/intrusions');
+      if (!r.ok) throw new Error('Failed');
+      return r.json();
+    },
+    refetchInterval: 30_000,
+  });
+  const totalIntrusionAttempts = intrusions.reduce((s: number, i: any) => s + i.attempts, 0);
 
   useEffect(() => {
     Promise.all([
@@ -72,6 +85,26 @@ export default function Dashboard() {
           <StatCard title="Commands" value={stats?.totalCommands ?? 0} icon={Terminal} href="/commands" />
           <StatCard title="Sessions" value={stats?.totalChatSessions ?? 0} icon={Bot} href="/chat" />
         </div>
+
+        {/* Intrusion summary strip */}
+        <Link href="/intrusions">
+          <div className="flex items-center justify-between px-4 py-3 border border-red-500/30 bg-red-950/20 hover:border-red-500/60 hover:bg-red-950/30 transition-all cursor-pointer rounded-lg font-mono">
+            <div className="flex items-center gap-3">
+              <ShieldAlert size={16} className="text-red-400" />
+              <span className="text-xs text-red-400 tracking-widest uppercase font-bold">Intrusion Detection</span>
+              <span className="text-[10px] px-2 py-0.5 border border-red-500/30 text-red-400/70 tracking-widest">
+                {intrusions.length} hostile IP{intrusions.length !== 1 ? 's' : ''} tracked
+              </span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-[10px] text-muted-foreground tracking-wider">{totalIntrusionAttempts} total attempts</span>
+              <span className="text-[9px] text-red-400/60 tracking-widest">VIEW LOG →</span>
+            </div>
+          </div>
+        </Link>
+
+        {/* Live threat map */}
+        <ThreatMap />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           <div className="bg-card/50 border border-border rounded-lg overflow-hidden">
