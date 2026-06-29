@@ -92,11 +92,18 @@ export function updateProviderHeaders(
   pick('limitTokensPerDay', 'x-ratelimit-limit-tokens-day');
   pick('remainingTokensPerDay', 'x-ratelimit-remaining-tokens-day');
 
-  // OpenRouter / Mistral variants
+  // OpenRouter / per-minute suffix variants
   pick('limitRequestsPerMinute', 'x-ratelimit-limit-requests-per-minute');
   pick('remainingRequestsPerMinute', 'x-ratelimit-remaining-requests-per-minute');
   pick('limitTokensPerMinute', 'x-ratelimit-limit-tokens-per-minute');
   pick('remainingTokensPerMinute', 'x-ratelimit-remaining-tokens-per-minute');
+
+  // Mistral-specific header names (captured from live responses June 2026)
+  // Mistral uses -req-minute and -tokens-minute suffixes, not the standard -requests/-tokens names
+  pick('limitRequestsPerMinute', 'x-ratelimit-limit-req-minute');
+  pick('remainingRequestsPerMinute', 'x-ratelimit-remaining-req-minute');
+  pick('limitTokensPerMinute', 'x-ratelimit-limit-tokens-minute');
+  pick('remainingTokensPerMinute', 'x-ratelimit-remaining-tokens-minute');
 
   // Cohere variants
   pick('limitRequestsPerMinute', 'x-api-warning');

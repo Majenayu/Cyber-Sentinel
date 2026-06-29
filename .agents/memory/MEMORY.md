@@ -1,4 +1,5 @@
 - [Multi-AI engine](multi-ai.md) — best-answer mode queries all providers in parallel, judge picks winner; SYSTEM_PROMPT must be exported from groq.ts
+- [Mistral headers](mistral-headers.md) — uses x-ratelimit-*-req-minute / *-tokens-minute names, NOT standard -requests/-tokens; llama3-8b/70b-8192 decommissioned June 2026
 - [KB URL ingestion](kb-scrape.md) — scrape route uses Cheerio; `sources[]` array field on KB entries (legacy `source` string still supported)
 - [Commands target substitution](commands-target.md) — {{target}}, TARGET_IP, TARGET_URL patterns auto-filled; predefined CATEGORIES array
 - [API client exports](api-client-exports.md) — customFetch must be explicitly exported from lib/api-client-react/src/index.ts to be available in mobile; mobile uses @ts-ignore on import due to tsconfig path gap

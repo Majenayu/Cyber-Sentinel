@@ -8,11 +8,10 @@ export interface AIProvider {
   call: (messages: any[], systemPrompt: string) => Promise<string>;
 }
 
+// llama3-70b-8192 and llama3-8b-8192 were decommissioned by Groq — removed June 2026
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
-  'llama3-70b-8192',
-  'llama3-8b-8192',
 ];
 
 function makeGroqProvider(apiKey: string, label: string, key: string): AIProvider {

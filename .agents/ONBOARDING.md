@@ -52,6 +52,34 @@ Mistral keys from [console.mistral.ai](https://console.mistral.ai) → **API Key
 
 **Model in use:** `mistral-small-latest` — this is the correct free-tier model. Do not change it to `open-mistral-7b` or `open-mixtral-8x7b`; those require a paid plan and return 401 on free accounts.
 
+### Mistral rate-limit headers use non-standard names
+
+Mistral's API does **not** use the standard `x-ratelimit-limit-requests` / `x-ratelimit-limit-tokens` header names. The actual headers (captured June 2026) are:
+
+| Mistral header | Meaning |
+|---|---|
+| `x-ratelimit-limit-req-minute` | Request limit per minute |
+| `x-ratelimit-remaining-req-minute` | Remaining requests this minute |
+| `x-ratelimit-limit-tokens-minute` | Token limit per minute |
+| `x-ratelimit-remaining-tokens-minute` | Remaining tokens this minute |
+| `x-ratelimit-tokens-query-cost` | Tokens consumed by the last request |
+
+`artifacts/api-server/src/lib/ai-limits-cache.ts` already includes parsing for these names. If progress bars in Settings → Usage & Limits appear empty for Mistral, this is the section to check.
+
+**Free tier values observed:** 50 req/min · 50,000 tokens/min
+
+### Groq decommissioned models
+
+As of June 2026, the following Groq models are decommissioned and return `400` errors:
+
+- ❌ `llama3-8b-8192` — decommissioned
+- ❌ `llama3-70b-8192` — decommissioned
+
+These have been removed from the `GROQ_MODELS` fallback list in `artifacts/api-server/src/lib/multi-ai.ts`. The current active models are:
+
+- ✅ `llama-3.3-70b-versatile` (primary)
+- ✅ `llama-3.1-8b-instant` (fallback when rate-limited)
+
 ---
 
 ## Step 3 — Set environment variables (always required)
