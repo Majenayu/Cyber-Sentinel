@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, FileText, Trash2, Edit, Save, X, ExternalLink, Loader2, ChevronLeft, Tag, Sparkles, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Link, Globe, Download, Upload } from 'lucide-react';
+import { Search, Plus, FileText, Trash2, Edit, Save, X, ExternalLink, Loader2, ChevronLeft, Tag, Sparkles, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Link, Globe, Download, Upload, Wand2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -223,6 +223,8 @@ export default function VaultPage() {
   const [showList, setShowList] = useState(true);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [showAnalyze, setShowAnalyze] = useState(false);
+  const [isSimplifying, setIsSimplifying] = useState(false);
+  const [simplifyingForm, setSimplifyingForm] = useState(false);
 
   const fetchEntries = async (q?: string) => {
     const url = q ? `/api/knowledge?q=${encodeURIComponent(q)}` : '/api/knowledge';
@@ -309,6 +311,38 @@ export default function VaultPage() {
     const s = [...prev.sources]; s[i] = val; return { ...prev, sources: s };
   });
   const removeSource = (i: number) => setFormData(prev => ({ ...prev, sources: prev.sources.filter((_, idx) => idx !== i) }));
+
+  const handleSimplify = async () => {
+    if (!selectedId) return;
+    setIsSimplifying(true);
+    try {
+      const res = await fetch(`/api/knowledge/${selectedId}/simplify`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Simplify failed');
+      setEntries(prev => prev.map(e => e.id === selectedId ? { ...e, content: data.content } : e));
+    } catch (err: any) {
+      alert(`Simplify failed: ${err.message}`);
+    }
+    setIsSimplifying(false);
+  };
+
+  const handleSimplifyPreview = async () => {
+    if (!formData.content.trim()) return;
+    setSimplifyingForm(true);
+    try {
+      const res = await fetch('/api/knowledge/simplify-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: formData.title, content: formData.content }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Simplify failed');
+      setFormData(prev => ({ ...prev, content: data.content }));
+    } catch (err: any) {
+      alert(`Simplify failed: ${err.message}`);
+    }
+    setSimplifyingForm(false);
+  };
 
   const exportVault = () => {
     const blob = new Blob([JSON.stringify(entries, null, 2)], { type: 'application/json' });
@@ -397,12 +431,26 @@ export default function VaultPage() {
                 <UrlIngestRow onScraped={handleScraped} />
               </div>
 
-              <textarea
-                placeholder="Paste content, writeups, notes, commands — markdown supported..."
-                value={formData.content}
-                onChange={e => setFormData({ ...formData, content: e.target.value })}
-                className="w-full resize-none border border-border text-xs p-3 bg-black/30 focus:outline-none focus:border-primary rounded font-mono min-h-[300px]"
-              />
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Content</label>
+                  <button
+                    type="button"
+                    onClick={handleSimplifyPreview}
+                    disabled={simplifyingForm || !formData.content.trim()}
+                    className="flex items-center gap-1 px-2.5 py-1 text-[10px] border border-primary/40 text-primary hover:bg-primary/10 rounded transition-colors disabled:opacity-40"
+                  >
+                    {simplifyingForm ? <Loader2 size={10} className="animate-spin" /> : <Wand2 size={10} />}
+                    {simplifyingForm ? 'Simplifying…' : 'AI Simplify'}
+                  </button>
+                </div>
+                <textarea
+                  placeholder="Paste content, writeups, notes, commands — markdown supported..."
+                  value={formData.content}
+                  onChange={e => setFormData({ ...formData, content: e.target.value })}
+                  className="w-full resize-none border border-border text-xs p-3 bg-black/30 focus:outline-none focus:border-primary rounded font-mono min-h-[300px]"
+                />
+              </div>
             </div>
           </div>
         ) : selectedEntry ? (
@@ -434,6 +482,15 @@ export default function VaultPage() {
                   })()}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleSimplify}
+                    disabled={isSimplifying}
+                    title="AI: clean & simplify content into readable language"
+                    className="h-8 px-2.5 text-xs border border-primary/40 text-primary hover:bg-primary/10 rounded flex items-center gap-1.5 transition-colors disabled:opacity-40"
+                  >
+                    {isSimplifying ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                    {isSimplifying ? 'Simplifying…' : 'Simplify'}
+                  </button>
                   <button onClick={() => setIsEditing(true)} className="p-2 border border-border rounded text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors"><Edit size={14} /></button>
                   <button onClick={() => handleDelete(selectedEntry.id)} className="p-2 border border-border rounded text-muted-foreground hover:text-destructive hover:border-destructive/50 transition-colors"><Trash2 size={14} /></button>
                 </div>
