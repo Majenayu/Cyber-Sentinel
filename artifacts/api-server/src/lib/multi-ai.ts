@@ -40,8 +40,8 @@ function makeOpenRouterProvider(apiKey: string, label: string): AIProvider {
   // Try multiple free models in order
   const MODELS = [
     'meta-llama/llama-3.1-8b-instruct:free',
+    'deepseek/deepseek-r1-0528:free',
     'mistralai/mistral-7b-instruct:free',
-    'google/gemma-2-9b-it:free',
   ];
   return {
     name: label,
@@ -91,8 +91,8 @@ function makeGeminiProvider(apiKey: string): AIProvider {
   // Try models in order until one works
   const MODELS = [
     'gemini-2.0-flash',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-flash-8b',
   ];
   return {
     name: 'Gemini',
@@ -201,7 +201,7 @@ function makeCohereProvider(apiKey: string): AIProvider {
             'X-Client-Name': 'CyberSentinel',
           },
           body: JSON.stringify({
-            model: 'command-r',
+            model: 'command-r7b-12-2024',
             messages: cohereMessages,
             max_tokens: 2048,
           }),

@@ -12,9 +12,9 @@ const PROVIDERS = [
   { key: 'openrouter', label: 'OpenRouter',    model: 'llama-3.1-8b-instruct:free',     configured: () => !!process.env.OPENROUTER_API_KEY_1 },
   { key: 'gemini',     label: 'Gemini',        model: 'gemini-2.0-flash',               configured: () => !!process.env.GEMINI_API_KEY },
   { key: 'mistral',    label: 'Mistral',       model: 'mistral-small-latest',           configured: () => !!process.env.MISTRAL_API_KEY },
-  { key: 'cohere',     label: 'Cohere',        model: 'command-r',                      configured: () => !!process.env.COHERE_API_KEY },
+  { key: 'cohere',     label: 'Cohere',        model: 'command-r7b-12-2024',            configured: () => !!process.env.COHERE_API_KEY },
   { key: 'together',   label: 'Together AI',   model: 'Llama-3.3-70B-Instruct-Turbo-Free', configured: () => !!process.env.TOGETHER_API_KEY },
-  { key: 'cloudflare', label: 'Cloudflare AI', model: 'llama-3.3-70b-fp8-fast',        configured: () => !!((process.env.CLOUDFLARE_AI_ACCOUNT_ID ?? process.env.OTHER_SECRET_1) && process.env.CLOUDFLARE_AI_API_TOKEN) },
+  { key: 'cloudflare', label: 'Cloudflare AI', model: 'llama-3.3-70b-fp8-fast',        configured: () => !!(process.env.CLOUDFLARE_AI_ACCOUNT_ID && process.env.CLOUDFLARE_AI_API_TOKEN) },
 ];
 
 router.get('/health/usage', async (_req, res) => {
