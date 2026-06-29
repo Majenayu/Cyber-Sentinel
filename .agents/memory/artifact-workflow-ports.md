@@ -9,6 +9,18 @@ Artifact workflows (`artifacts/xxx: yyy`) inherit env vars from `[userenv.develo
 ## The Problem
 `.replit` defines `Start application` (PORT=25629) and `API Server` (API_PORT=8080). Artifact workflows `artifacts/cyber-sentinel: web` and `artifacts/api-server: API Server` use the same ports from env, causing conflicts when both sets run simultaneously.
 
+## Replit Preview Blank Page (Vite HMR WebSocket)
+**Symptom:** `localhost:5000` returns 200 and screenshot tool shows the app, but `.replit.dev` preview is blank white.
+**Cause:** Vite injects an HMR client into every page that opens a WebSocket back to the raw dev port (5000). The Replit proxy only exposes port 443 (HTTPS) — the direct WebSocket to 5000 is blocked, the Vite client never initialises, React never mounts.
+**Fix:** `hmr: { clientPort: 443 }` in `server` block of `vite.config.ts`. Already applied — do not remove.
+
+**Why:** Without this, every page load through the Replit proxy produces a silent blank — the HTML loads fine but JS execution stalls waiting for the Vite client WebSocket that never connects.
+
+**How to apply:** Add to any Vite project deployed on Replit:
+```ts
+server: { hmr: { clientPort: 443 } }
+```
+
 ## The Fix Applied
 - `artifacts/api-server/src/index.ts`: uses `API_PORT ?? "8080"` — never use the frontend PORT as API port fallback.
 - `[userenv.development] PORT` must be `"5000"` — Replit's preview proxy reads this to know which port to forward to the webview iframe. If it's set to anything else (e.g. 25629), the preview panel goes blank even though the server is healthy.
