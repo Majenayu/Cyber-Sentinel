@@ -176,7 +176,7 @@ export default function ChatPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [ctfMode, setCtfMode] = useState(false);
-  const [useBestAI, setUseBestAI] = useState(true);
+  const [modelMode, setModelMode] = useState<'best' | 'groq' | 'mistral'>('best');
   const [showTemplates, setShowTemplates] = useState(false);
   const [processingProviders, setProcessingProviders] = useState<string[]>([]);
   const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
@@ -254,14 +254,36 @@ export default function ChatPage() {
 
       if (isImage) {
         const reader = new FileReader();
-        reader.onload = (ev) => {
+        reader.onload = async (ev) => {
           const dataUrl = ev.target?.result as string;
           const base64 = dataUrl.split(',')[1];
+          // Update with base64 while analysis runs
           setAttachedFiles(prev => prev.map(f =>
             f.name === file.name && f.analyzing
-              ? { ...f, analyzing: false, base64, analysis: `[Image attached: ${file.name}]` }
+              ? { ...f, base64, analyzing: true }
               : f
           ));
+          // Call AI vision analysis
+          try {
+            const res = await fetch('/api/analyze/image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ base64, mimeType: file.type, filename: file.name }),
+            });
+            const data = await res.json();
+            const analysis = res.ok ? (data.analysis ?? `[Image: ${file.name}]`) : `[Image: ${file.name}]`;
+            setAttachedFiles(prev => prev.map(f =>
+              f.name === file.name && f.analyzing
+                ? { ...f, analyzing: false, analysis }
+                : f
+            ));
+          } catch {
+            setAttachedFiles(prev => prev.map(f =>
+              f.name === file.name && f.analyzing
+                ? { ...f, analyzing: false, analysis: `[Image attached: ${file.name}]` }
+                : f
+            ));
+          }
         };
         reader.readAsDataURL(file);
       } else {
@@ -315,10 +337,10 @@ export default function ChatPage() {
     setIsLoading(true);
     setProcessingProviders([]);
 
-    if (useBestAI) {
+    if (modelMode === 'best') {
       await sendBestAI(fullContent);
     } else {
-      await sendStream(fullContent);
+      await sendStream(fullContent, modelMode);
     }
   };
 
@@ -444,7 +466,7 @@ export default function ChatPage() {
     }
   };
 
-  const sendStream = async (text: string) => {
+  const sendStream = async (text: string, provider?: 'groq' | 'mistral') => {
     const streamingId = `streaming-${Date.now()}`;
     setMessages(prev => [...prev, { id: streamingId, role: 'assistant', content: '', streaming: true }]);
     const abort = new AbortController();
@@ -452,7 +474,7 @@ export default function ChatPage() {
     try {
       const response = await fetch(`/api/chat/sessions/${currentSessionId}/messages/stream`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text }), signal: abort.signal,
+        body: JSON.stringify({ content: text, provider }), signal: abort.signal,
       });
       if (!response.ok || !response.body) throw new Error('Stream failed');
       const reader = response.body.getReader();
@@ -634,9 +656,11 @@ export default function ChatPage() {
             <button onClick={() => setCtfMode(m => !m)} title="CTF Mode" className={cn("hidden sm:flex items-center gap-1 px-2 py-1 text-[10px] rounded border transition-all", ctfMode ? "border-yellow-400/60 text-yellow-400 bg-yellow-400/10" : "border-border text-muted-foreground hover:border-primary/30 hover:text-primary")}>
               <Flag size={9} /> CTF
             </button>
-            <button onClick={() => setUseBestAI(m => !m)} title="Best-AI: queries all 7 providers and picks the best answer" className={cn("hidden sm:flex items-center gap-1 px-2 py-1 text-[10px] rounded border transition-all", useBestAI ? "border-primary/60 text-primary bg-primary/10" : "border-border text-muted-foreground hover:border-primary/30 hover:text-primary")}>
-              <Zap size={9} /> {useBestAI ? 'BEST-AI' : 'SINGLE'}
-            </button>
+            <div className="hidden sm:flex items-center rounded border border-border overflow-hidden text-[10px]">
+              <button onClick={() => setModelMode('best')} title="Best-AI: queries all providers and picks the best answer" className={cn("flex items-center gap-1 px-2 py-1 transition-all", modelMode === 'best' ? "bg-primary/20 text-primary border-r border-primary/30" : "text-muted-foreground hover:text-primary border-r border-border")}><Zap size={9} /> Best</button>
+              <button onClick={() => setModelMode('groq')} title="Groq only (streaming)" className={cn("flex items-center gap-1 px-2 py-1 transition-all", modelMode === 'groq' ? "bg-primary/20 text-primary border-r border-primary/30" : "text-muted-foreground hover:text-primary border-r border-border")}>Groq</button>
+              <button onClick={() => setModelMode('mistral')} title="Mistral only" className={cn("flex items-center gap-1 px-2 py-1 transition-all", modelMode === 'mistral' ? "bg-primary/20 text-primary" : "text-muted-foreground hover:text-primary")}>Mistral</button>
+            </div>
             {messages.length > 0 && (
               <button onClick={exportSession} title="Export session as Markdown" className="hidden sm:flex items-center gap-1 px-2 py-1 text-[10px] rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/30 transition-all">
                 <Download size={9} /> Export
@@ -650,7 +674,7 @@ export default function ChatPage() {
         </div>
 
         {/* Provider processing bar */}
-        {isLoading && useBestAI && processingProviders.length > 0 && (
+        {isLoading && modelMode === 'best' && processingProviders.length > 0 && (
           <div className="px-4 py-1.5 bg-black/30 border-b border-border/50 flex items-center gap-2 flex-wrap">
             <span className="text-[9px] text-muted-foreground uppercase tracking-wider">Querying:</span>
             {processingProviders.map(p => (
@@ -750,8 +774,8 @@ export default function ChatPage() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 placeholder={
-                  hasAnalyzing ? 'Analyzing attachment…' :
-                  currentSessionId ? (useBestAI ? 'Enter directive… Best-AI picks the top answer' : 'Enter directive… ✨ to enhance') :
+                  hasAnalyzing ? 'Analyzing image…' :
+                  currentSessionId ? (modelMode === 'best' ? 'Enter directive… Best-AI picks the top answer' : modelMode === 'mistral' ? 'Enter directive… Mistral only' : 'Enter directive… Groq streaming') :
                   'Create a session first…'
                 }
                 disabled={!currentSessionId || hasAnalyzing}

@@ -1,8 +1,9 @@
 import { Router } from 'express';
+import Groq from 'groq-sdk';
 import connectToDatabase from '../lib/mongodb';
 import Session from '../lib/models/Session';
-import { getChatResponse, streamChatResponse } from '../lib/groq';
-import { getBestAnswer, getBestEnhancedPrompt } from '../lib/multi-ai';
+import { getChatResponse, streamChatResponse, enhancePrompt } from '../lib/groq';
+import { getBestAnswer } from '../lib/multi-ai';
 import { detectToolsInText } from './scrape';
 
 const router = Router();
@@ -67,14 +68,14 @@ router.get('/chat/sessions/:id/messages', async (req, res) => {
   }
 });
 
-/** Streaming endpoint — tries Groq streaming first, falls back to multi-AI if rate-limited */
+/** Streaming endpoint — supports provider param: 'groq' (default) or 'mistral' */
 router.post('/chat/sessions/:id/messages/stream', async (req, res) => {
   try {
     await connectToDatabase();
     const session = await Session.findById(req.params.id);
     if (!session) { res.status(404).json({ error: 'Not found' }); return; }
 
-    const { content } = req.body;
+    const { content, provider: providerPref } = req.body;
     const history = session.messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content }));
 
     session.messages.push({ role: 'user', content, createdAt: new Date() } as any);
@@ -88,28 +89,65 @@ router.post('/chat/sessions/:id/messages/stream', async (req, res) => {
 
     let fullContent = '';
 
-    // Try Groq streaming first
-    try {
-      fullContent = await streamChatResponse(content, history, (text) => {
-        res.write(`data: ${JSON.stringify({ text })}\n\n`);
-      });
-    } catch (streamErr: any) {
-      // Groq failed (rate limit, network, etc.) — fall back to multi-AI best answer
-      res.write(`data: ${JSON.stringify({ text: '' })}\n\n`); // clear any partial
+    if (providerPref === 'mistral') {
+      // Mistral-only path
+      const mistralKey = process.env.MISTRAL_API_KEY;
+      if (!mistralKey) {
+        res.write(`data: ${JSON.stringify({ error: 'Mistral API key not configured. Add MISTRAL_API_KEY to secrets.' })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+        return;
+      }
       try {
         const { SYSTEM_PROMPT } = await import('../lib/groq');
-        const messages = [...history, { role: 'user', content }];
-        const { content: bestContent, provider, reason } = await getBestAnswer(messages, SYSTEM_PROMPT);
-        fullContent = bestContent;
-        // Stream it word-by-word so the UI still animates
-        const words = bestContent.split(' ');
+        const mistralRes = await fetch('https://api.mistral.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${mistralKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'mistral-small-latest',
+            messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...history, { role: 'user', content }],
+            max_tokens: 2048,
+          }),
+        });
+        if (!mistralRes.ok) {
+          const errText = await mistralRes.text().catch(() => '');
+          throw new Error(`Mistral: ${mistralRes.status} ${errText.slice(0, 120)}`);
+        }
+        const data = await mistralRes.json();
+        fullContent = data.choices?.[0]?.message?.content ?? '';
+        // Stream word-by-word for animation
+        const words = fullContent.split(' ');
         for (let i = 0; i < words.length; i++) {
           const chunk = (i === 0 ? '' : ' ') + words[i];
           res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
         }
-        res.write(`data: ${JSON.stringify({ provider, reason })}\n\n`);
-      } catch (fallbackErr: any) {
-        res.write(`data: ${JSON.stringify({ error: `All AI providers failed: ${fallbackErr.message}` })}\n\n`);
+        res.write(`data: ${JSON.stringify({ provider: 'Mistral' })}\n\n`);
+      } catch (err: any) {
+        res.write(`data: ${JSON.stringify({ error: `Mistral failed: ${err.message}` })}\n\n`);
+      }
+    } else {
+      // Groq streaming path (default)
+      try {
+        fullContent = await streamChatResponse(content, history, (text) => {
+          res.write(`data: ${JSON.stringify({ text })}\n\n`);
+        });
+      } catch (streamErr: any) {
+        // Groq failed — fall back to multi-AI best answer
+        res.write(`data: ${JSON.stringify({ text: '' })}\n\n`);
+        try {
+          const { SYSTEM_PROMPT } = await import('../lib/groq');
+          const messages = [...history, { role: 'user', content }];
+          const { content: bestContent, provider, reason } = await getBestAnswer(messages, SYSTEM_PROMPT);
+          fullContent = bestContent;
+          const words = bestContent.split(' ');
+          for (let i = 0; i < words.length; i++) {
+            const chunk = (i === 0 ? '' : ' ') + words[i];
+            res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+          }
+          res.write(`data: ${JSON.stringify({ provider, reason })}\n\n`);
+        } catch (fallbackErr: any) {
+          res.write(`data: ${JSON.stringify({ error: `All AI providers failed: ${fallbackErr.message}` })}\n\n`);
+        }
       }
     }
 
@@ -118,9 +156,7 @@ router.post('/chat/sessions/:id/messages/stream', async (req, res) => {
       await session.save();
     }
 
-    const lastMsg = session.messages[session.messages.length - 1] as any;
     res.write('data: [DONE]\n\n');
-    res.write(`data: ${JSON.stringify({ messageId: lastMsg._id?.toString() ?? '' })}\n\n`);
     res.end();
   } catch (error: any) {
     if (!res.headersSent) {
@@ -133,7 +169,7 @@ router.post('/chat/sessions/:id/messages/stream', async (req, res) => {
   }
 });
 
-/** Non-streaming fallback — uses multi-AI getBestAnswer directly */
+/** Non-streaming fallback */
 router.post('/chat/sessions/:id/messages', async (req, res) => {
   try {
     await connectToDatabase();
@@ -165,19 +201,65 @@ router.post('/chat/sessions/:id/messages', async (req, res) => {
   }
 });
 
+/** Enhance prompt — rewrites a rough query into precise pentesting language */
 router.post('/chat/enhance-prompt', async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt?.trim()) return res.status(400).json({ error: 'prompt required' });
-    const enhanced = await getBestEnhancedPrompt(prompt.trim());
+    // Use enhancePrompt from groq.ts which has the assistant-primer technique
+    const enhanced = await enhancePrompt(prompt.trim());
     res.json({ enhanced });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
 
+/** Image analysis — uses Groq vision model to analyze screenshots/images from a security perspective */
+router.post('/analyze/image', async (req, res) => {
+  try {
+    const { base64, mimeType, filename } = req.body;
+    if (!base64 || !mimeType) return res.status(400).json({ error: 'base64 and mimeType required' });
 
-/** Multi-AI best-answer endpoint — queries all configured providers, picks the best */
+    const apiKey = process.env.GROQ_API_KEY ?? process.env.GROQ_API_KEY_2;
+    if (!apiKey) return res.status(500).json({ error: 'No Groq API key configured' });
+
+    const groq = new Groq({ apiKey });
+    const completion = await groq.chat.completions.create({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      max_tokens: 600,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: `data:${mimeType};base64,${base64}` },
+            },
+            {
+              type: 'text',
+              text: `You are a cybersecurity expert analyzing a screenshot or image for a penetration tester. Analyze this image and extract all security-relevant information. Focus on:
+- Any IP addresses, hostnames, ports, or services visible
+- Error messages, stack traces, or debug info that reveals system info
+- Network diagrams or topology
+- Credentials, tokens, or sensitive data visible
+- Configuration files or code snippets
+- Version numbers or software fingerprints
+- Any flags or hints if this is a CTF screenshot
+Be concise, bullet-pointed, and technical. If no security-relevant info, describe what the image shows briefly.`,
+            },
+          ],
+        },
+      ],
+    } as any);
+
+    const analysis = completion.choices[0]?.message?.content ?? 'Could not analyze image.';
+    res.json({ analysis });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/** Multi-AI best-answer endpoint */
 router.post('/chat/sessions/:id/messages/best', async (req, res) => {
   try {
     await connectToDatabase();

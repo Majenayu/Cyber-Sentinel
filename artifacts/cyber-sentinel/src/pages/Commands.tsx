@@ -32,6 +32,7 @@ export default function CommandsPage() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [target, setTarget] = useState('');
   const [showCheatsheet, setShowCheatsheet] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchCommands = async () => {
     const res = await fetch('/api/commands');
@@ -40,8 +41,6 @@ export default function CommandsPage() {
   };
 
   useEffect(() => { fetchCommands().finally(() => setIsLoading(false)); }, []);
-
-  const categories = ['All', ...CATEGORIES.filter(c => commands.some(cmd => cmd.category === c)), ...Array.from(new Set(commands.map(c => c.category))).filter(c => !CATEGORIES.includes(c))].filter((v, i, a) => a.indexOf(v) === i);
 
   const filteredCommands = commands.filter(c => {
     const matchesSearch = !searchQuery || c.title.toLowerCase().includes(searchQuery.toLowerCase()) || c.command.toLowerCase().includes(searchQuery.toLowerCase()) || (c.description && c.description.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -56,7 +55,12 @@ export default function CommandsPage() {
   }, {} as Record<string, any[]>);
 
   const resetForm = () => { setFormData({ title: '', command: '', description: '', category: '' }); setEditingId(null); setSaveError(null); };
-  const handleEdit = (cmd: any) => { setFormData({ title: cmd.title, command: cmd.command, description: cmd.description || '', category: cmd.category }); setEditingId(cmd.id); setIsFormOpen(true); };
+  const handleEdit = (cmd: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFormData({ title: cmd.title, command: cmd.command, description: cmd.description || '', category: cmd.category });
+    setEditingId(cmd.id);
+    setIsFormOpen(true);
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -74,17 +78,18 @@ export default function CommandsPage() {
     setIsSaving(false);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!confirm('Delete this command?')) return;
     await fetch(`/api/commands/${id}`, { method: 'DELETE' });
     await fetchCommands();
   };
 
-  const handleCopy = (id: string, text: string) => {
+  const handleCopy = (id: string, text: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     navigator.clipboard.writeText(target ? substituteTarget(text, target) : text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-    // Track usage (fire-and-forget)
     fetch(`/api/commands/${id}/use`, { method: 'POST' }).catch(() => {});
     setCommands(prev => prev.map(c => c.id === id ? { ...c, useCount: (c.useCount ?? 0) + 1, lastUsed: new Date().toISOString() } : c));
   };
@@ -138,10 +143,12 @@ export default function CommandsPage() {
           <h2 className="font-semibold flex items-center gap-2 text-xs md:text-sm"><Code2 size={16} className="text-primary" /> Categories</h2>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-          <button onClick={() => { setCategoryFilter(null); setShowSidebar(false); }} className={cn("w-full text-left px-3 py-2 rounded text-xs transition-colors", !categoryFilter ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground")}>All</button>
+          <button onClick={() => { setCategoryFilter(null); setShowSidebar(false); }} className={cn("w-full text-left px-3 py-2 rounded text-xs transition-colors", !categoryFilter ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground")}>
+            All <span className="ml-1 text-[10px] opacity-50">({commands.length})</span>
+          </button>
           {CATEGORIES.filter(c => commands.some(cmd => cmd.category === c)).map(cat => (
             <button key={cat} onClick={() => { setCategoryFilter(cat); setShowSidebar(false); }} className={cn("w-full text-left px-3 py-2 rounded text-xs transition-colors capitalize", categoryFilter === cat ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground")}>
-              {cat}
+              {cat} <span className="ml-1 text-[10px] opacity-40">({commands.filter(c => c.category === cat).length})</span>
             </button>
           ))}
         </div>
@@ -158,7 +165,7 @@ export default function CommandsPage() {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <button onClick={() => setShowSidebar(true)} className="md:hidden p-1.5 border border-border rounded text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors shrink-0"><Code2 size={14} /></button>
-              <div className="relative flex-1 md:flex-none md:w-48">
+              <div className="relative flex-1 md:flex-none md:w-56">
                 <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
                 <input placeholder="Search commands..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-8 pr-3 py-1.5 bg-black/50 border border-border rounded text-xs focus:outline-none focus:border-primary" />
               </div>
@@ -181,6 +188,7 @@ export default function CommandsPage() {
           {target && <div className="text-[10px] text-primary/60 pl-5">→ Commands will auto-substitute <code className="bg-black/30 px-1 rounded">{'{{target}}'}</code> with <span className="text-primary font-mono">{target}</span></div>}
         </div>
 
+        {/* Add/Edit form */}
         {isFormOpen && (
           <div className="p-3 md:p-4 border-b border-border bg-black/30 space-y-2.5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
@@ -202,45 +210,98 @@ export default function CommandsPage() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-2.5">
+        {/* Card grid */}
+        <div className="flex-1 overflow-y-auto p-3 md:p-5">
           {isLoading ? (
-            <div className="text-center py-16 text-primary text-xs"><Loader2 className="animate-spin inline mr-2" size={16} />Loading...</div>
+            <div className="flex justify-center items-center py-16 text-primary text-sm">
+              <Loader2 className="animate-spin mr-2" size={18} /> Loading commands...
+            </div>
           ) : filteredCommands.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground text-xs">No commands found. Use <code className="text-primary">{'{{target}}'}</code> in commands for auto-fill.</div>
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-xs gap-3">
+              <FileCode size={32} className="opacity-20" />
+              <p>No commands found. Use <code className="text-primary">{'{{target}}'}</code> in commands for auto-fill.</p>
+              <button onClick={() => { resetForm(); setIsFormOpen(true); }} className="px-3 py-1.5 text-xs border border-primary/50 text-primary hover:bg-primary/20 rounded flex items-center gap-1 transition-colors"><Plus size={12} /> Add First Command</button>
+            </div>
           ) : (
-            filteredCommands.map(cmd => {
-              const displayCommand = target ? substituteTarget(cmd.command, target) : cmd.command;
-              const hasTarget = cmd.command.includes('{{target}}') || cmd.command.includes('{{TARGET}}') || cmd.command.includes('TARGET_IP') || cmd.command.includes('TARGET_URL');
-              return (
-                <div key={cmd.id} className="bg-card/50 border border-border rounded-lg p-3 md:p-4 group hover:border-primary/30 transition-all">
-                  <div className="flex items-start justify-between mb-2 gap-2">
-                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                      <Terminal size={13} className="text-primary shrink-0" />
-                      <span className="font-bold text-xs">{cmd.title}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-secondary border border-border rounded text-muted-foreground uppercase shrink-0 capitalize">{cmd.category}</span>
-                      {hasTarget && target && <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 border border-primary/30 rounded text-primary shrink-0">→ {target}</span>}
-                      {hasTarget && !target && <span className="text-[10px] text-muted-foreground/40 flex items-center gap-0.5"><Target size={8} /> needs target</span>}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredCommands.map(cmd => {
+                const displayCommand = target ? substituteTarget(cmd.command, target) : cmd.command;
+                const hasTarget = cmd.command.includes('{{target}}') || cmd.command.includes('{{TARGET}}') || cmd.command.includes('TARGET_IP') || cmd.command.includes('TARGET_URL');
+                const isExpanded = expandedId === cmd.id;
+
+                return (
+                  <div
+                    key={cmd.id}
+                    onClick={() => setExpandedId(isExpanded ? null : cmd.id)}
+                    className="bg-card border border-border hover:border-primary/50 transition-all cursor-pointer group flex flex-col rounded-lg overflow-hidden relative"
+                  >
+                    {/* Card header */}
+                    <div className="p-4 pb-3 flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <Terminal size={15} className="text-muted-foreground group-hover:text-primary transition-colors shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-sm group-hover:text-primary transition-colors leading-tight truncate">{cmd.title}</h3>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span className="text-[10px] px-1.5 py-0.5 border border-border bg-secondary text-muted-foreground rounded uppercase font-bold capitalize">{cmd.category}</span>
+                            {hasTarget && target && <span className="text-[10px] px-1.5 py-0.5 bg-primary/10 border border-primary/30 rounded text-primary">→ {target}</span>}
+                            {hasTarget && !target && <span className="text-[9px] text-muted-foreground/40 flex items-center gap-0.5"><Target size={7} /> needs target</span>}
+                            {cmd.useCount > 0 && <span className="text-[9px] text-muted-foreground/30 font-mono" title={`Last used: ${cmd.lastUsed ? new Date(cmd.lastUsed).toLocaleDateString() : 'unknown'}`}>×{cmd.useCount}</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          onClick={e => handleEdit(cmd, e)}
+                          className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors"
+                          title="Edit"
+                        >
+                          <Edit size={12} />
+                        </button>
+                        <button
+                          onClick={e => handleDelete(cmd.id, e)}
+                          className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-destructive transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      {cmd.useCount > 0 && (
-                        <span className="text-[9px] text-muted-foreground/40 font-mono" title={`Last used: ${cmd.lastUsed ? new Date(cmd.lastUsed).toLocaleDateString() : 'unknown'}`}>
-                          ×{cmd.useCount}
-                        </span>
-                      )}
-                      <button onClick={() => handleCopy(cmd.id, displayCommand)} className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors" title="Copy command">
-                        {copiedId === cmd.id ? <Check size={13} className="text-primary" /> : <Copy size={13} />}
+
+                    {/* Command preview */}
+                    <div className={cn("mx-3 mb-3 rounded border text-[11px] font-mono overflow-hidden transition-colors", target && hasTarget ? "bg-primary/5 border-primary/20" : "bg-black/60 border-primary/10")}>
+                      <pre className={cn("text-primary px-3 py-2.5 overflow-x-auto", isExpanded ? "whitespace-pre-wrap break-all" : "truncate")}>
+                        {displayCommand}
+                      </pre>
+                    </div>
+
+                    {/* Description */}
+                    {cmd.description && (
+                      <p className="text-[11px] text-muted-foreground px-4 pb-3 leading-relaxed line-clamp-2">{cmd.description}</p>
+                    )}
+
+                    {/* Copy button — full width bottom bar */}
+                    <div className="mt-auto border-t border-border/50 px-4 py-2.5 flex items-center justify-between">
+                      <span className="text-[9px] text-primary/40 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <Code2 size={8} /> {isExpanded ? 'Click to collapse' : 'Click to expand'}
+                      </span>
+                      <button
+                        onClick={e => handleCopy(cmd.id, displayCommand, e)}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-1 rounded text-[10px] font-bold border transition-all",
+                          copiedId === cmd.id
+                            ? "border-primary bg-primary/20 text-primary"
+                            : "border-border text-muted-foreground hover:border-primary/50 hover:text-primary hover:bg-primary/10"
+                        )}
+                      >
+                        {copiedId === cmd.id ? <><Check size={10} /> Copied!</> : <><Copy size={10} /> Copy</>}
                       </button>
-                      <button onClick={() => handleEdit(cmd)} className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors"><Edit size={13} /></button>
-                      <button onClick={() => handleDelete(cmd.id)} className="p-1 hover:bg-secondary rounded text-muted-foreground hover:text-destructive transition-colors"><Trash2 size={13} /></button>
                     </div>
                   </div>
-                  <pre className={cn("text-primary p-2.5 md:p-3 rounded border text-xs overflow-x-auto font-mono transition-colors", target && hasTarget ? "bg-primary/5 border-primary/20" : "bg-black/60 border-primary/10")}>
-                    {displayCommand}
-                  </pre>
-                  {cmd.description && <p className="text-[11px] text-muted-foreground mt-2">{cmd.description}</p>}
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
