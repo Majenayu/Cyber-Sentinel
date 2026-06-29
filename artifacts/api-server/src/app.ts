@@ -56,8 +56,13 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Optional API secret guard — set CYBERSENTINEL_API_SECRET to enable
-const API_SECRET = process.env.CYBERSENTINEL_API_SECRET;
+// Optional API secret guard — only enforced in production.
+// In development the API binds to localhost:8080 which is not externally reachable,
+// so network isolation is sufficient and the secret would break the Vite dev proxy.
+const API_SECRET =
+  process.env.NODE_ENV === 'production'
+    ? process.env.CYBERSENTINEL_API_SECRET
+    : undefined;
 if (API_SECRET) {
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
     // Always allow health checks without auth

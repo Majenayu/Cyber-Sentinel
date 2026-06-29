@@ -23,7 +23,7 @@ The following secrets must be set in the Replit Secrets panel before the app wil
 | `MONGODB_URI` | ✅ Yes | MongoDB Atlas connection string |
 | `GROQ_API_KEY` | ✅ Yes | Groq AI (primary LLM provider) |
 | `MISTRAL_API_KEY` | ⬜ Optional | Mistral AI (secondary, used in Best-AI mode) |
-| `CYBERSENTINEL_API_SECRET` | ⬜ Optional | Locks the API — if set, Vite proxy must forward it |
+| `CYBERSENTINEL_API_SECRET` | ⬜ Optional | Locks the API in **production only** — dev ignores it |
 | `SESSION_SECRET` | ⬜ Optional | Signs session cookies |
 
 ---
@@ -70,8 +70,8 @@ Then restart the API Server workflow.
 
 ### All API calls return 401
 **Symptom:** Dashboard shows no data; browser console shows 401s; API logs show 401 on every `/api/*` route.  
-**Cause:** `CYBERSENTINEL_API_SECRET` is set but the Vite proxy was started before the secret was entered — so it launched without the key in its environment.  
-**Fix:** Restart `artifacts/cyber-sentinel: web`. The proxy re-reads `process.env.CYBERSENTINEL_API_SECRET` at startup.
+**Cause:** This should not happen in development — the API secret middleware is only active when `NODE_ENV=production`. If it does happen, check that the API server is running with `NODE_ENV=development` (the workflow sets this via `export NODE_ENV=development` in the dev command). If someone accidentally set `NODE_ENV=production` in the env vars, remove it.  
+**Note:** `CYBERSENTINEL_API_SECRET` is only enforced in production builds. In development the API is open on localhost:8080 which is not reachable externally.
 
 ### pnpm install fails with `@workspace/db not found`
 **Cause:** Old phantom dependency left in `package.json`.  

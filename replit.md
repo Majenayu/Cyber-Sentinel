@@ -62,4 +62,4 @@ After secrets are set, restart all workflows. Everything should be green on the 
 - **Port conflict**: Only one API server workflow should run at a time. If you see `EADDRINUSE: 8080`, a duplicate workflow is competing. Kill stale processes with `fuser -k 8080/tcp`.
 - The API server rebuilds on every `dev` start (esbuild bundle) — takes ~1–2s, normal behavior
 - MongoDB connection is cached per-process; if MONGODB_URI changes, restart the API server workflow
-- `CYBERSENTINEL_API_SECRET` is optional — if set, every `/api` request must include `x-api-key: <secret>`; the Vite dev proxy forwards it automatically
+- `CYBERSENTINEL_API_SECRET` is optional and **only enforced in production** (`NODE_ENV=production`). In development the API server is on localhost:8080 (not externally reachable), so no key is required.

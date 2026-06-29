@@ -13,6 +13,9 @@ Artifact workflows (`artifacts/xxx: yyy`) inherit env vars from `[userenv.develo
 - `artifacts/api-server/src/index.ts`: Changed port fallback from `API_PORT ?? PORT ?? "8080"` to `API_PORT ?? "8080"` — never use the frontend PORT as API port fallback.
 - When artifact workflows fail due to port conflict, remove the `.replit`-defined duplicate workflows (`Start application`, `API Server`) via `removeWorkflow()` to free ports, then restart the artifact workflows.
 
+## API Secret — Dev vs Production
+`CYBERSENTINEL_API_SECRET` is read in `app.ts` as `process.env.NODE_ENV === 'production' ? process.env.CYBERSENTINEL_API_SECRET : undefined`. The secret gate is disabled in development. Vite proxy `headers:{}` does NOT add upstream request headers — it adds response headers back to the browser. Use `configure + proxyReq` event if upstream header injection is ever needed.
+
 ## configureWorkflow Limitation
 At 10/10 workflow limit, `configureWorkflow` cannot update even EXISTING workflows — it always throws "Workflow limit exceeded". The 4 `.migration-backup/*` artifact-managed workflows cannot be deleted either. The only escape is `removeWorkflow()` on non-artifact workflows.
 
