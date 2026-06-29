@@ -4,6 +4,16 @@ import Command from '../lib/models/Command';
 
 const router = Router();
 
+/** Normalize a command string for dedup comparison */
+function normalizeCmd(s: string) {
+  return s.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** Normalize a title for dedup comparison */
+function normalizeTitle(s: string) {
+  return s.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 router.get('/commands', async (req, res) => {
   try {
     await connectToDatabase();
@@ -27,7 +37,37 @@ router.post('/commands', async (req, res) => {
   try {
     await connectToDatabase();
     const { title, command, description, category } = req.body;
-    const cmd = await Command.create({ title, command, description: description ?? null, category: category || 'uncategorized' });
+    if (!title || !command) {
+      res.status(400).json({ error: 'title and command are required' });
+      return;
+    }
+
+    const normCmd = normalizeCmd(command);
+    const normTitle = normalizeTitle(title);
+
+    // Reject if exact command string already exists
+    const byCmd = await Command.findOne({
+      $expr: { $eq: [{ $trim: { input: { $toLower: '$command' } } }, normCmd] },
+    });
+    if (byCmd) {
+      res.status(409).json({ error: 'A command with this exact command string already exists', existing: byCmd._id.toString() });
+      return;
+    }
+
+    // Reject if a command with the same normalised title already exists
+    const all = await Command.find({}).select('title command _id').lean();
+    const titleDup = all.find(c => normalizeTitle(c.title) === normTitle);
+    if (titleDup) {
+      res.status(409).json({ error: `A command titled "${titleDup.title}" already exists`, existing: titleDup._id.toString() });
+      return;
+    }
+
+    const cmd = await Command.create({
+      title,
+      command,
+      description: description ?? null,
+      category: category || 'uncategorized',
+    });
     res.status(201).json({
       id: cmd._id.toString(),
       title: cmd.title,

@@ -310,9 +310,11 @@ router.post('/analyze/deduplicate', async (req, res) => {
     }
 
     // ── Deduplicate Commands ───────────────────────────────────────────────
-    const allCommands = await Command.find({}).lean();
-    const cmdGroups: Record<string, typeof allCommands> = {};
+    let allCommands = await Command.find({}).lean();
+    const deletedIds = new Set<string>();
 
+    // Pass 1: exact command string match
+    const cmdGroups: Record<string, typeof allCommands> = {};
     for (const cmd of allCommands) {
       const key = cmd.command.trim().toLowerCase().replace(/\s+/g, ' ');
       if (!cmdGroups[key]) cmdGroups[key] = [];
@@ -322,8 +324,35 @@ router.post('/analyze/deduplicate', async (req, res) => {
     let commandsRemoved = 0;
     for (const group of Object.values(cmdGroups)) {
       if (group.length <= 1) continue;
-      // Keep the one with the longest description; delete the rest
       group.sort((a, b) => (b.description?.length ?? 0) - (a.description?.length ?? 0));
+      const [, ...dupes] = group;
+      for (const dupe of dupes) {
+        await Command.findByIdAndDelete(dupe._id);
+        deletedIds.add(dupe._id.toString());
+        commandsRemoved++;
+      }
+    }
+
+    // Pass 2: same normalised title — keep the one with longest description+command combined
+    const normaliseTitle = (s: string) =>
+      s.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+    allCommands = allCommands.filter(c => !deletedIds.has(c._id.toString()));
+    const titleGroups: Record<string, typeof allCommands> = {};
+    for (const cmd of allCommands) {
+      const key = normaliseTitle(cmd.title);
+      if (!titleGroups[key]) titleGroups[key] = [];
+      titleGroups[key].push(cmd);
+    }
+
+    for (const group of Object.values(titleGroups)) {
+      if (group.length <= 1) continue;
+      // Score = description length + command length (most informative wins)
+      group.sort((a, b) => {
+        const scoreB = (b.description?.length ?? 0) + b.command.length;
+        const scoreA = (a.description?.length ?? 0) + a.command.length;
+        return scoreB - scoreA;
+      });
       const [, ...dupes] = group;
       for (const dupe of dupes) {
         await Command.findByIdAndDelete(dupe._id);
