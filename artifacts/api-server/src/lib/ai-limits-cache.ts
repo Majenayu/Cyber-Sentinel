@@ -116,32 +116,9 @@ export const KNOWN_LIMITS: Record<string, ProviderInfo['staticLimits']> = {
     requestsPerDay: 6000,
     note: 'Free tier · llama-3.3-70b-versatile',
   },
-  openrouter: {
-    requestsPerMinute: 20,
-    requestsPerDay: 200,
-    note: 'Free tier · deepseek-r1-0528:free',
-  },
-  gemini: {
-    requestsPerMinute: 15,
-    tokensPerDay: 1_000_000,
-    note: 'Free tier · gemini-1.5-flash',
-  },
   mistral: {
     requestsPerMinute: 60,
     tokensPerMonth: 500_000,
     note: 'Free tier · mistral-small-latest',
   } as any,
-  cohere: {
-    requestsPerMinute: 20,
-    requestsPerMonth: 1000,
-    note: 'Trial key · command-r',
-  } as any,
-  together: {
-    requestsPerMinute: 60,
-    note: 'Free tier · llama-3.3-70B-Instruct-Turbo-Free',
-  },
-  cloudflare: {
-    requestsPerDay: 10_000,
-    note: 'Workers AI free · llama-3.3-70b-fp8-fast',
-  },
 };

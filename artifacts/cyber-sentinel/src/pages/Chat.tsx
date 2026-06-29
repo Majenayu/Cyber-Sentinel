@@ -253,28 +253,14 @@ export default function ChatPage() {
 
       if (isImage) {
         const reader = new FileReader();
-        reader.onload = async (ev) => {
+        reader.onload = (ev) => {
           const dataUrl = ev.target?.result as string;
           const base64 = dataUrl.split(',')[1];
-          try {
-            const res = await fetch('/api/chat/analyze-image', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ imageBase64: base64, mimeType: file.type, fileName: file.name }),
-            });
-            const data = await res.json();
-            setAttachedFiles(prev => prev.map(f =>
-              f.name === file.name && f.analyzing
-                ? { ...f, analyzing: false, base64, analysis: data.analysis ?? data.error, error: res.ok ? undefined : data.error }
-                : f
-            ));
-          } catch (err: any) {
-            setAttachedFiles(prev => prev.map(f =>
-              f.name === file.name && f.analyzing
-                ? { ...f, analyzing: false, error: `Analysis failed: ${err.message}` }
-                : f
-            ));
-          }
+          setAttachedFiles(prev => prev.map(f =>
+            f.name === file.name && f.analyzing
+              ? { ...f, analyzing: false, base64, analysis: `[Image attached: ${file.name}]` }
+              : f
+          ));
         };
         reader.readAsDataURL(file);
       } else {
@@ -302,7 +288,7 @@ export default function ChatPage() {
     for (const f of attachedFiles) {
       if (f.error) continue;
       if (f.type === 'image' && f.analysis) {
-        parts.push(`\n\n---\n[Attached image: ${f.name}]\nGemini Vision Analysis:\n${f.analysis}`);
+        parts.push(`\n\n---\n[Attached image: ${f.name}]\n${f.analysis}`);
       } else if (f.type === 'text' && f.textContent) {
         parts.push(`\n\n---\n[Attached file: ${f.name}]\n\`\`\`\n${f.textContent}\n\`\`\``);
       }
@@ -760,7 +746,7 @@ export default function ChatPage() {
             {attachedFiles.length > 0 && (
               <p className="text-[9px] text-muted-foreground/40 mt-1.5 px-1">
                 {attachedFiles.filter(f => f.analyzing).length > 0
-                  ? `Analyzing ${attachedFiles.filter(f => f.analyzing).length} file(s) with Gemini Vision…`
+                  ? `Processing ${attachedFiles.filter(f => f.analyzing).length} file(s)…`
                   : `${attachedFiles.filter(f => !f.error).length} file(s) attached — analysis will be included in your message.`
                 }
               </p>
