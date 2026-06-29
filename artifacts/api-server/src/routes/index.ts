@@ -9,6 +9,12 @@ import analyzeRouter from "./analyze";
 import usageRouter from "./usage";
 import scrapeRouter from "./scrape";
 import intrusionRouter from "./intrusion";
+import cveRouter from "./cve";
+import iprepRouter from "./iprep";
+import breachRouter from "./breach";
+import reconRouter from "./recon";
+import trackerRouter from "./tracker";
+import osintRouter from "./osint";
 
 const router: IRouter = Router();
 
@@ -22,5 +28,11 @@ router.use(analyzeRouter);
 router.use(usageRouter);
 router.use(scrapeRouter);
 router.use(intrusionRouter);
+router.use(cveRouter);
+router.use(iprepRouter);
+router.use(breachRouter);
+router.use(reconRouter);
+router.use(trackerRouter);
+router.use(osintRouter);
 
 export default router;

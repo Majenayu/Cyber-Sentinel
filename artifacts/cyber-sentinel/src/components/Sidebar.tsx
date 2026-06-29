@@ -1,6 +1,11 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Database, Wrench, FileCode, Bot, Settings, Activity, ShieldAlert } from 'lucide-react';
+import {
+  Database, Wrench, FileCode, Bot, Settings, Activity, ShieldAlert,
+  Terminal, Bug, Globe, ShieldOff, Key, Zap, Hash, Users, Radar,
+  AlertTriangle, GitBranch, Mail, Fingerprint, Search, ChevronLeft, ChevronRight,
+  Music, Radio
+} from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -11,6 +16,9 @@ function cn(...inputs: (string | boolean | undefined | null)[]) {
 
 interface SidebarProps {
   onNavigate?: () => void;
+  onCommandPalette?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 function SkullIcon({ size = 20 }: { size?: number }) {
@@ -31,67 +39,180 @@ function SkullIcon({ size = 20 }: { size?: number }) {
   );
 }
 
-export default function Sidebar({ onNavigate }: SidebarProps) {
+function Clock() {
+  const [t, setT] = useState(new Date());
+  useEffect(() => { const id = setInterval(() => setT(new Date()), 1000); return () => clearInterval(id); }, []);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const utc = `${pad(t.getUTCHours())}:${pad(t.getUTCMinutes())}:${pad(t.getUTCSeconds())}`;
+  const local = `${pad(t.getHours())}:${pad(t.getMinutes())}:${pad(t.getSeconds())}`;
+  return (
+    <div className="px-3 py-2 bg-primary/5 border border-primary/10 rounded text-[9px] font-mono space-y-0.5">
+      <div className="flex justify-between items-center">
+        <span className="text-muted-foreground/50 tracking-widest">UTC</span>
+        <span className="text-primary tabular-nums">{utc}</span>
+      </div>
+      <div className="flex justify-between items-center">
+        <span className="text-muted-foreground/50 tracking-widest">LCL</span>
+        <span className="text-primary/70 tabular-nums">{local}</span>
+      </div>
+    </div>
+  );
+}
+
+const MAIN_NAV = [
+  { href: '/', label: 'Dashboard', icon: Activity, shortcut: 'G D' },
+  { href: '/chat', label: 'AI Ops', icon: Bot, shortcut: 'G C' },
+  { href: '/vault', label: 'Knowledge Base', icon: Database, shortcut: 'G K' },
+  { href: '/tools', label: 'Tool Reference', icon: Wrench, shortcut: 'G T' },
+  { href: '/commands', label: 'Saved Commands', icon: FileCode, shortcut: 'G M' },
+  { href: '/intrusions', label: 'Intrusion Log', icon: ShieldAlert, shortcut: 'G I' },
+];
+
+const SECURITY_NAV = [
+  { href: '/shells', label: 'Reverse Shells', icon: Terminal },
+  { href: '/jwt', label: 'JWT Decoder', icon: Key },
+  { href: '/payloads', label: 'Payload Library', icon: Zap },
+  { href: '/hash', label: 'Hash Tools', icon: Hash },
+  { href: '/dork', label: 'Dork Builder', icon: Search },
+  { href: '/cve', label: 'CVE Search', icon: Bug },
+  { href: '/ip-rep', label: 'IP Reputation', icon: Globe },
+  { href: '/breach', label: 'Breach Checker', icon: ShieldOff },
+];
+
+const OSINT_NAV = [
+  { href: '/recon', label: 'Network Recon', icon: Radar },
+  { href: '/osint', label: 'Social OSINT', icon: Users },
+  { href: '/typosquat', label: 'Typosquat Gen', icon: AlertTriangle },
+  { href: '/email-header', label: 'Email Analyzer', icon: Mail },
+  { href: '/fingerprint', label: 'Fingerprint', icon: Fingerprint },
+  { href: '/skill-tree', label: 'Skill Tree', icon: GitBranch },
+  { href: '/tracker', label: 'QR / Honeypot', icon: Radio },
+];
+
+export default function Sidebar({ onNavigate, onCommandPalette, collapsed: externalCollapsed, onToggleCollapse }: SidebarProps) {
   const [pathname] = useLocation();
   const { theme } = useTheme();
+  const [secOpen, setSecOpen] = useState(true);
+  const [osintOpen, setOsintOpen] = useState(false);
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
 
-  const navItems = [
-    { href: '/', label: 'Dashboard', icon: Activity },
-    { href: '/chat', label: 'AI Ops', icon: Bot },
-    { href: '/vault', label: 'Knowledge Base', icon: Database },
-    { href: '/tools', label: 'Tool Reference', icon: Wrench },
-    { href: '/commands', label: 'Saved Commands', icon: FileCode },
-    { href: '/intrusions', label: 'Intrusion Log', icon: ShieldAlert },
-  ];
+  const collapsed = externalCollapsed ?? internalCollapsed;
+  const toggleCollapse = onToggleCollapse ?? (() => setInternalCollapsed(c => !c));
+
+  const NavItem = ({ href, label, icon: Icon, shortcut }: { href: string; label: string; icon: React.ElementType; shortcut?: string }) => {
+    const isActive = pathname === href || (href !== '/' && pathname.startsWith(href));
+    return (
+      <Link href={href}>
+        <div onClick={onNavigate}
+          title={collapsed ? label : undefined}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-150 border cursor-pointer group",
+            collapsed ? "justify-center px-2" : "",
+            isActive
+              ? "bg-primary/10 text-primary border-primary/20"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary border-transparent"
+          )}
+        >
+          <Icon size={15} className={isActive ? "text-primary shrink-0" : "text-muted-foreground shrink-0"} />
+          {!collapsed && <span className="flex-1 truncate">{label}</span>}
+          {!collapsed && shortcut && (
+            <span className="text-[9px] text-muted-foreground/30 group-hover:text-muted-foreground/50 tracking-wider shrink-0">{shortcut}</span>
+          )}
+        </div>
+      </Link>
+    );
+  };
+
+  const SectionHeader = ({ label, open, onToggle }: { label: string; open: boolean; onToggle: () => void }) => {
+    if (collapsed) return null;
+    return (
+      <button onClick={onToggle} className="w-full flex items-center justify-between px-3 py-1 text-[9px] text-muted-foreground/40 tracking-[0.2em] uppercase hover:text-muted-foreground/60 transition-colors">
+        <span>{label}</span>
+        <span className="text-[8px]">{open ? '▲' : '▼'}</span>
+      </button>
+    );
+  };
 
   return (
-    <div className="w-64 border-r border-border bg-card/50 flex flex-col h-screen shrink-0 font-mono">
-      <div className="h-16 flex items-center px-6 border-b border-border">
-        <div className="flex items-center gap-2.5 text-primary font-bold tracking-tight">
-          <span className="text-primary"><SkullIcon size={22} /></span>
-          <span className="text-lg">CyberSentinel_</span>
-        </div>
+    <div className={cn(
+      "border-r border-border bg-card/50 flex flex-col h-screen shrink-0 font-mono transition-all duration-200",
+      collapsed ? "w-14" : "w-64"
+    )}>
+      {/* Header */}
+      <div className="h-16 flex items-center px-4 border-b border-border justify-between shrink-0">
+        {!collapsed && (
+          <div className="flex items-center gap-2.5 text-primary font-bold tracking-tight min-w-0">
+            <span className="text-primary shrink-0"><SkullIcon size={20} /></span>
+            <span className="text-base truncate">CyberSentinel_</span>
+          </div>
+        )}
+        {collapsed && <SkullIcon size={20} className="text-primary mx-auto" />}
+        <button onClick={toggleCollapse}
+          className={cn("text-muted-foreground hover:text-primary transition-colors shrink-0", collapsed && "mx-auto")}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+        </button>
       </div>
 
-      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
-          return (
-            <Link key={item.href} href={item.href}>
-              <div
-                onClick={onNavigate}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-all duration-200 border cursor-pointer",
-                  isActive
-                    ? "bg-primary/10 text-primary border-primary/20"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary border-transparent"
-                )}
-              >
-                <item.icon size={16} className={isActive ? "text-primary" : "text-muted-foreground"} />
-                {item.label}
-              </div>
-            </Link>
-          );
-        })}
+      {/* Clock */}
+      {!collapsed && (
+        <div className="px-3 pt-3 shrink-0">
+          <Clock />
+        </div>
+      )}
+
+      {/* Search / Command Palette */}
+      {!collapsed && onCommandPalette && (
+        <div className="px-3 pt-2 shrink-0">
+          <button onClick={onCommandPalette}
+            className="w-full flex items-center gap-2 px-3 py-1.5 bg-black/30 border border-border rounded text-xs text-muted-foreground hover:text-foreground hover:border-border/80 transition-colors">
+            <Search size={11} />
+            <span className="flex-1 text-left">Search…</span>
+            <kbd className="text-[9px] border border-border/50 rounded px-1">Ctrl+K</kbd>
+          </button>
+        </div>
+      )}
+      {collapsed && onCommandPalette && (
+        <div className="px-1 pt-2 shrink-0">
+          <button onClick={onCommandPalette} title="Search (Ctrl+K)"
+            className="w-full flex justify-center p-2 text-muted-foreground hover:text-primary transition-colors">
+            <Search size={15} />
+          </button>
+        </div>
+      )}
+
+      {/* Nav */}
+      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto scrollbar-thin">
+        {!collapsed && <SectionHeader label="Main" open={true} onToggle={() => {}} />}
+        {MAIN_NAV.map(item => <NavItem key={item.href} {...item} />)}
+
+        <div className="pt-2">
+          <SectionHeader label="Security Tools" open={secOpen} onToggle={() => setSecOpen(o => !o)} />
+          {(secOpen || collapsed) && SECURITY_NAV.map(item => <NavItem key={item.href} {...item} />)}
+        </div>
+
+        <div className="pt-2">
+          <SectionHeader label="OSINT & Recon" open={osintOpen} onToggle={() => setOsintOpen(o => !o)} />
+          {(osintOpen || collapsed) && OSINT_NAV.map(item => <NavItem key={item.href} {...item} />)}
+        </div>
       </nav>
 
-      <div className="p-4 border-t border-border bg-black/20">
-        <div className="flex items-center gap-2 px-2 py-1 mb-3 rounded bg-primary/5 border border-primary/10">
-          <Activity size={12} className="text-primary animate-pulse" />
-          <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-            Opsec: [READY]
-          </span>
-        </div>
-
-        <Link href="/settings">
-          <div onClick={onNavigate} className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer">
-            <Settings size={16} />
-            <span>Settings</span>
+      {/* Footer */}
+      <div className="p-2 border-t border-border bg-black/20 shrink-0 space-y-1">
+        {!collapsed && (
+          <div className="flex items-center gap-2 px-2 py-1 mb-1 rounded bg-primary/5 border border-primary/10">
+            <Activity size={10} className="text-primary animate-pulse shrink-0" />
+            <span className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold truncate">Opsec: [READY]</span>
           </div>
-        </Link>
-        <div className="mt-3 text-[9px] text-muted-foreground/50 uppercase tracking-tighter text-center">
-          V1.0.4-INTERNAL // BY DEEPMIND
-        </div>
+        )}
+
+        <NavItem href="/settings" label="Settings" icon={Settings} />
+
+        {!collapsed && (
+          <div className="mt-2 text-[8px] text-muted-foreground/30 uppercase tracking-tighter text-center">
+            V2.0.0-INTERNAL // CYBERSENTINEL
+          </div>
+        )}
       </div>
     </div>
   );

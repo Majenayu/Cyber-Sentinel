@@ -3,22 +3,11 @@ import { Terminal, Database, Wrench, Bot, Activity, ShieldCheck, CheckCircle, XC
 import { Link, useLocation } from 'wouter';
 import { useGetStats } from '@workspace/api-client-react';
 import { useQuery } from '@tanstack/react-query';
-import ThreatMap from '@/components/ThreatMap';
+import Globe3D from '@/components/Globe3D';
 
-interface ProviderSnapshot {
-  key: string;
-  label: string;
-  configured: boolean;
-}
-
-interface UsageData {
-  providers: ProviderSnapshot[];
-}
-
-interface HealthStatus {
-  database: string;
-  encryption: string;
-}
+interface ProviderSnapshot { key: string; label: string; configured: boolean; }
+interface UsageData { providers: ProviderSnapshot[]; }
+interface HealthStatus { database: string; encryption: string; }
 
 export default function Dashboard() {
   const { data: stats, isLoading } = useGetStats({ query: { refetchInterval: 30_000 } });
@@ -29,11 +18,7 @@ export default function Dashboard() {
 
   const { data: intrusions = [] } = useQuery<any[]>({
     queryKey: ['intrusions'],
-    queryFn: async () => {
-      const r = await fetch('/api/auth/intrusions');
-      if (!r.ok) throw new Error('Failed');
-      return r.json();
-    },
+    queryFn: async () => { const r = await fetch('/api/auth/intrusions'); if (!r.ok) throw new Error('Failed'); return r.json(); },
     refetchInterval: 30_000,
   });
   const totalIntrusionAttempts = intrusions.reduce((s: number, i: any) => s + i.attempts, 0);
@@ -103,8 +88,8 @@ export default function Dashboard() {
           </div>
         </Link>
 
-        {/* Live threat map */}
-        <ThreatMap />
+        {/* 3D Threat Globe */}
+        <Globe3D />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           <div className="bg-card/50 border border-border rounded-lg overflow-hidden">
@@ -115,11 +100,8 @@ export default function Dashboard() {
               {stats?.recentTags && stats.recentTags.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {stats.recentTags.map((tag: string) => (
-                    <button
-                      key={tag}
-                      onClick={() => navigate(`/vault?tag=${encodeURIComponent(tag)}`)}
-                      className="px-2 py-1 bg-secondary text-secondary-foreground text-xs font-mono rounded border border-primary/20 hover:border-primary/60 hover:bg-primary/10 hover:text-primary transition-all cursor-pointer"
-                    >
+                    <button key={tag} onClick={() => navigate(`/vault?tag=${encodeURIComponent(tag)}`)}
+                      className="px-2 py-1 bg-secondary text-secondary-foreground text-xs font-mono rounded border border-primary/20 hover:border-primary/60 hover:bg-primary/10 hover:text-primary transition-all cursor-pointer">
                       #{tag}
                     </button>
                   ))}
@@ -161,6 +143,30 @@ export default function Dashboard() {
                 <StatusValue value={health?.encryption} />
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Quick Links to new tools */}
+        <div className="bg-card/50 border border-border rounded-lg overflow-hidden">
+          <div className="p-3 border-b border-border bg-black/20 font-mono font-semibold flex items-center gap-2 text-xs">
+            <Terminal className="text-primary" size={14} /> Security Toolkit — Quick Access
+          </div>
+          <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
+            {[
+              { href: '/shells', label: 'Rev Shells' }, { href: '/jwt', label: 'JWT Decoder' },
+              { href: '/payloads', label: 'Payloads' }, { href: '/hash', label: 'Hash Tools' },
+              { href: '/cve', label: 'CVE Search' }, { href: '/breach', label: 'Breach Chk' },
+              { href: '/recon', label: 'Recon' }, { href: '/ip-rep', label: 'IP Rep' },
+              { href: '/osint', label: 'OSINT' }, { href: '/dork', label: 'Dork Bldr' },
+              { href: '/typosquat', label: 'Typosquat' }, { href: '/email-header', label: 'Email Hdr' },
+              { href: '/fingerprint', label: 'Fingerprint' }, { href: '/skill-tree', label: 'Skill Tree' },
+            ].map(({ href, label }) => (
+              <Link key={href} href={href}>
+                <div className="px-3 py-2 text-center text-[10px] font-mono border border-border rounded hover:border-primary/40 hover:text-primary hover:bg-primary/5 text-muted-foreground transition-all cursor-pointer tracking-wider">
+                  {label}
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </div>
