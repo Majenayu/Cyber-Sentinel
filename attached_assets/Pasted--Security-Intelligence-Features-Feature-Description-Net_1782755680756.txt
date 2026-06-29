@@ -1,0 +1,47 @@
+
+🛡️ Security & Intelligence Features
+Feature	Description
+Network Recon Toolkit	Port scanner, WHOIS, DNS resolver, subdomain finder all in one "Recon" page
+CVE Search	Search the NVD vulnerability database by software name or keyword
+IP Reputation Check	Look up any IP against AbuseIPDB, Shodan, or VirusTotal
+Reverse Shell Generator	One-click payloads for bash, Python, netcat, PowerShell for any OS
+Hash Identifier + Cracker	Detect hash type (MD5/SHA1/bcrypt) and do rainbow table lookups
+JWT Decoder	Paste a JWT and see header, payload, expiry decoded instantly
+Payload Library	Pre-built XSS, SQLi, LFI, SSRF, XXE payloads with copy button
+📊 Dashboard & UI Improvements
+Feature	Description
+Animated terminal clock	Live UTC + local time in the sidebar, hacker-style
+Activity feed	Scrolling live ticker of all API events (new KB entry, new chat, etc.)
+Dark/dim mode toggle	Even darker screen-dim mode for night ops
+Collapsible sidebar	Icon-only mini sidebar to maximize screen space
+Command palette	Ctrl+K search across KB, tools, commands from anywhere
+Keyboard shortcuts	G+D = dashboard, G+C = chat, G+K = vault, etc.
+Dashboard widgets	Drag-and-rearrange cards on the dashboard
+🔍 Knowledge Base Enhancements
+Feature	Description
+Full-text search	Search inside KB entries, not just by title/tag
+Markdown rendering	Render KB entries as formatted markdown instead of raw text
+Export to PDF	Export any KB entry or the full vault as a PDF report
+Bulk import	Upload a .json or .csv to mass-import knowledge entries
+AI auto-tagger	AI reads a new entry and suggests tags automatically
+📱 Mobile App
+Feature	Description
+Biometric lock	Face ID / fingerprint to open the mobile app
+Push notifications	Alert on phone when new intrusion is detected
+Offline mode	Cache vault + commands locally for use without internet
+
+1	3D Rotating Globe	Three.js spinning earth with red arcs connecting attacker IPs to your server, like a war room display do it in dashboard and perfect one replace current map Glitch Screensaver	After 2 min idle, screen glitches and shows matrix rain + "SYSTEM IDLE" in red
+4	Typing Sound Effects	Mechanical keyboard sounds on every keystroke in the dashboard
+5	Alert Siren Mode	When a new intrusion hits, red flash + siren animation on the whole screen for 3 seconds6	"Hack Cinema" Mode	Press a key and the screen floods with fake terminal output that looks like a movie hacking scene
+7	Animated Network Graph	Nodes and edges representing connections between your KB entries/tools, like a knowledge graph 10	Hacker Radio	Background lo-fi/synthwave stream with visualizer bar in the sidebar 11	Clock Widget	Live UTC clock + attacker IP timezone clock side by side in the header
+12	AI Voice Mode	AI chat responses read aloud in a robotic voice using Web Speech API ,  only for the log use Particle Rain	Instead of matrix characters — full animated particle field in the background ,	Skill Tree	Visual tree of pentesting techniques you've added to your KB — like an RPG skill graph 16	Email Breach Checker	Enter any email → checks HaveIBeenPwned API → shows all breach databases it appeared in
+17	Browser Fingerprint Inspector	Shows YOUR OWN full browser fingerprint — canvas hash, WebGL renderer, fonts, plugins, timezone drift
+18	Metadata Extractor	Upload any image/PDF → strips and displays all EXIF metadata (GPS, device, author, creation time0	QR Code Tracker	Generate a QR code with a tracking pixel → when anyone scans it you get their IP, device, location, time	Honeypot Link Generator	Create an invisible 1x1 tracking pixel URL — embed anywhere → logs every visitor with full fingerprint 	Social Media OSINT	Enter a username → checks availability/presence across 100+ platforms (like Sherlock)  Phone Number Lookup	Enter a number → shows carrier, region, line type (VoIP/mobile/landline) via numverify AP Dark Web Keyword Alert	Set keywords → daily check against known dark web leak indexes → email alert if found 	Credential Exposure Check	Check if a password has appeared in any breach (HIBP k-anonymity API — safe, no password sent)
+27	Domain History Viewer	Enter a domain → shows historical WHOIS, hosting changes, old IPs, DNS history
+28	Google Dork Builder	Visual builder for Google dorking queries (inurl, filetype, intitle, site) with one-click search
+29	Website Screenshot Bot	Enter any URL → take a screenshot of it server-side and display it (good for dark web-adjacent sites)Email Header Analyzer	Paste raw email headers → trace the routing path, detect spoofing, extract originating IP
+31	Subdomain Takeover Checker	Check if a subdomain points to an unclaimed cloud service (S3, Heroku, GitHub Pages)
+32	Typosquat Generator	Enter your domain → shows all typosquat variations someone might register to impersonate you SSL Monitor	Track SSL certs for your domains → alert 30 days before expiry + alert if cert changes unexpectedly
+34	Reverse Image Search	Upload a photo → searches Google/Bing/Yandex for matches (useful for profiling)
+35	Fake Login Honeypot Builder	Generate a fake login page for your domain → any credentials entered get logged and emailed to you
+
