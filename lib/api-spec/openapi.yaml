@@ -19,6 +19,8 @@ tags:
     description: Tool reference
   - name: chat
     description: Chat sessions and messages
+  - name: analyze
+    description: AI analysis and maintenance operations
 paths:
   /healthz:
     get:
@@ -32,6 +34,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /health/status:
+    get:
+      operationId: getSystemStatus
+      tags: [health]
+      summary: Get system component status
+      responses:
+        "200":
+          description: System status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemStatus"
 
   /stats:
     get:
@@ -289,6 +304,19 @@ paths:
         "204":
           description: Deleted
 
+  /analyze/deduplicate:
+    post:
+      operationId: deduplicateEntries
+      tags: [analyze]
+      summary: Remove duplicate tools and commands
+      responses:
+        "200":
+          description: Deduplication result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeduplicateResult"
+
   /chat/sessions/{id}/messages:
     get:
       operationId: listMessages
@@ -342,6 +370,31 @@ components:
           type: string
       required:
         - status
+
+    SystemStatus:
+      type: object
+      properties:
+        database:
+          type: string
+        ai:
+          type: string
+        encryption:
+          type: string
+      required:
+        - database
+        - ai
+        - encryption
+
+    DeduplicateResult:
+      type: object
+      properties:
+        toolsRemoved:
+          type: integer
+        commandsRemoved:
+          type: integer
+      required:
+        - toolsRemoved
+        - commandsRemoved
 
     Stats:
       type: object

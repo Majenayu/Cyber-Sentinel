@@ -38,6 +38,12 @@ function RootLayoutNav() {
           title: "Tool Detail",
         }}
       />
+      <Stack.Screen
+        name="settings"
+        options={{
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 }

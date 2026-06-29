@@ -9,6 +9,17 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface SystemStatus {
+  database: string;
+  ai: string;
+  encryption: string;
+}
+
+export interface DeduplicateResult {
+  toolsRemoved: number;
+  commandsRemoved: number;
+}
+
 export interface Stats {
   totalKnowledgeEntries: number;
   totalChatSessions: number;

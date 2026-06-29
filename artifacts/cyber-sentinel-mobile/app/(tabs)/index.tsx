@@ -1,8 +1,11 @@
+import { Feather } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import React from "react";
 import {
   ActivityIndicator,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,11 +18,13 @@ import { getGetStatsQueryOptions } from "@workspace/api-client-react";
 
 import { useColors } from "@/hooks/useColors";
 
-function StatCard({ label, value, icon }: { label: string; value: number | string; icon: string }) {
+type FeatherIconName = React.ComponentProps<typeof Feather>["name"];
+
+function StatCard({ label, value, icon }: { label: string; value: number | string; icon: FeatherIconName }) {
   const colors = useColors();
   return (
     <View style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <Text style={[styles.statIcon, { color: colors.primary }]}>{icon}</Text>
+      <Feather name={icon} size={22} color={colors.primary} />
       <Text style={[styles.statValue, { color: colors.foreground }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{label}</Text>
     </View>
@@ -43,12 +48,25 @@ export default function DashboardScreen() {
         paddingHorizontal: 16,
       }}
     >
-      <Text style={[styles.heading, { color: colors.primary }]}>
-        {">"} CYBERSENTINEL
-      </Text>
-      <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
-        Security Operations Center
-      </Text>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={[styles.heading, { color: colors.primary }]}>
+            {">"} CYBERSENTINEL
+          </Text>
+          <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
+            Security Operations Center
+          </Text>
+        </View>
+        <Pressable
+          onPress={() => router.push("/settings" as any)}
+          style={({ pressed }) => [
+            styles.gearBtn,
+            { borderColor: pressed ? colors.primary : colors.border, borderRadius: colors.radius },
+          ]}
+        >
+          <Feather name="settings" size={18} color={colors.mutedForeground} />
+        </Pressable>
+      </View>
 
       {isLoading && (
         <View style={styles.centered}>
@@ -67,10 +85,10 @@ export default function DashboardScreen() {
       {stats && (
         <>
           <View style={styles.statsGrid}>
-            <StatCard label="Knowledge Entries" value={stats.totalKnowledgeEntries} icon="📚" />
-            <StatCard label="Chat Sessions" value={stats.totalChatSessions} icon="💬" />
-            <StatCard label="Commands" value={stats.totalCommands} icon="⚡" />
-            <StatCard label="Tools" value={stats.totalTools} icon="🔧" />
+            <StatCard label="Knowledge Entries" value={stats.totalKnowledgeEntries} icon="book" />
+            <StatCard label="Chat Sessions" value={stats.totalChatSessions} icon="message-circle" />
+            <StatCard label="Commands" value={stats.totalCommands} icon="terminal" />
+            <StatCard label="Tools" value={stats.totalTools} icon="tool" />
           </View>
 
           {stats.recentTags.length > 0 && (
@@ -104,6 +122,20 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 24,
+  },
+  gearBtn: {
+    width: 36,
+    height: 36,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
   heading: {
     fontSize: 22,
     fontFamily: "Inter_700Bold",
@@ -114,7 +146,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_400Regular",
     letterSpacing: 1,
-    marginBottom: 24,
   },
   centered: { flex: 1, alignItems: "center", paddingTop: 40 },
   errorBox: {

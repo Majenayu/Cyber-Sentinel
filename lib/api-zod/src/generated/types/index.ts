@@ -9,6 +9,7 @@
 export * from './command';
 export * from './commandInput';
 export * from './commandUpdate';
+export * from './deduplicateResult';
 export * from './healthStatus';
 export * from './knowledgeEntry';
 export * from './knowledgeInput';
@@ -19,5 +20,6 @@ export * from './messageInput';
 export * from './session';
 export * from './sessionInput';
 export * from './stats';
+export * from './systemStatus';
 export * from './tool';
 export * from './toolDetail';

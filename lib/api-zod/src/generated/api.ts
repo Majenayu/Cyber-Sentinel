@@ -17,6 +17,16 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Get system component status
+ */
+export const GetSystemStatusResponse = zod.object({
+  "database": zod.string(),
+  "ai": zod.string(),
+  "encryption": zod.string()
+})
+
+
+/**
  * @summary Get dashboard statistics
  */
 export const GetStatsResponse = zod.object({
@@ -256,6 +266,15 @@ export const DeleteSessionParams = zod.object({
 })
 
 export const DeleteSessionResponse = zod.void()
+
+
+/**
+ * @summary Remove duplicate tools and commands
+ */
+export const DeduplicateEntriesResponse = zod.object({
+  "toolsRemoved": zod.number(),
+  "commandsRemoved": zod.number()
+})
 
 
 /**

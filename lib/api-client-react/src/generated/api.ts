@@ -23,6 +23,7 @@ import type {
   Command,
   CommandInput,
   CommandUpdate,
+  DeduplicateResult,
   HealthStatus,
   KnowledgeEntry,
   KnowledgeInput,
@@ -33,6 +34,7 @@ import type {
   Session,
   SessionInput,
   Stats,
+  SystemStatus,
   Tool,
   ToolDetail
 } from './api.schemas';
@@ -129,6 +131,83 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetSystemStatusUrl = () => {
+
+
+
+
+  return `/api/health/status`
+}
+
+/**
+ * @summary Get system component status
+ */
+export const getSystemStatus = async ( options?: RequestInit): Promise<SystemStatus> => {
+
+  return customFetch<SystemStatus>(getGetSystemStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSystemStatusQueryKey = () => {
+    return [
+    `/api/health/status`
+    ] as const;
+    }
+
+
+export const getGetSystemStatusQueryOptions = <TData = Awaited<ReturnType<typeof getSystemStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSystemStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSystemStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSystemStatus>>> = ({ signal }) => getSystemStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSystemStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSystemStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getSystemStatus>>>
+export type GetSystemStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get system component status
+ */
+
+export function useGetSystemStatus<TData = Awaited<ReturnType<typeof getSystemStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSystemStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSystemStatusQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -1247,6 +1326,76 @@ export const useDeleteSession = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteSessionMutationOptions(options));
+    }
+
+export const getDeduplicateEntriesUrl = () => {
+
+
+
+
+  return `/api/analyze/deduplicate`
+}
+
+/**
+ * @summary Remove duplicate tools and commands
+ */
+export const deduplicateEntries = async ( options?: RequestInit): Promise<DeduplicateResult> => {
+
+  return customFetch<DeduplicateResult>(getDeduplicateEntriesUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getDeduplicateEntriesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deduplicateEntries>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deduplicateEntries>>, TError,void, TContext> => {
+
+const mutationKey = ['deduplicateEntries'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deduplicateEntries>>, void> = () => {
+
+
+          return  deduplicateEntries(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeduplicateEntriesMutationResult = NonNullable<Awaited<ReturnType<typeof deduplicateEntries>>>
+
+    export type DeduplicateEntriesMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove duplicate tools and commands
+ */
+export const useDeduplicateEntries = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deduplicateEntries>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deduplicateEntries>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getDeduplicateEntriesMutationOptions(options));
     }
 
 export const getListMessagesUrl = (id: string,) => {
