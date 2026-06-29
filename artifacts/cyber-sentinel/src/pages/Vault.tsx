@@ -2,34 +2,66 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Plus, FileText, Trash2, Edit, Save, X, ExternalLink, Loader2, ChevronLeft, Tag, Sparkles, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Link, Globe, Download, Upload, Wand2 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 function cn(...inputs: (string | boolean | undefined | null)[]) {
   return twMerge(clsx(inputs));
 }
 
-function renderContent(content: string) {
-  const parts = content.split(/(```[\s\S]*?```)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('```') && part.endsWith('```')) {
-      const match = part.match(/```(\w*)\n?([\s\S]*?)```/);
-      const lang = match?.[1] ?? '';
-      const code = match?.[2] ?? part.slice(3, -3);
-      return (
-        <div key={i} className="relative group/code my-3 md:my-4">
-          {lang && (
-            <div className="flex items-center justify-between bg-black/80 px-3 py-1 rounded-t border border-primary/10 border-b-0">
-              <span className="text-[10px] text-primary/60 uppercase font-mono">{lang}</span>
-              <button onClick={() => navigator.clipboard.writeText(code.trim())} className="text-[10px] text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover/code:opacity-100">copy</button>
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      components={{
+        h1: ({ children }) => <h1 className="text-lg md:text-xl font-bold text-primary border-b border-primary/20 pb-2 mb-4 mt-6 first:mt-0">{children}</h1>,
+        h2: ({ children }) => <h2 className="text-base md:text-lg font-bold text-primary/90 border-b border-border pb-1 mb-3 mt-5 first:mt-0">{children}</h2>,
+        h3: ({ children }) => <h3 className="text-sm md:text-base font-bold text-primary/80 mb-2 mt-4 first:mt-0">{children}</h3>,
+        h4: ({ children }) => <h4 className="text-xs md:text-sm font-bold text-primary/70 mb-2 mt-3">{children}</h4>,
+        p: ({ children }) => <p className="text-xs md:text-sm leading-relaxed mb-3 text-foreground/90">{children}</p>,
+        ul: ({ children }) => <ul className="list-none space-y-1 mb-3 pl-3 border-l border-primary/20">{children}</ul>,
+        ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 mb-3 pl-2 text-xs md:text-sm">{children}</ol>,
+        li: ({ children }) => <li className="text-xs md:text-sm text-foreground/90 flex gap-2 items-start"><span className="text-primary/60 mt-0.5 shrink-0">→</span><span>{children}</span></li>,
+        code: ({ children, className }) => {
+          const isInline = !className;
+          if (isInline) {
+            return <code className="bg-black/70 text-primary px-1.5 py-0.5 rounded text-[11px] font-mono border border-primary/15">{children}</code>;
+          }
+          const lang = (className ?? '').replace('language-', '');
+          const code = String(children).replace(/\n$/, '');
+          return (
+            <div className="relative group/code my-3 md:my-4">
+              {lang && (
+                <div className="flex items-center justify-between bg-black/80 px-3 py-1 rounded-t border border-primary/10 border-b-0">
+                  <span className="text-[10px] text-primary/60 uppercase font-mono">{lang}</span>
+                  <button onClick={() => navigator.clipboard.writeText(code)} className="text-[10px] text-muted-foreground hover:text-primary transition-colors opacity-0 group-hover/code:opacity-100">copy</button>
+                </div>
+              )}
+              <pre className={cn("bg-black/80 text-primary p-3 md:p-4 overflow-x-auto font-mono text-xs md:text-sm shadow-inner border border-primary/10", lang ? "rounded-b rounded-tr" : "rounded")}>
+                <code>{code}</code>
+              </pre>
             </div>
-          )}
-          <pre className={cn("bg-black/80 text-primary p-3 md:p-4 overflow-x-auto font-mono text-xs md:text-sm shadow-inner border border-primary/10", lang ? "rounded-b rounded-tr" : "rounded")}>
-            <code>{code.trim()}</code>
-          </pre>
-        </div>
-      );
-    }
-    return <div key={i} className="whitespace-pre-wrap mb-3 text-xs md:text-sm leading-relaxed">{part}</div>;
-  });
+          );
+        },
+        pre: ({ children }) => <>{children}</>,
+        blockquote: ({ children }) => <blockquote className="border-l-2 border-primary/40 pl-4 my-3 text-xs md:text-sm text-muted-foreground italic">{children}</blockquote>,
+        hr: () => <hr className="border-border my-4" />,
+        a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{children}</a>,
+        strong: ({ children }) => <strong className="font-bold text-primary/90">{children}</strong>,
+        em: ({ children }) => <em className="italic text-foreground/80">{children}</em>,
+        table: ({ children }) => (
+          <div className="overflow-x-auto my-4">
+            <table className="w-full text-xs border-collapse border border-border">{children}</table>
+          </div>
+        ),
+        thead: ({ children }) => <thead className="bg-primary/10">{children}</thead>,
+        th: ({ children }) => <th className="border border-border px-3 py-2 text-left font-bold text-primary/80 text-[11px]">{children}</th>,
+        td: ({ children }) => <td className="border border-border px-3 py-2 text-[11px] text-foreground/80">{children}</td>,
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  );
 }
 
 interface AnalyzeEvent {
@@ -519,11 +551,13 @@ export default function VaultPage() {
                 </div>
               )}
               <div className="max-w-4xl mx-auto">
-                {renderContent(
-                  viewMode === 'simplified' && selectedEntry.simplifiedContent
-                    ? selectedEntry.simplifiedContent
-                    : selectedEntry.content
-                )}
+                <MarkdownContent
+                  content={
+                    viewMode === 'simplified' && selectedEntry.simplifiedContent
+                      ? selectedEntry.simplifiedContent
+                      : selectedEntry.content
+                  }
+                />
               </div>
             </div>
           </div>
