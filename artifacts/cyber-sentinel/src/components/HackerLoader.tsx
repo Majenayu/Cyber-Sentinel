@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useTheme, THEMES } from '@/contexts/ThemeContext';
 
-const CHARS = '01アイウエカキクサシスタチツハヒフ0xDEAD0xC0DE0xFF01100110';
+const CHARS = '01アイウエカキクサシスタチツハヒフ0xDEAD0xC0DE0xFF0110';
 
 function MatrixBg({ color }: { color: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -12,151 +12,44 @@ function MatrixBg({ color }: { color: string }) {
     if (!ctx) return;
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    const FONT = 13;
+    const FONT = 14;
     const cols = Math.floor(canvas.width / FONT);
-    const drops = Array.from({ length: cols }, () => Math.random() * -60);
+    const drops = Array.from({ length: cols }, () => Math.random() * -80);
     const r = parseInt(color.slice(1, 3), 16);
     const g = parseInt(color.slice(3, 5), 16);
     const b = parseInt(color.slice(5, 7), 16);
     let animId: number;
     function draw() {
-      ctx!.fillStyle = 'rgba(0,0,0,0.07)';
+      ctx!.fillStyle = 'rgba(0,0,0,0.055)';
       ctx!.fillRect(0, 0, canvas!.width, canvas!.height);
       ctx!.font = `${FONT}px monospace`;
       for (let i = 0; i < drops.length; i++) {
-        const bright = Math.random() > 0.88;
-        ctx!.fillStyle = bright ? `rgba(255,255,255,0.8)` : `rgba(${r},${g},${b},${0.2 + Math.random() * 0.5})`;
+        const bright = Math.random() > 0.9;
+        ctx!.fillStyle = bright
+          ? `rgba(255,255,255,0.7)`
+          : `rgba(${r},${g},${b},${0.15 + Math.random() * 0.4})`;
         ctx!.fillText(CHARS[Math.floor(Math.random() * CHARS.length)], i * FONT, drops[i] * FONT);
         if (drops[i] * FONT > canvas!.height && Math.random() > 0.975) drops[i] = 0;
-        drops[i] += 0.5;
+        drops[i] += 0.4;
       }
       animId = requestAnimationFrame(draw);
     }
     animId = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(animId);
   }, [color]);
-  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ opacity: 0.4 }} />;
+  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 0.55, mixBlendMode: 'screen' }} />;
 }
 
-function WorldMap({ color, scanX }: { color: string; scanX: number }) {
-  const dots = [
-    { x: 220, y: 90, label: 'MOSCOW' },
-    { x: 420, y: 130, label: 'TOKYO' },
-    { x: 160, y: 160, label: 'LONDON' },
-    { x: 95, y: 170, label: 'NYC' },
-    { x: 310, y: 200, label: 'DUBAI' },
-    { x: 380, y: 220, label: 'DELHI' },
-    { x: 110, y: 240, label: 'SAO PAULO' },
-    { x: 430, y: 240, label: 'BEIJING' },
-    { x: 470, y: 300, label: 'SYDNEY' },
-    { x: 170, y: 120, label: 'BERLIN' },
-    { x: 75, y: 145, label: 'CHICAGO' },
-    { x: 310, y: 145, label: 'RIYADH' },
-  ];
-
-  return (
-    <svg viewBox="0 0 560 340" width="100%" height="100%" className="overflow-visible">
-      <defs>
-        <filter id="glow-map">
-          <feGaussianBlur stdDeviation="2.5" result="b" />
-          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <filter id="dot-glow">
-          <feGaussianBlur stdDeviation="3" result="b" />
-          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-        <linearGradient id="scan-grad" x1="0" x2="1" y1="0" y2="0">
-          <stop offset="0%" stopColor={color} stopOpacity="0" />
-          <stop offset="40%" stopColor={color} stopOpacity="0.08" />
-          <stop offset="50%" stopColor={color} stopOpacity="0.35" />
-          <stop offset="60%" stopColor={color} stopOpacity="0.08" />
-          <stop offset="100%" stopColor={color} stopOpacity="0" />
-        </linearGradient>
-        <clipPath id="map-clip">
-          <rect x="0" y="0" width="560" height="340" />
-        </clipPath>
-      </defs>
-
-      {/* Grid lines */}
-      {[0, 56, 112, 168, 224, 280, 336, 392, 448, 504, 560].map(x => (
-        <line key={`v${x}`} x1={x} y1={0} x2={x} y2={340} stroke={color} strokeOpacity={0.06} strokeWidth={0.5} />
-      ))}
-      {[0, 34, 68, 102, 136, 170, 204, 238, 272, 306, 340].map(y => (
-        <line key={`h${y}`} x1={0} y1={y} x2={560} y2={y} stroke={color} strokeOpacity={0.06} strokeWidth={0.5} />
-      ))}
-
-      {/* Continent outlines — simplified */}
-      {/* North America */}
-      <path d="M 55 60 L 80 55 L 110 58 L 130 70 L 140 90 L 135 120 L 120 145 L 100 160 L 80 155 L 60 140 L 45 120 L 40 95 Z"
-        fill="none" stroke={color} strokeWidth={1.2} strokeOpacity={0.55} filter="url(#glow-map)" />
-      {/* South America */}
-      <path d="M 90 165 L 115 160 L 130 175 L 135 200 L 130 240 L 115 265 L 100 270 L 88 255 L 82 230 L 80 205 L 82 180 Z"
-        fill="none" stroke={color} strokeWidth={1.2} strokeOpacity={0.55} filter="url(#glow-map)" />
-      {/* Europe */}
-      <path d="M 155 55 L 185 50 L 210 55 L 220 70 L 215 90 L 195 100 L 175 105 L 158 95 L 148 78 Z"
-        fill="none" stroke={color} strokeWidth={1.2} strokeOpacity={0.55} filter="url(#glow-map)" />
-      {/* Africa */}
-      <path d="M 165 110 L 210 108 L 235 120 L 245 150 L 248 185 L 240 220 L 220 240 L 200 245 L 180 235 L 162 210 L 155 175 L 155 145 L 158 120 Z"
-        fill="none" stroke={color} strokeWidth={1.2} strokeOpacity={0.55} filter="url(#glow-map)" />
-      {/* Asia */}
-      <path d="M 225 48 L 290 42 L 360 48 L 420 60 L 455 80 L 460 110 L 440 140 L 400 160 L 360 165 L 310 160 L 270 150 L 235 135 L 218 110 L 218 80 Z"
-        fill="none" stroke={color} strokeWidth={1.2} strokeOpacity={0.55} filter="url(#glow-map)" />
-      {/* Australia */}
-      <path d="M 415 240 L 460 235 L 490 248 L 498 270 L 490 295 L 460 305 L 430 298 L 410 278 L 408 258 Z"
-        fill="none" stroke={color} strokeWidth={1.2} strokeOpacity={0.55} filter="url(#glow-map)" />
-      {/* Japan */}
-      <path d="M 448 88 L 460 82 L 468 90 L 462 100 L 452 98 Z"
-        fill="none" stroke={color} strokeWidth={1} strokeOpacity={0.5} />
-
-      {/* Connection lines between dots */}
-      {dots.slice(0, 6).map((d, i) => (
-        <line key={`conn${i}`}
-          x1={dots[i].x} y1={dots[i].y}
-          x2={dots[(i + 3) % dots.length].x} y2={dots[(i + 3) % dots.length].y}
-          stroke={color} strokeOpacity={0.1} strokeWidth={0.5} strokeDasharray="3,6" />
-      ))}
-
-      {/* Scan beam */}
-      <rect
-        x={scanX - 80}
-        y={0}
-        width={160}
-        height={340}
-        fill="url(#scan-grad)"
-        clipPath="url(#map-clip)"
-      />
-      {/* Scan line */}
-      <line x1={scanX} y1={0} x2={scanX} y2={340} stroke={color} strokeOpacity={0.6} strokeWidth={1} />
-
-      {/* Target dots */}
-      {dots.map((dot, i) => {
-        const isScanned = dot.x < scanX;
-        return (
-          <g key={i} filter={isScanned ? "url(#dot-glow)" : undefined}>
-            <circle cx={dot.x} cy={dot.y} r={isScanned ? 5 : 3} fill="none"
-              stroke={color} strokeWidth={isScanned ? 1.5 : 0.8} strokeOpacity={isScanned ? 0.9 : 0.35} />
-            <circle cx={dot.x} cy={dot.y} r={isScanned ? 2.5 : 1.5}
-              fill={color} fillOpacity={isScanned ? 0.9 : 0.25} />
-            {isScanned && (
-              <>
-                <circle cx={dot.x} cy={dot.y} r={8} fill="none"
-                  stroke={color} strokeWidth={0.6} strokeOpacity={0.35} />
-                <text x={dot.x + 8} y={dot.y - 4} fontSize={6} fill={color} fillOpacity={0.7}
-                  fontFamily="monospace">{dot.label}</text>
-              </>
-            )}
-          </g>
-        );
-      })}
-
-      {/* Corner brackets */}
-      <path d="M 8 8 L 8 24 M 8 8 L 24 8" stroke={color} strokeWidth={1.5} strokeOpacity={0.7} fill="none" />
-      <path d="M 552 8 L 552 24 M 552 8 L 536 8" stroke={color} strokeWidth={1.5} strokeOpacity={0.7} fill="none" />
-      <path d="M 8 332 L 8 316 M 8 332 L 24 332" stroke={color} strokeWidth={1.5} strokeOpacity={0.7} fill="none" />
-      <path d="M 552 332 L 552 316 M 552 332 L 536 332" stroke={color} strokeWidth={1.5} strokeOpacity={0.7} fill="none" />
-    </svg>
-  );
-}
+const STATUS_STEPS = [
+  { at: 0,  text: 'INITIALIZING SYSTEM...' },
+  { at: 12, text: 'SCANNING GLOBAL NETWORK...' },
+  { at: 26, text: 'DETECTING THREAT VECTORS...' },
+  { at: 42, text: 'MAPPING TARGET NODES...' },
+  { at: 57, text: 'DECRYPTING CHANNELS...' },
+  { at: 71, text: 'BYPASSING FIREWALLS...' },
+  { at: 85, text: 'ESTABLISHING SECURE LINK...' },
+  { at: 97, text: 'ACCESS READY' },
+];
 
 interface HackerLoaderProps {
   onDone: () => void;
@@ -168,53 +61,53 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
 
   const [phase, setPhase] = useState<'loading' | 'auth'>('loading');
   const [progress, setProgress] = useState(0);
-  const [scanX, setScanX] = useState(0);
-  const [statusText, setStatusText] = useState('INITIALIZING...');
+  const [statusText, setStatusText] = useState('INITIALIZING SYSTEM...');
   const [fading, setFading] = useState(false);
+  const [scanLineY, setScanLineY] = useState(0);
 
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [shake, setShake] = useState(false);
+  const [authVisible, setAuthVisible] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const STATUS_STEPS = [
-    { at: 10, text: 'SCANNING GLOBAL NETWORK...' },
-    { at: 25, text: 'DETECTING THREAT VECTORS...' },
-    { at: 40, text: 'MAPPING TARGET NODES...' },
-    { at: 58, text: 'DECRYPTING CHANNELS...' },
-    { at: 74, text: 'BYPASSING FIREWALLS...' },
-    { at: 88, text: 'ESTABLISHING SECURE LINK...' },
-    { at: 100, text: 'ACCESS READY' },
-  ];
+  // Hex color to rgb helper
+  const hex = color.replace('#', '');
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  const rgb = `${r},${g},${b}`;
 
   useEffect(() => {
     if (phase !== 'loading') return;
-    const total = 3500;
+    const TOTAL = 3800;
 
-    const progInterval = setInterval(() => {
+    const progTimer = setInterval(() => {
       setProgress(p => {
-        if (p >= 100) { clearInterval(progInterval); return 100; }
-        return Math.min(100, p + (Math.random() * 2.5 + 0.5));
+        if (p >= 100) { clearInterval(progTimer); return 100; }
+        const rand = Math.random() * 2.2 + 0.3;
+        return Math.min(100, p + rand);
       });
-    }, total / 80);
+    }, TOTAL / 85);
 
-    const scanInterval = setInterval(() => {
-      setScanX(x => {
-        const next = x + 3.5;
-        return next > 560 ? 0 : next;
-      });
-    }, 16);
+    // Horizontal scan line
+    const scanTimer = setInterval(() => {
+      setScanLineY(y => (y + 1) % 100);
+    }, 18);
 
     const doneTimer = setTimeout(() => {
       setProgress(100);
       setStatusText('ACCESS READY');
-      clearInterval(scanInterval);
-      setTimeout(() => setPhase('auth'), 600);
-    }, total);
+      clearInterval(scanTimer);
+      setTimeout(() => {
+        setPhase('auth');
+        setTimeout(() => setAuthVisible(true), 80);
+      }, 500);
+    }, TOTAL);
 
     return () => {
-      clearInterval(progInterval);
-      clearInterval(scanInterval);
+      clearInterval(progTimer);
+      clearInterval(scanTimer);
       clearTimeout(doneTimer);
     };
   }, [phase]);
@@ -226,20 +119,20 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
   }, [progress, phase]);
 
   useEffect(() => {
-    if (phase === 'auth') {
-      setTimeout(() => inputRef.current?.focus(), 100);
+    if (phase === 'auth' && authVisible) {
+      setTimeout(() => inputRef.current?.focus(), 120);
     }
-  }, [phase]);
+  }, [phase, authVisible]);
 
   const handleSubmit = useCallback(() => {
     if (username === 'Majen') {
       setFading(true);
-      setTimeout(onDone, 500);
+      setTimeout(onDone, 600);
     } else {
       setError('ACCESS DENIED // INVALID OPERATOR ID');
       setShake(true);
       setUsername('');
-      setTimeout(() => { setShake(false); setError(''); }, 1200);
+      setTimeout(() => { setShake(false); setError(''); }, 1300);
     }
   }, [username, onDone]);
 
@@ -249,106 +142,165 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black font-mono overflow-hidden"
-      style={{ transition: 'opacity 0.5s ease', opacity: fading ? 0 : 1, pointerEvents: fading ? 'none' : 'all' }}
+      className="fixed inset-0 z-[9999] bg-black overflow-hidden font-mono"
+      style={{ transition: 'opacity 0.6s ease', opacity: fading ? 0 : 1, pointerEvents: fading ? 'none' : 'all' }}
     >
+      {/* ── World map background image ── */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: 'url(/worldmap-bg.png)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          filter: 'brightness(0.7) grayscale(1)',
+          opacity: 0.85,
+        }}
+      />
+      {/* Color tint layer — blends theme color onto the grayscale map */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundColor: color,
+          mixBlendMode: 'color',
+          opacity: 0.55,
+        }}
+      />
+
+      {/* Dark vignette overlay */}
+      <div className="absolute inset-0" style={{
+        background: `radial-gradient(ellipse 120% 80% at 50% 50%, rgba(0,0,0,0) 10%, rgba(0,0,0,0.65) 100%)`
+      }} />
+
+      {/* Horizontal sweep scan line */}
+      {phase === 'loading' && (
+        <div
+          className="absolute left-0 right-0 pointer-events-none"
+          style={{
+            top: `${scanLineY}%`,
+            height: '2px',
+            background: `linear-gradient(90deg, transparent 0%, rgba(${rgb},0.0) 10%, rgba(${rgb},0.6) 50%, rgba(${rgb},0.0) 90%, transparent 100%)`,
+            boxShadow: `0 0 12px rgba(${rgb},0.4)`,
+            transition: 'none',
+          }}
+        />
+      )}
+
+      {/* Corner grid decoration lines */}
+      <div className="absolute inset-4 pointer-events-none" style={{ border: `1px solid rgba(${rgb},0.12)` }} />
+      {/* Corner brackets */}
+      {[
+        'top-4 left-4 border-t-2 border-l-2',
+        'top-4 right-4 border-t-2 border-r-2',
+        'bottom-4 left-4 border-b-2 border-l-2',
+        'bottom-4 right-4 border-b-2 border-r-2',
+      ].map((cls, i) => (
+        <div key={i} className={`absolute w-8 h-8 pointer-events-none ${cls}`} style={{ borderColor: `rgba(${rgb},0.7)` }} />
+      ))}
+
+      {/* Matrix rain on top */}
       <MatrixBg color={color} />
 
-      <div className="relative z-10 flex flex-col items-center w-full max-w-2xl px-4 gap-4">
+      {/* ── Main UI (centered) ── */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 px-6">
 
-        {/* Header */}
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-3 mb-1">
-            <div className="h-px w-16 bg-gradient-to-r from-transparent" style={{ backgroundImage: `linear-gradient(to right, transparent, ${color})` }} />
-            <span className="text-[10px] tracking-[0.4em] uppercase" style={{ color, opacity: 0.6 }}>
-              GLOBAL OPS CENTER
+        {/* Title */}
+        <div className="text-center select-none">
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <div className="h-px w-20" style={{ background: `linear-gradient(to right, transparent, rgba(${rgb},0.8))` }} />
+            <span className="text-[10px] tracking-[0.5em] uppercase" style={{ color: `rgba(${rgb},0.55)` }}>
+              AI OPERATIONS HUB
             </span>
-            <div className="h-px w-16" style={{ backgroundImage: `linear-gradient(to left, transparent, ${color})` }} />
+            <div className="h-px w-20" style={{ background: `linear-gradient(to left, transparent, rgba(${rgb},0.8))` }} />
           </div>
-          <h1 className="text-3xl font-bold tracking-[0.35em] uppercase" style={{ color, textShadow: `0 0 20px ${color}88` }}>
+          <h1
+            className="text-4xl md:text-5xl font-bold tracking-[0.35em] uppercase"
+            style={{ color, textShadow: `0 0 30px rgba(${rgb},0.7), 0 0 60px rgba(${rgb},0.3)` }}
+          >
             CYBERSENTINEL
           </h1>
-          <p className="text-[11px] tracking-[0.3em] mt-0.5" style={{ color, opacity: 0.5 }}>
-            {phase === 'loading' ? 'AI OPERATIONS HUB // CLASSIFIED' : 'SYSTEM ONLINE // AUTHENTICATION REQUIRED'}
+          <p className="text-[11px] tracking-[0.4em] mt-1.5 uppercase" style={{ color: `rgba(${rgb},0.45)` }}>
+            CLASSIFIED // LEVEL-5 CLEARANCE
           </p>
-        </div>
-
-        {/* World Map */}
-        <div
-          className="w-full rounded border overflow-hidden relative"
-          style={{
-            borderColor: `${color}33`,
-            backgroundColor: `${color}06`,
-            boxShadow: `0 0 30px ${color}18, inset 0 0 60px ${color}05`,
-            height: '240px',
-          }}
-        >
-          {/* Map header bar */}
-          <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-3 py-1.5 border-b"
-            style={{ borderColor: `${color}22`, backgroundColor: `${color}0a` }}>
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: color }} />
-              <span className="text-[9px] tracking-widest uppercase" style={{ color, opacity: 0.7 }}>GLOBAL THREAT MAP</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-[9px] tracking-widest" style={{ color, opacity: 0.5 }}>
-                {phase === 'loading' ? statusText : '12 NODES MAPPED'}
-              </span>
-              <div className="flex gap-1">
-                {['#', '+', '×'].map((s, i) => (
-                  <span key={i} className="text-[9px] px-1" style={{ color, opacity: 0.4 }}>{s}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="absolute inset-0 pt-7">
-            <WorldMap color={color} scanX={phase === 'loading' ? scanX : 560} />
-          </div>
-
-          {/* Scan line for auth phase */}
-          {phase === 'auth' && (
-            <div className="absolute inset-0 pointer-events-none"
-              style={{ background: `linear-gradient(180deg, ${color}00 0%, ${color}04 50%, ${color}00 100%)` }} />
-          )}
         </div>
 
         {/* Loading phase */}
         {phase === 'loading' && (
-          <div className="w-full space-y-2">
-            <div className="flex items-center justify-between text-[10px]" style={{ color, opacity: 0.6 }}>
-              <span className="flex items-center gap-2">
-                <span className="animate-pulse">▮</span>
-                {statusText}
-              </span>
-              <span className="font-bold">{Math.floor(progress)}%</span>
-            </div>
-            <div className="relative w-full h-3 rounded-sm overflow-hidden border" style={{ borderColor: `${color}30`, backgroundColor: `${color}0a` }}>
-              {/* Animated stripes */}
-              <div className="absolute inset-0 opacity-20"
-                style={{
-                  backgroundImage: `repeating-linear-gradient(90deg, ${color} 0px, ${color} 8px, transparent 8px, transparent 16px)`,
-                  backgroundSize: '24px 100%',
-                  animation: 'stripe-scroll 0.4s linear infinite',
+          <div className="w-full max-w-xl">
+            {/* Main loading frame — like the reference */}
+            <div
+              className="relative w-full"
+              style={{
+                border: `1px solid rgba(${rgb},0.5)`,
+                boxShadow: `0 0 24px rgba(${rgb},0.2), inset 0 0 24px rgba(${rgb},0.04)`,
+                padding: '18px 20px',
+              }}
+            >
+              {/* Frame corner accents */}
+              {['-top-px -left-px', '-top-px -right-px', '-bottom-px -left-px', '-bottom-px -right-px'].map((pos, i) => (
+                <div key={i} className={`absolute w-3 h-3 ${pos}`}
+                  style={{
+                    borderTop: i < 2 ? `2px solid rgba(${rgb},0.9)` : 'none',
+                    borderBottom: i >= 2 ? `2px solid rgba(${rgb},0.9)` : 'none',
+                    borderLeft: i % 2 === 0 ? `2px solid rgba(${rgb},0.9)` : 'none',
+                    borderRight: i % 2 === 1 ? `2px solid rgba(${rgb},0.9)` : 'none',
+                  }}
+                />
+              ))}
+
+              {/* Status row */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="animate-pulse text-[10px]" style={{ color }}>▮</span>
+                  <span className="text-[11px] tracking-widest uppercase" style={{ color: `rgba(${rgb},0.8)` }}>
+                    {statusText}
+                  </span>
+                </div>
+                <span className="text-sm font-bold tabular-nums" style={{ color }}>
+                  {Math.floor(progress)}%
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="relative w-full h-4 overflow-hidden"
+                style={{ background: `rgba(${rgb},0.08)`, border: `1px solid rgba(${rgb},0.25)` }}>
+                {/* Animated stripes */}
+                <div className="absolute inset-0 opacity-30" style={{
+                  backgroundImage: `repeating-linear-gradient(90deg, rgba(${rgb},0.5) 0px, rgba(${rgb},0.5) 10px, transparent 10px, transparent 20px)`,
+                  animation: 'stripe-scroll 0.5s linear infinite',
                 }} />
-              <div
-                className="relative h-full rounded-sm transition-all duration-150"
-                style={{
-                  width: `${progress}%`,
-                  backgroundColor: color,
-                  boxShadow: `0 0 12px ${color}, 0 0 24px ${color}66`,
-                }}
-              />
+                {/* Fill */}
+                <div className="absolute inset-y-0 left-0 transition-all duration-150"
+                  style={{
+                    width: `${progress}%`,
+                    background: `linear-gradient(90deg, rgba(${rgb},0.7), rgba(${rgb},1))`,
+                    boxShadow: `0 0 16px rgba(${rgb},0.8), 0 0 32px rgba(${rgb},0.4)`,
+                  }}
+                />
+              </div>
+
+              {/* Bottom row */}
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[9px] tracking-[0.3em] uppercase" style={{ color: `rgba(${rgb},0.35)` }}>
+                  SYS.BOOT // CYBERSENTINEL_OS
+                </span>
+                <span className="text-[9px] tracking-[0.2em] uppercase" style={{ color: `rgba(${rgb},0.35)` }}>
+                  NODES: {Math.floor(progress / 8.5)}/12
+                </span>
+              </div>
             </div>
-            <div className="grid grid-cols-4 gap-2">
+
+            {/* Stats row */}
+            <div className="grid grid-cols-4 gap-2 mt-3">
               {[
-                { label: 'NODES', value: `${Math.floor(progress / 8.5)}/12` },
-                { label: 'THREATS', value: `${Math.floor(progress / 20)}` },
+                { label: 'MEMORY', value: '2.4GB' },
+                { label: 'THREADS', value: '16' },
                 { label: 'OPSEC', value: 'AES-256' },
                 { label: 'STATUS', value: progress < 100 ? 'SCANNING' : 'READY' },
               ].map(({ label, value }) => (
-                <div key={label} className="border rounded px-2 py-1.5 text-center" style={{ borderColor: `${color}22`, backgroundColor: `${color}07` }}>
-                  <div className="text-[8px] tracking-widest mb-0.5" style={{ color, opacity: 0.45 }}>{label}</div>
+                <div key={label} className="text-center py-1.5 px-2"
+                  style={{ border: `1px solid rgba(${rgb},0.2)`, background: `rgba(${rgb},0.05)` }}>
+                  <div className="text-[8px] tracking-widest mb-0.5 uppercase" style={{ color: `rgba(${rgb},0.4)` }}>{label}</div>
                   <div className="text-[10px] font-bold" style={{ color }}>{value}</div>
                 </div>
               ))}
@@ -359,69 +311,103 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
         {/* Auth phase */}
         {phase === 'auth' && (
           <div
-            className="w-full border rounded p-5 space-y-4"
+            className="w-full max-w-md"
             style={{
-              borderColor: `${color}40`,
-              backgroundColor: `${color}07`,
-              boxShadow: `0 0 20px ${color}15`,
+              opacity: authVisible ? 1 : 0,
+              transform: authVisible ? 'translateY(0)' : 'translateY(16px)',
+              transition: 'opacity 0.4s ease, transform 0.4s ease',
               animation: shake ? 'shake 0.4s ease' : undefined,
             }}
           >
-            <div className="text-center space-y-1">
-              <p className="text-[11px] tracking-[0.3em] uppercase" style={{ color, opacity: 0.5 }}>
-                IDENTITY VERIFICATION REQUIRED
-              </p>
-              <p className="text-base font-bold tracking-widest uppercase" style={{ color }}>
-                ENTER OPERATOR ID
-              </p>
-            </div>
-
-            <div className="relative">
-              <div className="flex items-center border rounded overflow-hidden"
-                style={{ borderColor: error ? '#ff3333' : `${color}60`, backgroundColor: 'rgba(0,0,0,0.5)' }}>
-                <span className="px-3 text-sm font-bold select-none" style={{ color, opacity: 0.6 }}>ID:_</span>
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  onKeyDown={handleKey}
-                  placeholder="TYPE OPERATOR ID"
-                  autoComplete="off"
-                  spellCheck={false}
-                  className="flex-1 bg-transparent py-3 pr-4 text-sm tracking-widest uppercase outline-none placeholder:opacity-30"
+            <div
+              className="relative p-6 space-y-5"
+              style={{
+                border: `1px solid rgba(${rgb},0.55)`,
+                background: `rgba(0,0,0,0.7)`,
+                boxShadow: `0 0 40px rgba(${rgb},0.2), inset 0 0 40px rgba(${rgb},0.04)`,
+              }}
+            >
+              {/* Corner accents */}
+              {['-top-px -left-px', '-top-px -right-px', '-bottom-px -left-px', '-bottom-px -right-px'].map((pos, i) => (
+                <div key={i} className={`absolute w-4 h-4 ${pos}`}
                   style={{
-                    color,
-                    caretColor: color,
-                    fontFamily: 'monospace',
+                    borderTop: i < 2 ? `2px solid rgba(${rgb},0.9)` : 'none',
+                    borderBottom: i >= 2 ? `2px solid rgba(${rgb},0.9)` : 'none',
+                    borderLeft: i % 2 === 0 ? `2px solid rgba(${rgb},0.9)` : 'none',
+                    borderRight: i % 2 === 1 ? `2px solid rgba(${rgb},0.9)` : 'none',
                   }}
                 />
-              </div>
-              {error && (
-                <p className="mt-1.5 text-[10px] tracking-wider text-center" style={{ color: '#ff4444' }}>
-                  {error}
+              ))}
+
+              <div className="text-center space-y-1">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: color }} />
+                  <span className="text-[10px] tracking-[0.4em] uppercase" style={{ color: `rgba(${rgb},0.5)` }}>
+                    SYSTEM ONLINE
+                  </span>
+                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: color }} />
+                </div>
+                <p className="text-xl font-bold tracking-[0.3em] uppercase" style={{ color, textShadow: `0 0 20px rgba(${rgb},0.6)` }}>
+                  ENTER OPERATOR ID
                 </p>
-              )}
+                <p className="text-[10px] tracking-widest uppercase" style={{ color: `rgba(${rgb},0.4)` }}>
+                  IDENTITY VERIFICATION REQUIRED
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center"
+                  style={{
+                    border: `1px solid ${error ? 'rgba(255,50,50,0.7)' : `rgba(${rgb},0.5)`}`,
+                    background: 'rgba(0,0,0,0.6)',
+                    boxShadow: error ? '0 0 12px rgba(255,50,50,0.2)' : `0 0 12px rgba(${rgb},0.1)`,
+                  }}>
+                  <span className="px-3 text-sm font-bold select-none" style={{ color: `rgba(${rgb},0.5)` }}>ID:_</span>
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    onKeyDown={handleKey}
+                    placeholder="TYPE OPERATOR ID"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="flex-1 bg-transparent py-3 pr-4 text-sm tracking-widest uppercase outline-none placeholder:opacity-25"
+                    style={{ color, caretColor: color, fontFamily: 'monospace' }}
+                  />
+                </div>
+                {error && (
+                  <p className="mt-2 text-[10px] tracking-wider text-center" style={{ color: 'rgb(255,70,70)' }}>
+                    {error}
+                  </p>
+                )}
+              </div>
+
+              <button
+                onClick={handleSubmit}
+                className="w-full py-3 text-sm font-bold tracking-[0.4em] uppercase transition-all duration-150"
+                style={{
+                  background: `rgba(${rgb},0.15)`,
+                  border: `1px solid rgba(${rgb},0.6)`,
+                  color,
+                  boxShadow: `0 0 16px rgba(${rgb},0.2)`,
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = `rgba(${rgb},0.25)`;
+                  e.currentTarget.style.boxShadow = `0 0 28px rgba(${rgb},0.5)`;
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = `rgba(${rgb},0.15)`;
+                  e.currentTarget.style.boxShadow = `0 0 16px rgba(${rgb},0.2)`;
+                }}
+              >
+                AUTHENTICATE ACCESS →
+              </button>
+
+              <p className="text-center text-[9px] tracking-widest uppercase" style={{ color: `rgba(${rgb},0.25)` }}>
+                UNAUTHORIZED ACCESS WILL BE LOGGED AND PROSECUTED
+              </p>
             </div>
-
-            <button
-              onClick={handleSubmit}
-              className="w-full py-2.5 rounded text-sm font-bold tracking-[0.3em] uppercase transition-all duration-150 border"
-              style={{
-                color: '#000',
-                backgroundColor: color,
-                borderColor: color,
-                boxShadow: `0 0 16px ${color}66`,
-              }}
-              onMouseEnter={e => (e.currentTarget.style.boxShadow = `0 0 28px ${color}`)}
-              onMouseLeave={e => (e.currentTarget.style.boxShadow = `0 0 16px ${color}66`)}
-            >
-              AUTHENTICATE →
-            </button>
-
-            <p className="text-center text-[9px] tracking-widest" style={{ color, opacity: 0.3 }}>
-              UNAUTHORIZED ACCESS WILL BE LOGGED AND PROSECUTED
-            </p>
           </div>
         )}
       </div>
@@ -429,16 +415,33 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
       <style>{`
         @keyframes stripe-scroll {
           from { background-position: 0 0; }
-          to { background-position: 24px 0; }
+          to { background-position: 20px 0; }
         }
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
-          20% { transform: translateX(-10px); }
-          40% { transform: translateX(10px); }
-          60% { transform: translateX(-8px); }
-          80% { transform: translateX(8px); }
+          15% { transform: translateX(-12px); }
+          35% { transform: translateX(12px); }
+          55% { transform: translateX(-8px); }
+          75% { transform: translateX(8px); }
         }
       `}</style>
     </div>
   );
+}
+
+function getHueRotate(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  if (max !== min) {
+    const d = max - min;
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+  }
+  const targetHue = h * 360;
+  return (targetHue - 0 + 360) % 360;
 }
