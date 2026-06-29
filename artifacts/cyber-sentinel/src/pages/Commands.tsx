@@ -28,6 +28,7 @@ export default function CommandsPage() {
   const [formData, setFormData] = useState({ title: '', command: '', description: '', category: '' });
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [target, setTarget] = useState('');
   const [showCheatsheet, setShowCheatsheet] = useState(false);
@@ -54,17 +55,22 @@ export default function CommandsPage() {
     return acc;
   }, {} as Record<string, any[]>);
 
-  const resetForm = () => { setFormData({ title: '', command: '', description: '', category: '' }); setEditingId(null); };
+  const resetForm = () => { setFormData({ title: '', command: '', description: '', category: '' }); setEditingId(null); setSaveError(null); };
   const handleEdit = (cmd: any) => { setFormData({ title: cmd.title, command: cmd.command, description: cmd.description || '', category: cmd.category }); setEditingId(cmd.id); setIsFormOpen(true); };
 
   const handleSave = async () => {
     setIsSaving(true);
     const payload = { title: formData.title, command: formData.command, description: formData.description || undefined, category: formData.category || 'uncategorized' };
     try {
-      if (editingId) await fetch(`/api/commands/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      else await fetch('/api/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = editingId
+        ? await fetch(`/api/commands/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        : await fetch('/api/commands', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error ?? `HTTP ${res.status}`); }
+      setSaveError(null);
       setIsFormOpen(false); resetForm(); await fetchCommands();
-    } catch {}
+    } catch (err: any) {
+      setSaveError(err.message ?? 'Failed to save command. Please try again.');
+    }
     setIsSaving(false);
   };
 
@@ -183,6 +189,7 @@ export default function CommandsPage() {
             </div>
             <textarea placeholder="Command — use {{target}} for auto-substitution" value={formData.command} onChange={e => setFormData({ ...formData, command: e.target.value })} className="w-full px-3 py-2 text-xs bg-black/50 border border-border rounded focus:outline-none focus:border-primary font-mono h-20 resize-none" />
             <input placeholder="Description (optional)" value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} className="w-full px-3 py-2 text-xs bg-secondary/50 border border-border rounded focus:outline-none focus:border-primary" />
+            {saveError && <p className="text-xs text-destructive text-right">{saveError}</p>}
             <div className="flex gap-2 justify-end">
               <button onClick={() => { setIsFormOpen(false); resetForm(); }} className="px-3 py-1.5 text-xs rounded hover:bg-secondary transition-colors flex items-center gap-1"><X size={12} /> Cancel</button>
               <button onClick={handleSave} disabled={isSaving || !formData.title || !formData.command} className="px-3 py-1.5 text-xs font-bold bg-primary text-black rounded hover:bg-primary/80 disabled:opacity-30 flex items-center gap-1 transition-colors">

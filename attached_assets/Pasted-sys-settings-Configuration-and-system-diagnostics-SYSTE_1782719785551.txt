@@ -1,0 +1,148 @@
+sys.settings
+Configuration and system diagnostics.
+
+SYSTEM STATUS
+Core Database (MongoDB)
+ONLINE
+AI Module (Groq)
+ONLINE
+Encryption
+AES-256 ACTIVE
+USAGE & LIMITS
+
+refresh
+MongoDB Storage
+Storage used (vs 512 MB free tier limit)
+322.9 KB / 512.0 MB
+511.7 MB free
+<0.1% used
+Data size
+142.9 KB / 512.0 MB
+511.9 MB free
+<0.1% used
+Index size
+180.0 KB / 512.0 MB
+511.8 MB free
+<0.1% used
+22 documents · 4 collections
+256.0 KB on disk
+AI Provider Limits
+7/7 configured
+Groq
+CONFIGURED
+llama-3.3-70b-versatile
+
+Req / min (free tier)
+1k limit
+Tokens / min (free tier)
+12k limit
+Req / day (free tier)
+6k limit
+Not yet queried. Send a Best-AI message in AI Ops to activate.
+
+Free tier · llama-3.3-70b-versatile
+
+OpenRouter
+CONFIGURED
+llama-3.1-8b-instruct:free
+
+Req / min (free tier)
+20 limit
+Req / day (free tier)
+200 limit
+Not yet queried. Send a Best-AI message in AI Ops to activate.
+
+Free tier · deepseek-r1-0528:free
+
+Gemini
+CONFIGURED
+gemini-2.0-flash
+
+Req / min (free tier)
+15 limit
+Tokens / day (free tier)
+1.0M limit
+Not yet queried. Send a Best-AI message in AI Ops to activate.
+
+Free tier · gemini-1.5-flash
+
+Mistral
+CONFIGURED
+mistral-small-latest
+
+Req / min (free tier)
+60 limit
+Tokens / month (free tier)
+500k limit
+Not yet queried. Send a Best-AI message in AI Ops to activate.
+
+Free tier · mistral-small-latest
+
+Cohere
+CONFIGURED
+command-r
+
+Req / min (free tier)
+20 limit
+Req / month (free tier)
+1k limit
+Not yet queried. Send a Best-AI message in AI Ops to activate.
+
+Trial key · command-r
+
+Together AI
+CONFIGURED
+Llama-3.3-70B-Instruct-Turbo-Free
+
+Req / min (free tier)
+60 limit
+Not yet queried. Send a Best-AI message in AI Ops to activate.
+
+Free tier · llama-3.3-70B-Instruct-Turbo-Free
+
+Cloudflare AI
+CONFIGURED
+llama-3.3-70b-fp8-fast
+
+Req / day (free tier)
+10k limit
+Not yet queried. Send a Best-AI message in AI Ops to activate.
+
+Workers AI free · llama-3.3-70b-fp8-fast
+
+Live data is captured from response headers when AI Ops requests are made. Static limits shown are free-tier defaults.
+
+PROVIDER HEALTH CHECK
+Run Health Check
+Groq-1
+→ "PONG"
+
+PASS
+336ms
+Groq-2
+→ "PONG"
+
+PASS
+336ms
+OpenRouter
+OpenRouter google/gemma-2-9b-it:free: 404 {"error":{"message":"No endpoints found for google/gemma-2-9b-it:free.","code":404},"user_id":"user_
+
+FAIL
+Gemini
+Gemini gemini-1.5-flash: 404 { "error": { "code": 404, "message": "models/gemini-1.5-flash is not found for API version
+
+FAIL
+Mistral
+Mistral open-mixtral-8x7b: 401 {"detail":"Unauthorized"}
+
+FAIL
+Cohere
+Cohere: 404 {"id":"79c578cc-eabb-412a-8fbc-567bd79e3e65","message":"model 'command-r' was removed on September 1
+
+FAIL
+Together
+Together mistralai/Mistral-7B-Instruct-v0.3: 401 { "id": "oq5qno2-2kFHot-a1335f6f78283de6", "error": { "message": "Invalid API key provided.
+
+FAIL
+Cloudflare
+Cloudflare @cf/mistral/mistral-7b-instruct-v0.1: 401 {"result":null,"success":false,"errors":[{"code":10000,"message":"Authentication error"}],"messages"

@@ -16,7 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
-// @ts-ignore
+// @ts-ignore — workspace package types not resolved in mobile tsconfig
 import {
   getListSessionsQueryOptions,
   getListSessionsQueryKey,
@@ -24,7 +24,7 @@ import {
   getListMessagesQueryKey,
   useCreateSession,
   useDeleteSession,
-  useSendMessage,
+  customFetch,
 } from "@workspace/api-client-react";
 
 import { useColors } from "@/hooks/useColors";
@@ -131,7 +131,9 @@ export default function ChatScreen() {
   const queryClient = useQueryClient();
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : 0;
@@ -164,16 +166,6 @@ export default function ChatScreen() {
     },
   });
 
-  const sendMessage = useSendMessage({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({
-          queryKey: getListMessagesQueryKey(currentSessionId ?? ""),
-        });
-      },
-    },
-  });
-
   const handleCreateSession = () => {
     const count = (sessions as Session[]).length + 1;
     createSession.mutate({ data: { title: `Session ${count}` } });
@@ -190,14 +182,37 @@ export default function ChatScreen() {
     ]);
   };
 
-  const handleSend = () => {
-    if (!input.trim() || !currentSessionId || sendMessage.isPending) return;
+  const handleSend = async () => {
+    if (!input.trim() || !currentSessionId || isSending) return;
     const content = input.trim();
     setInput("");
-    sendMessage.mutate({ id: currentSessionId, data: { content } });
+    const abort = new AbortController();
+    abortRef.current = abort;
+    setIsSending(true);
+    try {
+      await customFetch(`/api/chat/sessions/${currentSessionId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+        signal: abort.signal,
+      });
+      queryClient.invalidateQueries({
+        queryKey: getListMessagesQueryKey(currentSessionId),
+      });
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        Alert.alert("Error", err.message ?? "Failed to send message.");
+      }
+    } finally {
+      setIsSending(false);
+      abortRef.current = null;
+    }
   };
 
-  const isSending = sendMessage.isPending;
+  const handleStop = () => {
+    abortRef.current?.abort();
+  };
+
   const currentSession = (sessions as Session[]).find(
     (s: Session) => s.id === currentSessionId
   );
@@ -324,27 +339,35 @@ export default function ChatScreen() {
             onSubmitEditing={handleSend}
             blurOnSubmit
           />
-          <Pressable
-            onPress={handleSend}
-            disabled={!input.trim() || !currentSessionId || isSending}
-            style={({ pressed }) => [
-              styles.sendBtn,
-              {
-                backgroundColor:
-                  !input.trim() || !currentSessionId || isSending
-                    ? colors.secondary
-                    : colors.primary,
-                borderRadius: colors.radius,
-                opacity: pressed ? 0.7 : 1,
-              },
-            ]}
-          >
-            {isSending ? (
-              <ActivityIndicator size="small" color={colors.primaryForeground} />
-            ) : (
+          {isSending ? (
+            <Pressable
+              onPress={handleStop}
+              style={[
+                styles.sendBtn,
+                { backgroundColor: "#cc2200", borderRadius: colors.radius },
+              ]}
+            >
+              <Feather name="square" size={14} color="#ffffff" />
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={handleSend}
+              disabled={!input.trim() || !currentSessionId}
+              style={({ pressed }) => [
+                styles.sendBtn,
+                {
+                  backgroundColor:
+                    !input.trim() || !currentSessionId
+                      ? colors.secondary
+                      : colors.primary,
+                  borderRadius: colors.radius,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
               <Feather name="send" size={16} color={colors.primaryForeground} />
-            )}
-          </Pressable>
+            </Pressable>
+          )}
         </View>
       </KeyboardAvoidingView>
     </View>

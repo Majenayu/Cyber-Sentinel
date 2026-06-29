@@ -29,6 +29,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   streaming?: boolean;
+  isError?: boolean;
   provider?: string;
   reason?: string;
   toolCards?: ToolCard[];
@@ -377,6 +378,12 @@ export default function ChatPage() {
                   : m
               ));
               scrollToBottom();
+            } else if (parsed.error) {
+              setMessages(prev => prev.map(m =>
+                m.id === streamingId
+                  ? { ...m, content: `⚠ ${parsed.error}`, streaming: false, isError: true }
+                  : m
+              ));
             }
           } catch {}
         }
@@ -428,6 +435,10 @@ export default function ChatPage() {
             if (parsed.text) {
               setMessages(prev => prev.map(m => m.id === streamingId ? { ...m, content: m.content + parsed.text, streaming: true } : m));
               scrollToBottom();
+            } else if (parsed.error) {
+              setMessages(prev => prev.map(m =>
+                m.id === streamingId ? { ...m, content: `⚠ ${parsed.error}`, streaming: false, isError: true } : m
+              ));
             }
           } catch {}
         }
@@ -639,7 +650,10 @@ export default function ChatPage() {
                   {m.role === 'user' ? <User size={13} /> : <Bot size={13} />}
                 </div>
                 <div className={cn('flex flex-col gap-1 min-w-0', m.role === 'user' ? 'items-end max-w-[80%]' : 'items-start max-w-[92%] md:max-w-[85%]')}>
-                  <div className={cn('p-3 rounded-lg border break-words w-full', m.role === 'user' ? 'bg-secondary/30 border-border text-foreground' : 'bg-black/40 border-primary/15 text-foreground/90')}>
+                  <div className={cn('p-3 rounded-lg border break-words w-full',
+                    m.isError ? 'bg-red-950/30 border-red-500/30 text-red-400' :
+                    m.role === 'user' ? 'bg-secondary/30 border-border text-foreground' : 'bg-black/40 border-primary/15 text-foreground/90'
+                  )}>
                     <MessageContent content={m.content} streaming={m.streaming} />
                     {m.attachments && m.attachments.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2 pt-2 border-t border-border/30">

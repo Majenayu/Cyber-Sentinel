@@ -55,11 +55,17 @@ async function analyzeEntry(entry: { id: string; title: string; content: string 
     (parsed) => Array.isArray(parsed.tags),
   );
 
-  return JSON.parse(jsonStr) as {
+  let parsed: {
     tags: string[];
     tools: { name: string; slug: string; category: string; description: string; cheatsheet: string; officialUrl?: string }[];
     commands: { title: string; command: string; description: string; category: string }[];
   };
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    throw new Error(`AI returned invalid JSON: ${jsonStr.slice(0, 120)}`);
+  }
+  return parsed;
 }
 
 router.post('/analyze/knowledge', async (req, res) => {

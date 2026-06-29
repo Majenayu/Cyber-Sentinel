@@ -22,7 +22,7 @@ router.get('/knowledge', async (req, res) => {
       tags: e.tags ?? [],
       source: e.source ?? null,
       createdAt: e.createdAt,
-      updatedAt: e.createdAt,
+      updatedAt: e.updatedAt,
     })));
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -41,7 +41,7 @@ router.post('/knowledge', async (req, res) => {
       tags: entry.tags,
       source: entry.source ?? null,
       createdAt: entry.createdAt,
-      updatedAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -60,7 +60,7 @@ router.get('/knowledge/:id', async (req, res) => {
       tags: entry.tags ?? [],
       source: entry.source ?? null,
       createdAt: entry.createdAt,
-      updatedAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -79,7 +79,7 @@ router.patch('/knowledge/:id', async (req, res) => {
       tags: entry.tags ?? [],
       source: entry.source ?? null,
       createdAt: entry.createdAt,
-      updatedAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

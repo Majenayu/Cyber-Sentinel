@@ -151,32 +151,51 @@ router.post('/scrape/url', async (req, res) => {
   }
 
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+    // Follow redirects manually so each hop is validated against SSRF rules
+    let currentUrl = validation.parsed.toString();
+    let response!: Response;
+    const MAX_REDIRECTS = 5;
 
-    const response = await fetch(validation.parsed.toString(), {
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; CyberSentinel/1.0)',
-        'Accept': 'text/html,application/xhtml+xml',
-      },
-    });
-    clearTimeout(timeout);
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      try {
+        response = await fetch(currentUrl, {
+          redirect: 'manual',
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; CyberSentinel/1.0)',
+            'Accept': 'text/html,application/xhtml+xml',
+          },
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      // Not a redirect — proceed with this response
+      if (response.status < 300 || response.status >= 400) break;
+
+      const location = response.headers.get('Location');
+      if (!location) break; // no Location header, use what we have
+
+      // Resolve potentially-relative redirect URL and validate before following
+      const nextUrl = new URL(location, currentUrl).toString();
+      const nextValidation = await validateScrapeUrl(nextUrl);
+      if (!nextValidation.ok) {
+        res.status(400).json({ error: `Redirect blocked: ${nextValidation.error}` });
+        return;
+      }
+      currentUrl = nextUrl;
+
+      if (hop === MAX_REDIRECTS) {
+        res.status(400).json({ error: 'Too many redirects' });
+        return;
+      }
+    }
 
     if (!response.ok) {
       res.status(502).json({ error: `Remote returned ${response.status}` });
       return;
-    }
-
-    // Validate redirect target isn't private
-    const finalUrl = response.url;
-    if (finalUrl && finalUrl !== validation.parsed.toString()) {
-      const redirectValidation = await validateScrapeUrl(finalUrl);
-      if (!redirectValidation.ok) {
-        res.status(400).json({ error: 'Redirect target not allowed' });
-        return;
-      }
     }
 
     // Cap response size at 2 MB

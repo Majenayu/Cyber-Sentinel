@@ -1,3 +1,6 @@
 - [Multi-AI engine](multi-ai.md) — best-answer mode queries all providers in parallel, judge picks winner; SYSTEM_PROMPT must be exported from groq.ts
 - [KB URL ingestion](kb-scrape.md) — scrape route uses Cheerio; `sources[]` array field on KB entries (legacy `source` string still supported)
 - [Commands target substitution](commands-target.md) — {{target}}, TARGET_IP, TARGET_URL patterns auto-filled; predefined CATEGORIES array
+- [API client exports](api-client-exports.md) — customFetch must be explicitly exported from lib/api-client-react/src/index.ts to be available in mobile; mobile uses @ts-ignore on import due to tsconfig path gap
+- [SSE error contract](sse-error-contract.md) — all streaming error events must use { error: string } shape (not { text: "⚠..." }); Chat.tsx handles parsed.error with isError flag for red styling
+- [SSRF redirect fix](ssrf-scrape.md) — scrape.ts uses redirect:'manual' + per-hop validateScrapeUrl loop (max 5 hops); never use redirect:'follow'

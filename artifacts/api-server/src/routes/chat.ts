@@ -109,7 +109,7 @@ router.post('/chat/sessions/:id/messages/stream', async (req, res) => {
         }
         res.write(`data: ${JSON.stringify({ provider, reason })}\n\n`);
       } catch (fallbackErr: any) {
-        res.write(`data: ${JSON.stringify({ text: `\n\n⚠ All AI providers failed: ${fallbackErr.message}` })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: `All AI providers failed: ${fallbackErr.message}` })}\n\n`);
       }
     }
 
@@ -126,7 +126,7 @@ router.post('/chat/sessions/:id/messages/stream', async (req, res) => {
     if (!res.headersSent) {
       res.status(500).json({ error: error.message });
     } else {
-      res.write(`data: ${JSON.stringify({ text: `\n\n⚠ Error: ${error.message}` })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
       res.write('data: [DONE]\n\n');
       res.end();
     }

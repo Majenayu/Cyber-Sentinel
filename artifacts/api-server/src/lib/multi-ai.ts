@@ -332,8 +332,8 @@ export function getAvailableProviders(): AIProvider[] {
   if (process.env.COHERE_API_KEY) providers.push(makeCohereProvider(process.env.COHERE_API_KEY));
   if (process.env.TOGETHER_API_KEY) providers.push(makeTogetherProvider(process.env.TOGETHER_API_KEY));
 
-  // Cloudflare: CLOUDFLARE_AI_ACCOUNT_ID or OTHER_SECRET_1 as fallback account ID
-  const cfAccountId = process.env.CLOUDFLARE_AI_ACCOUNT_ID ?? process.env.OTHER_SECRET_1;
+  // Cloudflare: CLOUDFLARE_AI_ACCOUNT_ID required; OTHER_SECRET_1 is not used as a fallback
+  const cfAccountId = process.env.CLOUDFLARE_AI_ACCOUNT_ID;
   const cfToken = process.env.CLOUDFLARE_AI_API_TOKEN;
   if (cfAccountId && cfToken) providers.push(makeCloudflareProvider(cfAccountId, cfToken));
 
@@ -448,7 +448,7 @@ export async function getBestAnswer(
   );
 
   const successful = results
-    .filter((r): r is PromiseFulfilledResult<{ name: string; content: string }> => r.status === 'fulfilled' && r.value.content.length > 20)
+    .filter((r): r is PromiseFulfilledResult<{ name: string; content: string }> => r.status === 'fulfilled' && r.value.content.length > 5)
     .map(r => r.value);
 
   results.forEach((r, i) => {

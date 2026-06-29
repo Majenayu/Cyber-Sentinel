@@ -83,6 +83,7 @@ function AnalyzeModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') setError(err.message);
+    } finally {
       setRunning(false);
     }
   };
@@ -137,7 +138,7 @@ function AnalyzeModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
                   {showDetails && (
                     <div className="mt-2 space-y-1 max-h-48 overflow-y-auto pr-1">
                       {results.map((r, i) => (
-                        <div key={i} className={cn("flex items-start gap-2 text-[10px] p-2 rounded border", r.error ? "border-destructive/20 bg-destructive/5" : "border-border/50 bg-black/20")}>
+                        <div key={`${r.title}-${i}`} className={cn("flex items-start gap-2 text-[10px] p-2 rounded border", r.error ? "border-destructive/20 bg-destructive/5" : "border-border/50 bg-black/20")}>
                           {r.error ? <AlertCircle size={10} className="text-destructive shrink-0 mt-0.5" /> : <CheckCircle size={10} className="text-primary shrink-0 mt-0.5" />}
                           <div className="min-w-0"><div className="truncate text-foreground/80">{r.title}</div>
                             {r.error ? <div className="text-destructive/70">{r.error}</div> : <div className="text-muted-foreground">{r.tags.length > 0 && `tags: ${r.tags.slice(0, 4).join(', ')}`}{r.toolsAdded > 0 && ` · ${r.toolsAdded} tool(s)`}{r.commandsAdded > 0 && ` · ${r.commandsAdded} cmd(s)`}</div>}
