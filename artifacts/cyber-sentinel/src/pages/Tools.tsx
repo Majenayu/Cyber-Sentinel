@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wrench, ExternalLink, ChevronLeft, Loader2, Terminal, Code2 } from 'lucide-react';
+import { Wrench, ExternalLink, ChevronLeft, Loader2, Terminal, Code2, Trash2 } from 'lucide-react';
 
 function renderCheatsheet(content: string) {
   const parts = content.split(/(```[\s\S]*?```)/g);
@@ -85,9 +85,17 @@ export default function ToolsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetch('/api/tools').then(r => r.json()).then(data => setTools(Array.isArray(data) ? data : [])).finally(() => setIsLoading(false));
-  }, []);
+  const fetchTools = () =>
+    fetch('/api/tools').then(r => r.json()).then(data => setTools(Array.isArray(data) ? data : []));
+
+  useEffect(() => { fetchTools().finally(() => setIsLoading(false)); }, []);
+
+  const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation();
+    if (!confirm(`Delete "${name}" from Tool Reference?`)) return;
+    await fetch(`/api/tools/${id}`, { method: 'DELETE' });
+    await fetchTools();
+  };
 
   if (selectedSlug) return <ToolDetail slug={selectedSlug} onBack={() => setSelectedSlug(null)} />;
 
@@ -111,10 +119,19 @@ export default function ToolsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {tools.map(tool => (
                 <div key={tool.id} onClick={() => setSelectedSlug(tool.slug)}
-                  className="bg-card border border-border hover:border-primary/50 transition-all cursor-pointer group flex flex-col rounded-lg overflow-hidden p-4 md:p-6">
+                  className="bg-card border border-border hover:border-primary/50 transition-all cursor-pointer group flex flex-col rounded-lg overflow-hidden p-4 md:p-6 relative">
                   <div className="flex justify-between items-start mb-2">
                     <Terminal className="text-muted-foreground group-hover:text-primary transition-colors" size={18} />
-                    <span className="text-[10px] px-2 py-0.5 border border-border bg-secondary text-muted-foreground rounded uppercase font-bold">{tool.category}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] px-2 py-0.5 border border-border bg-secondary text-muted-foreground rounded uppercase font-bold">{tool.category}</span>
+                      <button
+                        onClick={e => handleDelete(e, tool.id, tool.name)}
+                        title="Delete tool"
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-all"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
                   <h2 className="text-base md:text-xl font-bold mt-2 group-hover:text-primary transition-colors">{tool.name}</h2>
                   <p className="text-xs text-muted-foreground mt-2 line-clamp-2 leading-relaxed">{tool.description}</p>

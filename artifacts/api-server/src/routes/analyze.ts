@@ -12,6 +12,11 @@ function getGroqClient() {
   return new Groq({ apiKey: process.env.GROQ_API_KEY });
 }
 
+/** Canonical slug: lowercase, letters/digits only, separated by hyphens */
+function canonicalSlug(raw: string): string {
+  return raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
 function buildPrompt(title: string, content: string): string {
   return (
     'You are a senior penetration tester helping organize a personal knowledge base.\n\n' +
@@ -24,7 +29,7 @@ function buildPrompt(title: string, content: string): string {
     '  "tools": [\n' +
     '    {\n' +
     '      "name": "ToolName",\n' +
-    '      "slug": "toolname",\n' +
+    '      "slug": "tool-name",\n' +
     '      "category": "recon|web|password|exploitation|post-exploitation|network|other",\n' +
     '      "description": "One or two plain-English sentences. What does this tool do and why would a pentester use it? Example style: Nmap is a network scanner that discovers open ports on a target — like knocking on every door of a building to see which ones are unlocked.",\n' +
     '      "cheatsheet": "Write in clean markdown. Include these sections:\\n## What it does\\n2-3 plain English sentences explaining the tool.\\n\\n## Real-world scenario\\nA concrete example: you have target IP 10.10.10.5, what do you do with this tool?\\n\\n## Linux (bash)\\nCode block with 3-4 practical examples, each with a comment explaining what it does.\\n\\n## Windows (PowerShell)\\nCode block with equivalent Windows commands.\\n\\n## Key flags explained\\nBullet list of important flags in plain English — e.g. -sV: detect what software version is running on each port.",\n' +
@@ -116,10 +121,10 @@ router.post('/analyze/knowledge', async (req, res) => {
           totalTags += result.tags.length;
         }
 
-        // Create Tool Reference entries — deduplicate by slug, update description/cheatsheet if richer
+        // Create Tool Reference entries — deduplicate by canonical slug, update if richer
         for (const tool of (result.tools ?? [])) {
           if (!tool.name || !tool.slug || !tool.cheatsheet) continue;
-          const slug = tool.slug.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+          const slug = canonicalSlug(tool.slug);
           const existing = await Tool.findOne({ slug });
           if (!existing) {
             await Tool.create({
@@ -195,6 +200,69 @@ router.post('/analyze/knowledge', async (req, res) => {
   } catch (err: any) {
     send({ type: 'error', message: err.message });
     res.end();
+  }
+});
+
+/** POST /api/analyze/deduplicate — clean up duplicate tools and commands in the DB */
+router.post('/analyze/deduplicate', async (req, res) => {
+  try {
+    await connectToDatabase();
+
+    // ── Deduplicate Tools ──────────────────────────────────────────────────
+    const allTools = await Tool.find({}).lean();
+    const toolGroups: Record<string, typeof allTools> = {};
+
+    for (const tool of allTools) {
+      // Strip ALL non-alpha chars so "browser-devtools" and "browserdevtools" → same key
+      const key = tool.slug.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!toolGroups[key]) toolGroups[key] = [];
+      toolGroups[key].push(tool);
+    }
+
+    let toolsRemoved = 0;
+    for (const group of Object.values(toolGroups)) {
+      if (group.length <= 1) continue;
+      // Keep the one with the longest cheatsheet; delete the rest
+      group.sort((a, b) => (b.cheatsheet?.length ?? 0) - (a.cheatsheet?.length ?? 0));
+      const [keep, ...dupes] = group;
+      for (const dupe of dupes) {
+        await Tool.findByIdAndDelete(dupe._id);
+        toolsRemoved++;
+      }
+      // Ensure the keeper has the canonical slug (hyphened form)
+      const canonical = canonicalSlug(keep.slug);
+      if (keep.slug !== canonical) {
+        // Only update slug if no other tool already owns it
+        const conflict = await Tool.findOne({ slug: canonical, _id: { $ne: keep._id } });
+        if (!conflict) await Tool.findByIdAndUpdate(keep._id, { $set: { slug: canonical } });
+      }
+    }
+
+    // ── Deduplicate Commands ───────────────────────────────────────────────
+    const allCommands = await Command.find({}).lean();
+    const cmdGroups: Record<string, typeof allCommands> = {};
+
+    for (const cmd of allCommands) {
+      const key = cmd.command.trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!cmdGroups[key]) cmdGroups[key] = [];
+      cmdGroups[key].push(cmd);
+    }
+
+    let commandsRemoved = 0;
+    for (const group of Object.values(cmdGroups)) {
+      if (group.length <= 1) continue;
+      // Keep the one with the longest description; delete the rest
+      group.sort((a, b) => (b.description?.length ?? 0) - (a.description?.length ?? 0));
+      const [, ...dupes] = group;
+      for (const dupe of dupes) {
+        await Command.findByIdAndDelete(dupe._id);
+        commandsRemoved++;
+      }
+    }
+
+    res.json({ toolsRemoved, commandsRemoved });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

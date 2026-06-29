@@ -43,4 +43,14 @@ router.get('/tools/:slug', async (req, res) => {
   }
 });
 
+router.delete('/tools/:id', async (req, res) => {
+  try {
+    await connectToDatabase();
+    await Tool.findByIdAndDelete(req.params.id);
+    res.status(204).send();
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

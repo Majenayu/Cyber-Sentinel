@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Database, Bot, Shield, Terminal, Trash2, Info, Keyboard, Activity, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Settings, Database, Bot, Shield, Terminal, Trash2, Info, Keyboard, Activity, CheckCircle, XCircle, Loader2, Layers } from 'lucide-react';
 
 interface HealthStatus {
   database: string;
@@ -12,6 +12,20 @@ export default function SettingsPage() {
   const [healthLoading, setHealthLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
   const [cleared, setCleared] = useState(false);
+  const [deduping, setDeduping] = useState(false);
+  const [dedupResult, setDedupResult] = useState<{ toolsRemoved: number; commandsRemoved: number } | null>(null);
+
+  const runDeduplicate = async () => {
+    setDeduping(true);
+    setDedupResult(null);
+    try {
+      const res = await fetch('/api/analyze/deduplicate', { method: 'POST' });
+      const data = await res.json();
+      setDedupResult(data);
+      setTimeout(() => setDedupResult(null), 6000);
+    } catch {}
+    setDeduping(false);
+  };
 
   useEffect(() => {
     fetch('/api/health/status')
@@ -123,6 +137,27 @@ export default function SettingsPage() {
           </div>
           <div className="p-4 space-y-4">
             <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-foreground">Deduplicate Tools &amp; Commands</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">
+                  Scans for duplicate tool references and saved commands, keeps the richest version, removes the rest.
+                </p>
+                {dedupResult && (
+                  <p className="text-[10px] text-primary mt-1 font-bold">
+                    ✓ Removed {dedupResult.toolsRemoved} duplicate tool(s) and {dedupResult.commandsRemoved} duplicate command(s).
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={runDeduplicate}
+                disabled={deduping}
+                className="ml-4 px-3 py-1.5 text-xs border border-primary/40 text-primary hover:bg-primary/10 rounded flex items-center gap-1.5 transition-colors disabled:opacity-40 shrink-0"
+              >
+                {deduping ? <Loader2 size={11} className="animate-spin" /> : <Layers size={11} />}
+                {deduping ? 'Running…' : 'Deduplicate'}
+              </button>
+            </div>
+            <div className="flex items-center justify-between border-t border-border pt-4">
               <div>
                 <p className="text-xs font-bold text-foreground">Clear All Chat Sessions</p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">Permanently deletes all AI Ops chat logs. Knowledge Vault is unaffected.</p>
