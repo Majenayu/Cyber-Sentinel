@@ -67,6 +67,7 @@ If `SMTP_PASSWORD` is missing or wrong, the app still works — intrusion attemp
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
 - Frontend: React + Vite + Tailwind v4 + wouter + shadcn/ui (cyberpunk dark theme, 12 hacker themes)
+- Maps: Leaflet 1.9 + react-leaflet 5 — interactive threat map and IP location map (CartoDB Dark Matter tiles, no API key required)
 - Mobile: Expo (React Native) with expo-router
 - API: Express 5 + MongoDB (mongoose) + Groq SDK + nodemailer
 - API codegen: Orval (from OpenAPI spec in `lib/api-spec/openapi.yaml`)
@@ -78,7 +79,13 @@ If `SMTP_PASSWORD` is missing or wrong, the app still works — intrusion attemp
 
 - `artifacts/cyber-sentinel/` — React/Vite web app (served at `/`)
   - `src/components/HackerLoader.tsx` — full-screen loading + username gate
-  - `src/pages/Intrusions.tsx` — intrusion log dashboard
+  - `src/components/ThreatMapLeaflet.tsx` — full interactive world map (Leaflet), used on Intrusions page
+  - `src/components/MiniMap.tsx` — small Leaflet map for single-IP location, used on IP Reputation page
+  - `src/components/Globe3D.tsx` — retired 3D canvas globe (no longer rendered, kept for reference)
+  - `src/pages/Intrusions.tsx` — intrusion log dashboard with live threat map at top
+  - `src/pages/IpRepPage.tsx` — IP reputation lookup with embedded location map below results
+  - `src/pages/Dashboard.tsx` — simplified dashboard, no globe; has intrusion strip button → /intrusions
+  - `src/index.css` — global styles including scrollbar hide (`scrollbar-width: none`)
 - `artifacts/cyber-sentinel-mobile/` — Expo mobile app
 - `artifacts/api-server/` — Express API server (served at `/api`)
   - `src/routes/` — route handlers (stats, knowledge, commands, tools, chat, analyze, health, intrusion)
@@ -102,6 +109,44 @@ If `SMTP_PASSWORD` is missing or wrong, the app still works — intrusion attemp
 - Themes: 12 hacker color themes stored in localStorage via ThemeContext; CSS custom properties on `:root[data-theme]`
 - PWA: manifest.json + sw.js (service worker) + skull SVG icons in public/ — installable on Android via Chrome
 - Intrusion tracking: IP geolocation via `ip-api.com` (free, no key required); email via Gmail SMTP + nodemailer
+- Maps: Leaflet (not Google Maps, not Mapbox) — uses free CartoDB Dark Matter tiles, requires no API key
+- Scrollbars: hidden globally via CSS (`scrollbar-width: none` + `::-webkit-scrollbar { display: none }`) — pages remain scrollable
+
+---
+
+## Interactive Maps
+
+### Threat Map (Intrusions page — `/intrusions`)
+
+`ThreatMapLeaflet.tsx` renders a full-width interactive world map (height 480px by default):
+
+- **Tile layer**: CartoDB Dark Matter (dark background, no API key needed)
+- **Red dots**: one per attacker IP, radius grows with `attempts` count (min 4px, max 15px)
+- **Dashed arc lines**: from each attacker location to the server (New Delhi, 28.6139°N 77.2090°E)
+- **Click a dot**: popup shows all attacker fields (IP, country, region, city, timezone, ISP, org, coords, attempts, IDs tried, browser, OS, platform, language, screen, cores, RAM, first/last seen, Google Maps link)
+- **Green server marker**: pulsing ring animation at the server location
+- **Auto-fit**: map zooms to fit all attackers on first load
+- **Scroll to zoom** from world level (zoom 2) down to street level (zoom 18)
+- Live data from `GET /api/auth/intrusions`, auto-refreshes every 30s
+
+### IP Location Map (IP Reputation page — `/ip-rep`)
+
+`MiniMap.tsx` renders a 300px tall embedded map below the IP lookup results:
+
+- Same CartoDB Dark Matter tiles
+- Red pulsing marker at the IP's lat/lon
+- Starts at zoom level 10 (city view), user can scroll to zoom to street level
+- Only renders when `lat` and `lon` are non-zero in the geo response
+- Clicking the marker shows the IP and exact coordinates
+
+### Changing the server location
+
+The server marker is hardcoded in `ThreatMapLeaflet.tsx`:
+```ts
+const SERVER_LAT = 28.6139; // New Delhi, India
+const SERVER_LON = 77.2090;
+```
+Edit these two constants to move it.
 
 ---
 
@@ -114,7 +159,7 @@ Every failed login attempt (wrong operator ID on the loader screen) is captured 
 | `ip` | Server (`req.headers['x-forwarded-for']`) | Real IP address of the attacker |
 | `country`, `city`, `region` | ip-api.com lookup | Geolocation of the IP |
 | `isp`, `org` | ip-api.com lookup | Internet provider and organization |
-| `lat`, `lon` | ip-api.com lookup | GPS coordinates (used for Google Maps link in email) |
+| `lat`, `lon` | ip-api.com lookup | GPS coordinates (plotted on threat map) |
 | `browser`, `os` | Parsed from User-Agent header | Browser and operating system |
 | `platform`, `language` | Browser `navigator` API | Device platform and language |
 | `screenResolution`, `colorDepth` | Browser `screen` API | Display characteristics |
@@ -125,7 +170,7 @@ Every failed login attempt (wrong operator ID on the loader screen) is captured 
 | `attempts` | Counter | Total attempts from this IP (all-time) |
 | `firstSeen`, `lastSeen` | Server timestamps | Timeline of activity |
 
-View all logged intrusions at `/intrusions` in the sidebar ("Intrusion Log").
+View all logged intrusions at `/intrusions` in the sidebar ("Intrusion Log"). All attacker IPs are plotted on the live threat map.
 
 ---
 
@@ -136,7 +181,11 @@ View all logged intrusions at `/intrusions` in the sidebar ("Intrusion Log").
 - MongoDB connection is cached per-process; if MONGODB_URI changes, restart the API server workflow
 - `CYBERSENTINEL_API_SECRET` is optional and **only enforced in production** (`NODE_ENV=production`). In development the API server is on localhost:8080 (not externally reachable), so no key is required.
 - `SMTP_PASSWORD` must be a **Gmail App Password**, not your Gmail login password. Regular passwords will fail with "Username and Password not accepted".
-- Intrusion geolocation calls `ip-api.com` with a 4-second timeout — on slow networks the lookup may be skipped and location will show "Unknown".
+- Intrusion geolocation calls `ip-api.com` with a 4-second timeout — on slow networks the lookup may be skipped and location will show "Unknown". Attackers without valid lat/lon are NOT plotted on the threat map.
+- **Leaflet CSS**: both `ThreatMapLeaflet.tsx` and `MiniMap.tsx` import `leaflet/dist/leaflet.css`. This is normal — Vite deduplicates it. Do not remove these imports or the map controls will break.
+- **Globe3D.tsx** is no longer rendered anywhere. It exists in `src/components/` but is not imported by any page. Do not re-add it to Dashboard or Intrusions — the replacement is `ThreatMapLeaflet.tsx`.
+- **react-leaflet v5** requires the `MapContainer` to be inside a DOM element with a defined height — always pass `style={{ height: '100%', width: '100%' }}` to the container and ensure its parent has a fixed height.
+- **`lib/api-client-react` has no build script** — the TypeScript error about `dist/index.d.ts` on Dashboard.tsx is pre-existing and harmless. Vite resolves the source directly at dev time.
 
 ---
 
@@ -170,6 +219,7 @@ Open each workflow in the Replit IDE and look for:
 - `EADDRINUSE` → another process already owns the port → run step 4
 - `Cannot find module` → pnpm install was not run → run `pnpm install` from the project root
 - `vite: not found` → same as above
+- `Failed to load url leaflet/dist/leaflet.css` → leaflet not installed → run `pnpm install` from root
 
 ### Step 6 — Verify from the shell
 ```bash
@@ -214,3 +264,5 @@ Themes: Matrix Green, Blood Red, Cyber Blue, Purple Haze, Orange Hack, Toxic Yel
 - Theme selector only in Settings page (removed from sidebar)
 - Login gate: only operator ID "Majen" grants access
 - Intrusion alert emails go to pgayushrai@gmail.com, sent from pgayushraipc@gmail.com
+- Scrollbars hidden globally (pages still scrollable)
+- Interactive Leaflet maps, not Globe3D — do not revert to the 3D canvas globe
