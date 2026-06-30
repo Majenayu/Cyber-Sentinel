@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Mail, AlertTriangle, CheckCircle, Copy, Check } from 'lucide-react';
+import { Mail, AlertTriangle, CheckCircle, Copy, Check, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ParsedHeader {
   hops: Array<{ from: string; by: string; date: string; delay: string }>;
@@ -121,8 +121,9 @@ function CopyBtn({ text }: { text: string }) {
 
 export default function EmailHeader() {
   const [raw, setRaw] = useState('');
+  const [showGuide, setShowGuide] = useState(false);
   const parsed = useMemo(() => raw.trim() ? parseHeaders(raw) : null, [raw]);
-  const spoofed = parsed ? (parsed.from !== parsed.returnPath && parsed.returnPath) || parsed.replyTo !== parsed.from : false;
+  const spoofed = parsed ? (parsed.from !== parsed.returnPath && !!parsed.returnPath) || (!!parsed.replyTo && parsed.replyTo !== parsed.from) : false;
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8 font-mono">
@@ -132,10 +133,51 @@ export default function EmailHeader() {
           <p className="text-muted-foreground text-xs">Paste raw email headers to trace routing, detect spoofing, and verify SPF/DKIM/DMARC.</p>
         </header>
 
+        <div className="border border-primary/20 bg-primary/5 rounded-lg overflow-hidden">
+          <button onClick={() => setShowGuide(!showGuide)}
+            className="w-full flex items-start gap-3 px-4 py-3 text-left">
+            <BookOpen size={14} className="text-primary shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-foreground font-semibold mb-0.5">What are email headers? How do I get them?</div>
+              <div className="text-xs text-muted-foreground">Click to learn what headers reveal and how to extract them from any email client.</div>
+            </div>
+            {showGuide ? <ChevronUp size={14} className="text-muted-foreground shrink-0 mt-0.5" /> : <ChevronDown size={14} className="text-muted-foreground shrink-0 mt-0.5" />}
+          </button>
+
+          {showGuide && (
+            <div className="px-4 pb-4 space-y-3 border-t border-primary/10">
+              <div className="text-xs text-muted-foreground leading-relaxed pt-3">
+                <strong className="text-foreground">What are email headers?</strong> Every email carries invisible metadata called headers — like a package with a shipping label. Headers show: who really sent the email (not just the display name), all the mail servers it passed through, when each hop happened, and whether the email is authentic (SPF/DKIM/DMARC checks). Phishing emails often spoof the "From" field while the Return-Path or X-Originating-IP reveals the real sender.
+              </div>
+              <div className="text-xs space-y-2">
+                <div className="text-foreground font-semibold">How to get raw headers:</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {[
+                    ['Gmail', 'Open email → ⋮ (3 dots) → "Show original"'],
+                    ['Outlook', 'Open email → File → Properties → "Internet headers"'],
+                    ['Apple Mail', 'View → Message → All Headers'],
+                    ['Thunderbird', 'View → Headers → All'],
+                    ['Yahoo Mail', 'Open email → ⋮ → "View raw message"'],
+                    ['Proton Mail', 'Open email → ⋮ → "View headers"'],
+                  ].map(([client, steps]) => (
+                    <div key={client} className="bg-black/20 border border-border/50 rounded px-3 py-2">
+                      <div className="text-primary font-bold text-[11px]">{client}</div>
+                      <div className="text-muted-foreground text-[11px] mt-0.5">{steps}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                <strong className="text-foreground">Key things to check:</strong> SPF validates that the sending server is authorized to send for that domain. DKIM adds a cryptographic signature to prove the email wasn't modified. DMARC enforces what happens when SPF/DKIM fail. A phishing email often has SPF=fail, DKIM=none, and a mismatched Return-Path.
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-[10px] text-muted-foreground tracking-widest uppercase">Raw Headers</label>
-            <button onClick={() => setRaw(SAMPLE)} className="text-[10px] text-primary/60 hover:text-primary tracking-wider">load sample →</button>
+            <button onClick={() => setRaw(SAMPLE)} className="text-[10px] text-primary/60 hover:text-primary tracking-wider">load phishing sample →</button>
           </div>
           <textarea value={raw} onChange={e => setRaw(e.target.value)} rows={8}
             placeholder="Paste raw email headers here…"
@@ -147,15 +189,27 @@ export default function EmailHeader() {
             {spoofed && (
               <div className="flex items-center gap-3 px-4 py-3 rounded border border-red-500/40 bg-red-950/20 text-red-400 text-xs">
                 <AlertTriangle size={16} />
-                <span><strong>POSSIBLE SPOOFING DETECTED:</strong> From address differs from Return-Path or Reply-To. Treat as suspicious.</span>
+                <span><strong>POSSIBLE SPOOFING DETECTED:</strong> The "From" display address differs from the Return-Path or Reply-To. This is a common phishing indicator — the real sender is different from who the email appears to be from.</span>
+              </div>
+            )}
+
+            {!spoofed && parsed.spf === 'PASS' && parsed.dkim === 'PASS' && (
+              <div className="flex items-center gap-3 px-4 py-3 rounded border border-green-500/40 bg-green-950/20 text-green-400 text-xs">
+                <CheckCircle size={16} />
+                <span><strong>EMAIL APPEARS LEGITIMATE:</strong> SPF and DKIM both pass. The sending server is authorized and the email wasn't modified in transit.</span>
               </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {[['SPF', parsed.spf], ['DKIM', parsed.dkim], ['DMARC', parsed.dmarc]].map(([k, v]) => (
-                <div key={k} className="bg-card/50 border border-border rounded-lg p-4 text-center space-y-1">
-                  <div className="text-[10px] text-muted-foreground tracking-widest uppercase">{k}</div>
-                  <StatusBadge val={v} />
+              {[
+                ['SPF', parsed.spf, 'Checks if the sending server is allowed to send for this domain'],
+                ['DKIM', parsed.dkim, 'Verifies the email content was not modified after sending'],
+                ['DMARC', parsed.dmarc, 'Policy that says what to do when SPF or DKIM fail'],
+              ].map(([k, v, explain]) => (
+                <div key={k} className="bg-card/50 border border-border rounded-lg p-4 space-y-2">
+                  <div className="text-[10px] text-muted-foreground tracking-widest uppercase text-center">{k}</div>
+                  <div className="text-center"><StatusBadge val={String(v)} /></div>
+                  <div className="text-[10px] text-muted-foreground/60 text-center leading-tight">{explain}</div>
                 </div>
               ))}
             </div>
@@ -164,21 +218,24 @@ export default function EmailHeader() {
               <div className="px-4 py-2 border-b border-border bg-black/20 text-xs font-bold text-primary tracking-widest uppercase">Message Details</div>
               <div className="px-4 py-2 divide-y divide-border/40">
                 {[
-                  ['From', parsed.from],
-                  ['To', parsed.to],
-                  ['Reply-To', parsed.replyTo],
-                  ['Return-Path', parsed.returnPath],
-                  ['Subject', parsed.subject],
-                  ['Date', parsed.date],
-                  ['Message-ID', parsed.messageId],
-                  ['X-Originating-IP', parsed.xOriginatingIp],
-                  ['X-Mailer', parsed.xMailer],
-                  ['User-Agent', parsed.userAgent],
-                  ['Content-Type', parsed.contentType],
-                ].filter(([, v]) => v).map(([k, v]) => (
-                  <div key={k} className="flex items-start justify-between py-2 gap-4 text-xs">
-                    <span className="text-muted-foreground shrink-0 w-36">{k}</span>
-                    <span className={`text-primary text-right break-all ${k === 'Return-Path' && spoofed ? 'text-red-400' : ''}`}>{v}</span>
+                  ['From', parsed.from, spoofed ? 'This display name can be faked easily' : ''],
+                  ['To', parsed.to, ''],
+                  ['Reply-To', parsed.replyTo, parsed.replyTo && parsed.replyTo !== parsed.from ? '⚠ Differs from From — replies go elsewhere' : ''],
+                  ['Return-Path', parsed.returnPath, parsed.returnPath && parsed.returnPath !== parsed.from ? '⚠ Bounces go to a different address' : ''],
+                  ['Subject', parsed.subject, ''],
+                  ['Date', parsed.date, ''],
+                  ['Message-ID', parsed.messageId, ''],
+                  ['X-Originating-IP', parsed.xOriginatingIp, 'The real IP address of the sender\'s mail server'],
+                  ['X-Mailer', parsed.xMailer, ''],
+                  ['User-Agent', parsed.userAgent, ''],
+                  ['Content-Type', parsed.contentType, ''],
+                ].filter(([, v]) => v).map(([k, v, note]) => (
+                  <div key={String(k)} className="flex items-start justify-between py-2 gap-4 text-xs">
+                    <div className="shrink-0 w-32">
+                      <div className="text-muted-foreground">{k}</div>
+                      {note && <div className="text-[10px] text-yellow-400/70 mt-0.5">{note}</div>}
+                    </div>
+                    <span className={`text-primary text-right break-all ${(k === 'Return-Path' || k === 'Reply-To') && spoofed ? 'text-red-400' : ''}`}>{String(v)}</span>
                   </div>
                 ))}
               </div>
@@ -187,14 +244,14 @@ export default function EmailHeader() {
             {parsed.hops.length > 0 && (
               <div className="bg-card/50 border border-border rounded-lg overflow-hidden">
                 <div className="px-4 py-2 border-b border-border bg-black/20 text-xs font-bold text-primary tracking-widest uppercase">
-                  Routing Path ({parsed.hops.length} hops)
+                  Routing Path ({parsed.hops.length} hops) — read bottom to top = earliest to latest
                 </div>
                 <div className="divide-y divide-border/40">
                   {parsed.hops.map((hop, i) => (
                     <div key={i} className="px-4 py-3 text-xs">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-[10px] text-muted-foreground">HOP {i + 1}</span>
-                        {hop.delay && <span className="text-[10px] text-yellow-400/60">{hop.delay} delay</span>}
+                        {hop.delay && <span className={`text-[10px] ${parseInt(hop.delay) > 300 ? 'text-red-400/70' : 'text-yellow-400/60'}`}>{hop.delay} delay{parseInt(hop.delay) > 300 ? ' ⚠ unusually long' : ''}</span>}
                       </div>
                       <div className="flex flex-wrap gap-4">
                         <span><span className="text-muted-foreground">FROM </span><span className="text-primary">{hop.from}</span></span>

@@ -7,25 +7,32 @@ router.get("/breach", async (req, res) => {
 
   try {
     const hibpKey = process.env.HIBP_API_KEY ?? "";
-    const headers: Record<string, string> = {
+    const hibpHeaders: Record<string, string> = {
       "User-Agent": "CyberSentinel-SecurityDashboard",
       "hibp-api-key": hibpKey,
     };
 
-    const [breachRes, pasteRes] = await Promise.allSettled([
+    const [breachRes, pasteRes, xonRes] = await Promise.allSettled([
       fetch(`https://haveibeenpwned.com/api/v3/breachedaccount/${encodeURIComponent(email)}?truncateResponse=false`, {
-        headers,
+        headers: hibpHeaders,
         signal: AbortSignal.timeout(10000),
       }),
       fetch(`https://haveibeenpwned.com/api/v3/pasteaccount/${encodeURIComponent(email)}`, {
-        headers,
+        headers: hibpHeaders,
         signal: AbortSignal.timeout(10000),
+      }),
+      fetch(`https://api.xposedornot.com/v1/check-email/${encodeURIComponent(email)}`, {
+        headers: { "User-Agent": "CyberSentinel-SecurityDashboard" },
+        signal: AbortSignal.timeout(8000),
       }),
     ]);
 
     let breaches: any[] = [];
     let pastes: any[] = [];
     let error: string | null = null;
+    let xonBreaches: string[] = [];
+    let xonFound = false;
+    let xonError: string | null = null;
 
     if (breachRes.status === "fulfilled") {
       if (breachRes.value.status === 200) {
@@ -47,6 +54,23 @@ router.get("/breach", async (req, res) => {
       }
     }
 
+    if (xonRes.status === "fulfilled") {
+      if (xonRes.value.status === 200) {
+        const xonData: any = await xonRes.value.json();
+        if (xonData.exposures && Array.isArray(xonData.exposures)) {
+          xonBreaches = xonData.exposures;
+          xonFound = xonBreaches.length > 0;
+        }
+      } else if (xonRes.value.status === 404) {
+        xonFound = false;
+        xonBreaches = [];
+      } else {
+        xonError = `XposedOrNot: status ${xonRes.value.status}`;
+      }
+    } else {
+      xonError = "XposedOrNot: " + (xonRes.reason?.message ?? "timeout");
+    }
+
     res.json({
       email,
       found: breaches.length > 0,
@@ -54,6 +78,12 @@ router.get("/breach", async (req, res) => {
       pasteCount: pastes.length,
       needsApiKey: !hibpKey,
       error,
+      xon: {
+        found: xonFound,
+        breachCount: xonBreaches.length,
+        breaches: xonBreaches,
+        error: xonError,
+      },
       breaches: breaches.map((b: any) => ({
         name: b.Name,
         title: b.Title,

