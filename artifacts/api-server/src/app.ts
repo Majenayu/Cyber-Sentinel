@@ -56,17 +56,38 @@ app.use(
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
-// Optional API secret guard — only enforced in production.
-// In development the API binds to localhost:8080 which is not externally reachable,
-// so network isolation is sufficient and the secret would break the Vite dev proxy.
+// Optional API secret guard — only enforced in production against *external* callers.
+// In development the API binds to localhost:8080 (not externally reachable), so no key needed.
+// In production monolith mode (Express serves both frontend + API on the same domain),
+// same-origin browser requests must be allowed through without the key — the Vite dev proxy
+// that injected x-api-key doesn't exist in the production build.
 const API_SECRET =
   process.env.NODE_ENV === 'production'
     ? process.env.CYBERSENTINEL_API_SECRET
     : undefined;
+
+// Own-origin detection: Render sets RENDER_EXTERNAL_URL automatically; ALLOWED_ORIGIN is a
+// fallback for other hosts. Requests whose Origin matches our own URL are same-origin frontend calls.
+const ownOrigins = new Set<string>(
+  [
+    process.env.RENDER_EXTERNAL_URL,
+    ...(process.env.ALLOWED_ORIGIN?.split(',').map(o => o.trim()) ?? []),
+  ]
+    .filter(Boolean)
+    .map(o => (o as string).replace(/\/$/, ''))
+);
+
 if (API_SECRET) {
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
     // Always allow health checks without auth
     if (req.path === '/healthz' || req.path === '/health/status') return next();
+
+    const origin = req.headers['origin'] as string | undefined;
+
+    // Allow requests with no Origin header (server-to-server, curl, health probes)
+    // and requests from our own frontend domain (monolith mode: frontend + API same host).
+    if (!origin || ownOrigins.has(origin)) return next();
+
     const provided =
       req.headers['x-api-key'] ??
       req.headers['authorization']?.replace(/^bearer\s+/i, '');
