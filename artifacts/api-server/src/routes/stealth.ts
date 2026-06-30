@@ -1,89 +1,226 @@
 import { Router } from "express";
+import https from "node:https";
+import http from "node:http";
+import { HttpsProxyAgent } from "https-proxy-agent";
+
 const router = Router();
 
-router.get("/stealth/myip", async (_req, res) => {
-  try {
-    const r = await fetch("https://api.ipify.org?format=json", {
-      signal: AbortSignal.timeout(5000),
-      headers: { "User-Agent": "CyberSentinel/1.0" },
+const FLAG: Record<string, string> = {
+  NL: "🇳🇱", DE: "🇩🇪", CH: "🇨🇭", SE: "🇸🇪", FI: "🇫🇮", NO: "🇳🇴",
+  US: "🇺🇸", CA: "🇨🇦", GB: "🇬🇧", FR: "🇫🇷", JP: "🇯🇵", SG: "🇸🇬",
+  AU: "🇦🇺", BR: "🇧🇷", RO: "🇷🇴", IS: "🇮🇸", PA: "🇵🇦", MX: "🇲🇽",
+  UA: "🇺🇦", PL: "🇵🇱", HU: "🇭🇺", CZ: "🇨🇿", TR: "🇹🇷", IN: "🇮🇳",
+  KR: "🇰🇷", HK: "🇭🇰", TW: "🇹🇼", TH: "🇹🇭", VN: "🇻🇳", ID: "🇮🇩",
+  ZA: "🇿🇦", AR: "🇦🇷", CL: "🇨🇱", CO: "🇨🇴", RU: "🇷🇺",
+};
+
+const COUNTRY_NAMES: Record<string, string> = {
+  NL: "Netherlands", DE: "Germany", CH: "Switzerland", SE: "Sweden",
+  FI: "Finland", NO: "Norway", US: "United States", CA: "Canada",
+  GB: "United Kingdom", FR: "France", JP: "Japan", SG: "Singapore",
+  AU: "Australia", BR: "Brazil", RO: "Romania", IS: "Iceland",
+  PA: "Panama", MX: "Mexico", UA: "Ukraine", PL: "Poland",
+  HU: "Hungary", CZ: "Czech Republic", TR: "Turkey", IN: "India",
+  KR: "South Korea", HK: "Hong Kong", TW: "Taiwan", TH: "Thailand",
+  VN: "Vietnam", ID: "Indonesia", ZA: "South Africa", AR: "Argentina",
+  CL: "Chile", CO: "Colombia", RU: "Russia",
+};
+
+function fetchViaProxy(targetUrl: string, proxyHost: string, proxyPort: number, timeoutMs = 8000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const proxyUrl = `http://${proxyHost}:${proxyPort}`;
+    const agent = new HttpsProxyAgent(proxyUrl);
+
+    const isHttps = targetUrl.startsWith("https://");
+    const lib = isHttps ? https : http;
+
+    const timer = setTimeout(() => {
+      req.destroy(new Error("proxy timeout"));
+    }, timeoutMs);
+
+    const req = lib.get(targetUrl, { agent: agent as any }, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => {
+        clearTimeout(timer);
+        resolve(data);
+      });
     });
-    if (!r.ok) throw new Error(`ipify returned ${r.status}`);
-    const data: any = await r.json();
-    res.json({ ip: data.ip });
-  } catch (err: any) {
-    res.status(503).json({ error: "Could not fetch current IP: " + (err.message ?? "timeout") });
-  }
-});
 
-const VPN_LOCATIONS = [
-  { country: "Netherlands", city: "Amsterdam", code: "NL", lat: 52.3676, lon: 4.9041 },
-  { country: "Germany", city: "Frankfurt", code: "DE", lat: 50.1109, lon: 8.6821 },
-  { country: "Switzerland", city: "Zurich", code: "CH", lat: 47.3769, lon: 8.5417 },
-  { country: "Sweden", city: "Stockholm", code: "SE", lat: 59.3293, lon: 18.0686 },
-  { country: "Finland", city: "Helsinki", code: "FI", lat: 60.1699, lon: 24.9384 },
-  { country: "Norway", city: "Oslo", code: "NO", lat: 59.9139, lon: 10.7522 },
-  { country: "United States", city: "New York", code: "US", lat: 40.7128, lon: -74.0060 },
-  { country: "United States", city: "Los Angeles", code: "US", lat: 34.0522, lon: -118.2437 },
-  { country: "United States", city: "Chicago", code: "US", lat: 41.8781, lon: -87.6298 },
-  { country: "Canada", city: "Toronto", code: "CA", lat: 43.6532, lon: -79.3832 },
-  { country: "United Kingdom", city: "London", code: "GB", lat: 51.5074, lon: -0.1278 },
-  { country: "France", city: "Paris", code: "FR", lat: 48.8566, lon: 2.3522 },
-  { country: "Japan", city: "Tokyo", code: "JP", lat: 35.6762, lon: 139.6503 },
-  { country: "Singapore", city: "Singapore", code: "SG", lat: 1.3521, lon: 103.8198 },
-  { country: "Australia", city: "Sydney", code: "AU", lat: -33.8688, lon: 151.2093 },
-  { country: "Brazil", city: "São Paulo", code: "BR", lat: -23.5505, lon: -46.6333 },
-  { country: "Romania", city: "Bucharest", code: "RO", lat: 44.4268, lon: 26.1025 },
-  { country: "Iceland", city: "Reykjavik", code: "IS", lat: 64.1265, lon: -21.8174 },
-  { country: "Panama", city: "Panama City", code: "PA", lat: 8.9936, lon: -79.5197 },
-  { country: "Mexico", city: "Mexico City", code: "MX", lat: 19.4326, lon: -99.1332 },
-];
-
-function fakeIp() {
-  const blocks = [
-    [45, 46, 51, 62, 77, 82, 84, 86, 88, 91],
-    Array.from({ length: 254 }, (_, i) => i + 1),
-    Array.from({ length: 254 }, (_, i) => i + 1),
-    Array.from({ length: 253 }, (_, i) => i + 2),
-  ];
-  return blocks.map(b => b[Math.floor(Math.random() * b.length)]).join(".");
+    req.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
 }
 
-router.get("/stealth/locations", (_req, res) => {
-  res.json({ locations: VPN_LOCATIONS });
-});
-
-router.post("/stealth/connect", async (req, res) => {
-  const { locationIndex } = req.body ?? {};
-  const idx = typeof locationIndex === "number" ? Math.max(0, Math.min(locationIndex, VPN_LOCATIONS.length - 1)) : Math.floor(Math.random() * VPN_LOCATIONS.length);
-  const location = VPN_LOCATIONS[idx];
-
-  const assignedIp = fakeIp();
-
-  res.json({
-    connected: true,
-    ip: assignedIp,
-    location,
-    note: "Simulated VPN connection — shows what a connection through this exit node would look like. For real anonymity use Tor or a paid VPN service.",
+async function getMyIpDirect(): Promise<string> {
+  const r = await fetch("https://api.ipify.org?format=json", {
+    signal: AbortSignal.timeout(5000),
+    headers: { "User-Agent": "CyberSentinel/1.0" },
   });
+  const d: any = await r.json();
+  return d.ip;
+}
+
+async function getMyIpViaProxy(proxyHost: string, proxyPort: number): Promise<string> {
+  const raw = await fetchViaProxy("https://api.ipify.org?format=json", proxyHost, proxyPort, 9000);
+  const d = JSON.parse(raw);
+  return d.ip;
+}
+
+// Cache proxy list for 5 minutes
+let proxyCache: { proxies: any[]; fetchedAt: number } | null = null;
+
+async function fetchProxies(): Promise<any[]> {
+  if (proxyCache && Date.now() - proxyCache.fetchedAt < 5 * 60 * 1000) {
+    return proxyCache.proxies;
+  }
+
+  const results: any[] = [];
+
+  // Source 1: Geonode free API
+  try {
+    const r = await fetch(
+      "https://proxylist.geonode.com/api/proxy-list?limit=100&page=1&sort_by=lastChecked&sort_type=desc&filterUpTime=50&protocols=http,https",
+      { signal: AbortSignal.timeout(10000), headers: { "User-Agent": "CyberSentinel/1.0" } }
+    );
+    if (r.ok) {
+      const d: any = await r.json();
+      for (const p of d.data ?? []) {
+        if (p.ip && p.port && p.country) {
+          results.push({
+            ip: p.ip,
+            port: Number(p.port),
+            country: p.country,
+            countryName: COUNTRY_NAMES[p.country] ?? p.country,
+            flag: FLAG[p.country] ?? "🌐",
+            uptime: p.upTime ?? 0,
+            speed: p.speed ?? 0,
+            anonymity: p.anonymityLevel ?? "unknown",
+            protocols: p.protocols ?? ["http"],
+          });
+        }
+      }
+    }
+  } catch {}
+
+  // Source 2: ProxyScrape fallback if geonode returned nothing
+  if (results.length < 10) {
+    try {
+      const r2 = await fetch(
+        "https://api.proxyscrape.com/v2/?request=getproxies&protocol=http&timeout=5000&country=all&ssl=all&anonymity=elite",
+        { signal: AbortSignal.timeout(10000), headers: { "User-Agent": "CyberSentinel/1.0" } }
+      );
+      if (r2.ok) {
+        const text = await r2.text();
+        const lines = text.trim().split("\n");
+        for (const line of lines.slice(0, 50)) {
+          const [ip, port] = line.trim().split(":");
+          if (ip && port && !isNaN(Number(port))) {
+            results.push({
+              ip: ip.trim(),
+              port: Number(port.trim()),
+              country: "??",
+              countryName: "Unknown",
+              flag: "🌐",
+              uptime: null,
+              speed: null,
+              anonymity: "elite",
+              protocols: ["http"],
+            });
+          }
+        }
+      }
+    } catch {}
+  }
+
+  proxyCache = { proxies: results, fetchedAt: Date.now() };
+  return results;
+}
+
+// GET /api/stealth/myip — real server IP
+router.get("/stealth/myip", async (_req, res) => {
+  try {
+    const ip = await getMyIpDirect();
+    res.json({ ip });
+  } catch (err: any) {
+    res.status(503).json({ error: "Could not fetch IP: " + (err.message ?? "timeout") });
+  }
 });
 
-router.get("/stealth/rotate", (_req, res) => {
-  const locations: typeof VPN_LOCATIONS = [];
-  const usedIdx = new Set<number>();
-  while (locations.length < 5) {
-    const idx = Math.floor(Math.random() * VPN_LOCATIONS.length);
-    if (!usedIdx.has(idx)) {
-      usedIdx.add(idx);
-      locations.push(VPN_LOCATIONS[idx]);
+// GET /api/stealth/proxies — real live proxy list
+router.get("/stealth/proxies", async (_req, res) => {
+  try {
+    const proxies = await fetchProxies();
+    res.json({ proxies: proxies.slice(0, 80), total: proxies.length });
+  } catch (err: any) {
+    res.status(503).json({ error: "Failed to fetch proxy list: " + (err.message ?? "unknown") });
+  }
+});
+
+// POST /api/stealth/connect — test a real proxy and return its IP
+router.post("/stealth/connect", async (req, res) => {
+  const { ip, port } = req.body ?? {};
+  if (!ip || !port) {
+    res.status(400).json({ error: "ip and port required" });
+    return;
+  }
+
+  const proxyPort = Number(port);
+  if (isNaN(proxyPort)) {
+    res.status(400).json({ error: "invalid port" });
+    return;
+  }
+
+  try {
+    const proxyIp = await getMyIpViaProxy(String(ip), proxyPort);
+    res.json({
+      connected: true,
+      exitIp: proxyIp,
+      proxyHost: ip,
+      proxyPort,
+      note: "Traffic routed through real proxy — external services now see this IP.",
+    });
+  } catch (err: any) {
+    res.status(502).json({
+      connected: false,
+      error: `Proxy ${ip}:${port} failed — ${err.message ?? "connection refused or timeout"}. Try another proxy.`,
+    });
+  }
+});
+
+// POST /api/stealth/rotate-test — test 5 proxies for rotation schedule
+router.post("/stealth/rotate-test", async (req, res) => {
+  const { proxies: candidates } = req.body ?? {};
+  if (!Array.isArray(candidates) || candidates.length === 0) {
+    res.status(400).json({ error: "proxies array required" });
+    return;
+  }
+
+  const results: any[] = [];
+
+  for (const p of candidates.slice(0, 10)) {
+    if (results.length >= 5) break;
+    try {
+      const exitIp = await getMyIpViaProxy(String(p.ip), Number(p.port));
+      results.push({
+        minute: results.length + 1,
+        exitIp,
+        proxyHost: p.ip,
+        proxyPort: Number(p.port),
+        country: p.countryName ?? p.country ?? "Unknown",
+        flag: p.flag ?? "🌐",
+        working: true,
+      });
+    } catch {
+      // skip broken proxies
     }
   }
-  const ips = locations.map(() => fakeIp());
+
   res.json({
-    rotation: locations.map((loc, i) => ({
-      minute: i + 1,
-      ip: ips[i],
-      location: loc,
-    })),
+    rotation: results,
+    found: results.length,
   });
 });
 
