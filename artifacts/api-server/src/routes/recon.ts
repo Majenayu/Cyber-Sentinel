@@ -7,6 +7,10 @@ function sanitizeDomain(d: string) {
   return String(d).toLowerCase().replace(/[^a-z0-9.\-_]/g, "").slice(0, 253);
 }
 
+async function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 router.post("/recon/dns", async (req, res) => {
   const { domain, types = ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA"] } = req.body ?? {};
   if (!domain) { res.status(400).json({ error: "domain required" }); return; }
@@ -120,6 +124,39 @@ router.post("/recon/port-check", async (req, res) => {
   });
 });
 
+async function fetchCrtSh(sanitized: string): Promise<string[]> {
+  const r = await fetch(`https://crt.sh/?q=%.${encodeURIComponent(sanitized)}&output=json`, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (compatible; CyberSentinel/1.0; +https://github.com)",
+      "Accept": "application/json",
+    },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!r.ok) throw new Error(`crt.sh returned ${r.status}`);
+  const data: any[] = await r.json();
+  return [...new Set(
+    data.flatMap((entry: any) =>
+      String(entry.name_value ?? "").split("\n").map((s: string) => s.trim().replace(/^\*\./, ""))
+    ).filter((s: string) => s.endsWith(sanitized) && s !== sanitized)
+  )].sort();
+}
+
+async function fetchHackerTarget(sanitized: string): Promise<string[]> {
+  const r = await fetch(`https://api.hackertarget.com/hostsearch/?q=${encodeURIComponent(sanitized)}`, {
+    headers: { "User-Agent": "CyberSentinel/1.0" },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!r.ok) throw new Error(`HackerTarget returned ${r.status}`);
+  const text = await r.text();
+  if (text.includes("error") || text.includes("API count")) throw new Error(text.trim());
+  const subdomains = [...new Set(
+    text.split("\n")
+      .map(line => line.split(",")[0]?.trim())
+      .filter(s => s && s.endsWith(sanitized) && s !== sanitized)
+  )].sort();
+  return subdomains;
+}
+
 router.post("/recon/subdomains", async (req, res) => {
   const { domain } = req.body ?? {};
   if (!domain) { res.status(400).json({ error: "domain required" }); return; }
@@ -130,22 +167,28 @@ router.post("/recon/subdomains", async (req, res) => {
     return;
   }
 
-  try {
-    const r = await fetch(`https://crt.sh/?q=%.${encodeURIComponent(sanitized)}&output=json`, {
-      headers: { "User-Agent": "CyberSentinel/1.0" },
-      signal: AbortSignal.timeout(20000),
-    });
-    if (!r.ok) throw new Error(`crt.sh returned ${r.status} — try again in a moment`);
-    const data: any[] = await r.json();
-    const subdomains = [...new Set(
-      data.flatMap((entry: any) =>
-        String(entry.name_value ?? "").split("\n").map((s: string) => s.trim().replace(/^\*\./, ""))
-      ).filter((s: string) => s.endsWith(sanitized) && s !== sanitized)
-    )].sort();
+  const MAX_RETRIES = 3;
+  let lastError = "";
 
-    res.json({ domain: sanitized, count: subdomains.length, subdomains: subdomains.slice(0, 300) });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message ?? "Subdomain enumeration failed" });
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const subdomains = await fetchCrtSh(sanitized);
+      res.json({ domain: sanitized, count: subdomains.length, subdomains: subdomains.slice(0, 300), source: "crt.sh" });
+      return;
+    } catch (err: any) {
+      lastError = err.message ?? "crt.sh failed";
+      if (attempt < MAX_RETRIES) await sleep(2000 * attempt);
+    }
+  }
+
+  try {
+    const subdomains = await fetchHackerTarget(sanitized);
+    res.json({ domain: sanitized, count: subdomains.length, subdomains: subdomains.slice(0, 300), source: "hackertarget.com (crt.sh unavailable)" });
+    return;
+  } catch (fallbackErr: any) {
+    res.status(502).json({
+      error: `Subdomain lookup failed — crt.sh: ${lastError}; fallback: ${fallbackErr.message ?? "error"}. Both services are temporarily unavailable. Try again in a minute.`
+    });
   }
 });
 

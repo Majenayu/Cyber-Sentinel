@@ -4,7 +4,7 @@ import {
   Database, Wrench, FileCode, Bot, Settings, Activity, ShieldAlert,
   Terminal, Bug, Globe, ShieldOff, Key, Zap, Hash, Users, Radar,
   AlertTriangle, GitBranch, Mail, Fingerprint, Search, ChevronLeft, ChevronRight,
-  Music, Radio
+  Music, Radio, EyeOff
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -87,6 +87,7 @@ const OSINT_NAV = [
   { href: '/fingerprint', label: 'Fingerprint', icon: Fingerprint },
   { href: '/skill-tree', label: 'Skill Tree', icon: GitBranch },
   { href: '/tracker', label: 'QR / Honeypot', icon: Radio },
+  { href: '/stealth', label: 'Stealth Mode', icon: EyeOff },
 ];
 
 export default function Sidebar({ onNavigate, onCommandPalette, collapsed: externalCollapsed, onToggleCollapse }: SidebarProps) {

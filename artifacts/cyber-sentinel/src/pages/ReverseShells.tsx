@@ -1,5 +1,18 @@
 import React, { useState } from 'react';
-import { Copy, Terminal, Check } from 'lucide-react';
+import { Copy, Terminal, Check, Info } from 'lucide-react';
+
+const SHELL_DESCRIPTIONS: Record<string, string> = {
+  Bash: "Bash reverse shells use /dev/tcp (a Bash built-in) to open a raw TCP socket to your listener. Works on most Linux systems where Bash ≥3.2 is the default shell. The -i flag forces interactive mode so you get a real prompt.",
+  Python: "Python reverse shells work on almost any machine with Python installed — servers, routers, IoT devices. They duplicate stdin/stdout/stderr file descriptors to the socket so every command runs over the connection. Python3 is preferred; use Python2 only on older systems.",
+  PHP: "PHP shells are ideal when you have code execution through a web vulnerability (file upload, eval injection, LFI). fsockopen() opens a TCP connection and exec/proc_open hands stdin/stdout to it. These work server-side, not in the browser.",
+  Netcat: "Netcat ('the Swiss army knife of networking') can open raw TCP connections. The -e flag spawns a shell directly — older Linux versions of nc support it; BSD/macOS nc does not. The mkfifo variant works around that by creating a named pipe.",
+  PowerShell: "PowerShell shells target Windows environments. The TCPClient version is more reliable and stealthy. The Base64 variant encodes the payload to avoid quote/escaping issues in command-line contexts like cmd.exe or scheduled tasks.",
+  Ruby: "Ruby reverse shells work wherever Ruby is installed (common on macOS, Linux dev machines). Uses TCPSocket from the standard library. Good fallback when Python is not available.",
+  Perl: "Perl is pre-installed on virtually every Unix/Linux system built before 2020. The Socket module handles TCP connections. Very reliable on older systems and embedded devices where only core Perl modules exist.",
+  Java: "Java shells are useful when you have command injection on a Java application (Spring, Struts, Jenkins). Uses Runtime.exec() with a String array to bypass shell metacharacter issues.",
+  Golang: "Go reverse shells compile to a self-contained binary with no external dependencies — ideal for deploying to hardened environments. The inline version writes a .go file to /tmp and runs it, useful when you have command execution but not file upload.",
+  Listener: "Listener commands run on YOUR attack machine to receive incoming connections. Always start your listener BEFORE triggering the payload on the target. rlwrap adds readline support (arrow keys, history) for a better interactive experience.",
+};
 
 const SHELLS = [
   {
@@ -92,6 +105,7 @@ export default function ReverseShells() {
   const [ip, setIp] = useState('10.10.10.10');
   const [port, setPort] = useState('4444');
   const [filter, setFilter] = useState('');
+  const [expandedDesc, setExpandedDesc] = useState<string | null>(null);
 
   function fill(cmd: string) {
     return cmd.replace(/\{IP\}/g, ip || 'LHOST').replace(/\{PORT\}/g, port || 'LPORT');
@@ -108,8 +122,18 @@ export default function ReverseShells() {
           <h1 className="text-2xl font-bold flex items-center gap-2 text-primary">
             <Terminal size={22} /> Reverse Shell Generator
           </h1>
-          <p className="text-muted-foreground text-xs">One-click payloads. Set your LHOST and LPORT, then copy.</p>
+          <p className="text-muted-foreground text-xs">
+            One-click reverse shell payloads for penetration testing. Set your LHOST (listener IP) and LPORT, then copy the payload and execute it on the target. Always start your <span className="text-primary">Listener</span> first before triggering the payload.
+          </p>
         </header>
+
+        <div className="flex items-start gap-3 px-4 py-3 rounded border border-primary/20 bg-primary/5 text-xs text-muted-foreground leading-relaxed">
+          <Info size={13} className="text-primary shrink-0 mt-0.5" />
+          <div>
+            <strong className="text-foreground">How reverse shells work:</strong> A reverse shell makes the <em>target</em> machine connect back to your machine (the attacker), bypassing firewalls that block inbound connections. You run a listener on your machine first, then execute the payload on the target. The shell gives you an interactive terminal on the target system.
+            <span className="block mt-1 text-muted-foreground/60">Click the <Info size={10} className="inline" /> icon on each section to see when and why to use that shell type.</span>
+          </div>
+        </div>
 
         <div className="flex flex-wrap gap-3">
           <div className="flex items-center gap-2 bg-card border border-border rounded px-3 py-2">
@@ -129,9 +153,23 @@ export default function ReverseShells() {
         <div className="space-y-4">
           {filtered.map(cat => (
             <div key={cat.cat} className="bg-card/50 border border-border rounded-lg overflow-hidden">
-              <div className="px-4 py-2 border-b border-border bg-black/20 text-xs font-bold text-primary tracking-widest uppercase">
-                {cat.cat}
+              <div className="px-4 py-2 border-b border-border bg-black/20 flex items-center justify-between">
+                <span className="text-xs font-bold text-primary tracking-widest uppercase">{cat.cat}</span>
+                {SHELL_DESCRIPTIONS[cat.cat] && (
+                  <button
+                    onClick={() => setExpandedDesc(expandedDesc === cat.cat ? null : cat.cat)}
+                    className="text-muted-foreground hover:text-primary transition-colors p-1 rounded"
+                    title="Show description"
+                  >
+                    <Info size={13} />
+                  </button>
+                )}
               </div>
+              {expandedDesc === cat.cat && SHELL_DESCRIPTIONS[cat.cat] && (
+                <div className="px-4 py-3 bg-primary/5 border-b border-border/50 text-[11px] text-muted-foreground leading-relaxed">
+                  {SHELL_DESCRIPTIONS[cat.cat]}
+                </div>
+              )}
               <div className="divide-y divide-border">
                 {cat.payloads.map(p => (
                   <div key={p.label} className="px-4 py-3 hover:bg-secondary/20 transition-colors">

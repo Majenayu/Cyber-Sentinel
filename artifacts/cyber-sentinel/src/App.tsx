@@ -26,6 +26,7 @@ import OsintPage from "@/pages/OsintPage";
 import TyposquatPage from "@/pages/TyposquatPage";
 import SkillTree from "@/pages/SkillTree";
 import TrackerPage from "@/pages/TrackerPage";
+import StealthPage from "@/pages/StealthPage";
 import Sidebar from "@/components/Sidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Menu } from "lucide-react";
@@ -153,6 +154,7 @@ function Layout() {
             <Route path="/typosquat" component={() => <Wrap title="Typosquat"><TyposquatPage /></Wrap>} />
             <Route path="/skill-tree" component={() => <Wrap title="Skill Tree"><SkillTree /></Wrap>} />
             <Route path="/tracker" component={() => <Wrap title="QR Tracker"><TrackerPage /></Wrap>} />
+            <Route path="/stealth" component={() => <Wrap title="Stealth Mode"><StealthPage /></Wrap>} />
             <Route component={NotFound} />
           </Switch>
         </div>
