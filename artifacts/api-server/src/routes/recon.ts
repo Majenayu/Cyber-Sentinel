@@ -12,6 +12,22 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+export const PORT_SERVICES: Record<number, string> = {
+  21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP", 53: "DNS",
+  80: "HTTP", 110: "POP3", 143: "IMAP", 389: "LDAP", 443: "HTTPS",
+  445: "SMB", 465: "SMTPS", 587: "SMTP/TLS", 993: "IMAPS", 995: "POP3S",
+  1433: "MSSQL", 1521: "Oracle DB", 3306: "MySQL", 3389: "RDP",
+  5432: "PostgreSQL", 5900: "VNC", 6379: "Redis", 8080: "HTTP-Alt",
+  8443: "HTTPS-Alt", 8888: "HTTP-Alt2", 9200: "Elasticsearch",
+  27017: "MongoDB", 6443: "Kubernetes", 2375: "Docker", 2376: "Docker TLS",
+};
+
+const DEFAULT_PORTS = [
+  21, 22, 23, 25, 53, 80, 110, 143, 389, 443,
+  445, 465, 587, 993, 995, 1433, 3306, 3389,
+  5432, 5900, 6379, 8080, 8443, 9200, 27017,
+];
+
 router.post("/recon/dns", async (req, res) => {
   const { domain, types = ["A", "AAAA", "MX", "NS", "TXT", "CNAME", "SOA"] } = req.body ?? {};
   if (!domain) { res.status(400).json({ error: "domain required" }); return; }
@@ -71,7 +87,9 @@ router.post("/recon/whois", async (req, res) => {
       const name = vcard.find((c: any) => c[0] === "fn")?.[3] ?? null;
       const email = vcard.find((c: any) => c[0] === "email")?.[3] ?? null;
       const org = vcard.find((c: any) => c[0] === "org")?.[3] ?? null;
-      return [{ roles: e.roles, name, email, org }];
+      const phone = vcard.find((c: any) => c[0] === "tel")?.[3] ?? null;
+      const address = vcard.find((c: any) => c[0] === "adr")?.[3] ?? null;
+      return [{ roles: e.roles, name, email, org, phone, address }];
     });
 
     res.json({
@@ -84,6 +102,7 @@ router.post("/recon/whois", async (req, res) => {
       entities,
       secureDns: data.secureDNS ?? null,
       handle: data.handle ?? null,
+      links: (data.links ?? []).filter((l: any) => l.type?.includes("whois") || l.rel === "related").map((l: any) => l.href),
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message ?? "WHOIS lookup failed" });
@@ -91,35 +110,38 @@ router.post("/recon/whois", async (req, res) => {
 });
 
 router.post("/recon/port-check", async (req, res) => {
-  const { host, ports = [21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 3306, 3389, 5432, 6379, 8080, 8443] } = req.body ?? {};
+  const { host, ports = DEFAULT_PORTS } = req.body ?? {};
   if (!host) { res.status(400).json({ error: "host required" }); return; }
 
   const sanitized = String(host).replace(/[^a-z0-9.\-:]/gi, "");
-  const portList = (Array.isArray(ports) ? ports : [ports]).slice(0, 30).map(Number).filter(p => p > 0 && p < 65536);
+  const portList = (Array.isArray(ports) ? ports : [ports]).slice(0, 50).map(Number).filter(p => p > 0 && p < 65536);
 
   const results = await Promise.all(portList.map(port =>
-    new Promise<{ port: number; open: boolean; latency: number | null; note?: string }>((resolve) => {
+    new Promise<{ port: number; service: string; open: boolean; latency: number | null; note?: string }>((resolve) => {
       const start = Date.now();
       const sock = new net.Socket();
       sock.setTimeout(3000);
       sock.on("connect", () => {
         const latency = Date.now() - start;
         sock.destroy();
-        resolve({ port, open: true, latency });
+        resolve({ port, service: PORT_SERVICES[port] ?? "unknown", open: true, latency });
       });
-      sock.on("timeout", () => { sock.destroy(); resolve({ port, open: false, latency: null }); });
+      sock.on("timeout", () => { sock.destroy(); resolve({ port, service: PORT_SERVICES[port] ?? "unknown", open: false, latency: null }); });
       sock.on("error", (e: any) => {
         sock.destroy();
         const note = e.code === "ECONNREFUSED" ? "refused" : e.code === "ENETUNREACH" ? "unreachable" : undefined;
-        resolve({ port, open: false, latency: null, note });
+        resolve({ port, service: PORT_SERVICES[port] ?? "unknown", open: false, latency: null, note });
       });
       sock.connect(port, sanitized);
     })
   ));
 
+  const open = results.filter(r => r.open).length;
   res.json({
     host: sanitized,
     results,
+    openCount: open,
+    closedCount: results.length - open,
     note: "Port checks use TCP connections — results depend on firewall rules. Ports may appear closed behind NAT even if the service is running.",
   });
 });
@@ -190,38 +212,81 @@ router.post("/recon/subdomains", async (req, res) => {
   }
 });
 
+// SSL: polls Qualys until READY or timeout (~90s max)
 router.post("/recon/ssl", async (req, res) => {
   const { domain } = req.body ?? {};
   if (!domain) { res.status(400).json({ error: "domain required" }); return; }
 
   const sanitized = String(domain).replace(/[^a-z0-9.\-]/gi, "");
-  try {
-    const r = await ghostFetch(
-      `https://api.ssllabs.com/api/v3/analyze?host=${encodeURIComponent(sanitized)}&fromCache=on&maxAge=12`
-    );
-    if (!r.ok) {
-      if (r.status === 429) throw new Error("SSL Labs rate limit — please wait 60 seconds before trying again");
-      throw new Error(`SSL Labs returned ${r.status}`);
+
+  const MAX_POLLS = 9;
+  const POLL_SLEEP = 10000;
+
+  let lastData: any = null;
+
+  for (let poll = 0; poll < MAX_POLLS; poll++) {
+    try {
+      const r = await ghostFetch(
+        `https://api.ssllabs.com/api/v3/analyze?host=${encodeURIComponent(sanitized)}&fromCache=on&maxAge=12&all=done`
+      );
+      if (!r.ok) {
+        if (r.status === 429) {
+          res.status(429).json({ error: "SSL Labs rate limit — please wait 60 seconds before trying again" });
+          return;
+        }
+        throw new Error(`SSL Labs returned ${r.status}`);
+      }
+      const data: any = await r.json();
+      lastData = data;
+
+      const status = data.status as string;
+
+      // Terminal states — return immediately
+      if (status === "READY" || status === "ERROR") {
+        res.json({
+          domain: sanitized,
+          status,
+          statusMessage: status === "ERROR" ? (data.statusMessage ?? "Analysis failed") : null,
+          grade: data.endpoints?.[0]?.grade ?? null,
+          gradeTrustIgnored: data.endpoints?.[0]?.gradeTrustIgnored ?? null,
+          endpoints: (data.endpoints ?? []).map((e: any) => ({
+            ipAddress: e.ipAddress,
+            grade: e.grade,
+            hasWarnings: e.hasWarnings,
+            isExceptional: e.isExceptional,
+            progress: e.progress,
+            statusMessage: e.statusMessage,
+            delegation: e.delegation,
+          })),
+        });
+        return;
+      }
+
+      // Still running — wait and poll again
+      if (poll < MAX_POLLS - 1) {
+        await sleep(POLL_SLEEP);
+      }
+    } catch (err: any) {
+      res.status(500).json({ error: err.message ?? "SSL check failed" });
+      return;
     }
-    const data: any = await r.json();
-    res.json({
-      domain: sanitized,
-      status: data.status,
-      statusMessage: data.statusMessage ?? (data.status === "DNS" ? "Resolving DNS — please retry in 30s" : data.status === "IN_PROGRESS" ? "Analysis running — retry in ~60s" : null),
-      grade: data.endpoints?.[0]?.grade ?? null,
-      gradeTrustIgnored: data.endpoints?.[0]?.gradeTrustIgnored ?? null,
-      endpoints: (data.endpoints ?? []).map((e: any) => ({
-        ipAddress: e.ipAddress,
-        grade: e.grade,
-        hasWarnings: e.hasWarnings,
-        isExceptional: e.isExceptional,
-        progress: e.progress,
-        statusMessage: e.statusMessage,
-      })),
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message ?? "SSL check failed" });
   }
+
+  // Timed out — return whatever we have
+  res.json({
+    domain: sanitized,
+    status: lastData?.status ?? "IN_PROGRESS",
+    statusMessage: "Analysis is still running. Click Retry in ~30 seconds for results.",
+    grade: lastData?.endpoints?.[0]?.grade ?? null,
+    gradeTrustIgnored: null,
+    endpoints: (lastData?.endpoints ?? []).map((e: any) => ({
+      ipAddress: e.ipAddress,
+      grade: e.grade,
+      progress: e.progress,
+      statusMessage: e.statusMessage,
+    })),
+    timedOut: true,
+  });
 });
 
 export default router;
