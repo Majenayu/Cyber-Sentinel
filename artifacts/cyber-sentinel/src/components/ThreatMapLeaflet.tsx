@@ -21,12 +21,46 @@ interface Intrusion {
   os: string;
   platform: string;
   language: string;
+  languages: string[];
   screenResolution: string;
+  colorDepth: number;
   cores: number;
   memory: number;
   firstSeen: string;
   lastSeen: string;
   userAgent: string;
+  referrer: string;
+  canvasHash: string;
+  webglRenderer: string;
+  webglVendor: string;
+  webglVersion: string;
+  webglExtensions: number;
+  audioHash: string;
+  webrtcIps: string[];
+  isIncognito: boolean;
+  hasAdBlocker: boolean;
+  geoPermission: string;
+  notificationPermission: string;
+  cameraPermission: string;
+  micPermission: string;
+  connectionType: string;
+  downlink: number;
+  rtt: number;
+  supportedCodecs: string;
+  batteryLevel: number;
+  batteryCharging: boolean;
+  uaData: string;
+  typeTimeMs: number;
+  usedPaste: boolean;
+  darkMode: boolean;
+  reducedMotion: boolean;
+  devicePixelRatio: number;
+  availableScreen: string;
+  viewport: string;
+  windowSize: string;
+  maxTouchPoints: number;
+  touchDevice: boolean;
+  timezoneOffset: number;
 }
 
 const SERVER_LAT = 28.6139;
@@ -181,46 +215,131 @@ export default function ThreatMapLeaflet({ height = 480 }: Props) {
                   weight: 2,
                 }}
               >
-                <Popup maxWidth={300}>
-                  <div style={{ fontFamily: 'Courier New,monospace', fontSize: 11, lineHeight: 1.75 }}>
-                    <div style={{ color: '#ff4455', fontWeight: 'bold', fontSize: 13, marginBottom: 8, letterSpacing: '0.1em' }}>
+                <Popup maxWidth={340}>
+                  <div style={{ fontFamily: 'Courier New,monospace', fontSize: 11, lineHeight: 1.75, maxHeight: 480, overflowY: 'auto' }}>
+                    <div style={{ color: '#ff4455', fontWeight: 'bold', fontSize: 13, marginBottom: 6, letterSpacing: '0.1em' }}>
                       ⚠ INTRUSION DETECTED
                     </div>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <tbody>
-                        {(([
-                          ['IP', intrusion.ip, '#ff8899'],
-                          ['Country', intrusion.country, '#ddd'],
-                          ['Region', intrusion.region, '#ddd'],
-                          ['City', intrusion.city, '#ddd'],
-                          ['Coords', `${intrusion.lat?.toFixed(4)}, ${intrusion.lon?.toFixed(4)}`, '#aaa'],
-                          ['Timezone', intrusion.timezone, '#aaa'],
-                          ['ISP', intrusion.isp, '#ddd'],
-                          ['Org', intrusion.org, '#ddd'],
-                          ['Attempts', String(intrusion.attempts), '#ffcc44'],
-                          ['IDs Tried', (intrusion.attemptedIds || []).join(', ') || '—', '#ff8899'],
-                          ['Browser', intrusion.browser, '#ddd'],
-                          ['OS', intrusion.os, '#ddd'],
-                          ['Platform', intrusion.platform, '#aaa'],
-                          ['Language', intrusion.language, '#aaa'],
-                          ['Screen', intrusion.screenResolution, '#aaa'],
-                          ['Cores', String(intrusion.cores || '—'), '#aaa'],
-                          ['RAM', intrusion.memory ? `${intrusion.memory}GB` : '—', '#aaa'],
-                          ['First Seen', intrusion.firstSeen ? new Date(intrusion.firstSeen).toLocaleString() : '—', '#777'],
-                          ['Last Seen', intrusion.lastSeen ? new Date(intrusion.lastSeen).toLocaleString() : '—', '#777'],
-                        ]) as [string, string, string][]).map(([k, v, c]) => (
-                          <tr key={k}>
-                            <td style={{ color: '#555', paddingRight: 10, paddingBottom: 1, whiteSpace: 'nowrap', verticalAlign: 'top' }}>{k}</td>
-                            <td style={{ color: c, paddingBottom: 1, wordBreak: 'break-word' }}>{v || '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+
+                    {/* Section helper */}
+                    {(() => {
+                      const Section = ({ title, rows }: { title: string; rows: [string, string, string][] }) => (
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ color: '#ff4455', fontSize: 9, letterSpacing: '0.2em', fontWeight: 'bold', borderBottom: '1px solid rgba(255,68,85,0.25)', paddingBottom: 2, marginBottom: 4 }}>
+                            {title}
+                          </div>
+                          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <tbody>
+                              {rows.map(([k, v, c]) => (
+                                <tr key={k}>
+                                  <td style={{ color: '#555', paddingRight: 8, paddingBottom: 1, whiteSpace: 'nowrap', verticalAlign: 'top', fontSize: 10 }}>{k}</td>
+                                  <td style={{ color: c, paddingBottom: 1, wordBreak: 'break-all', fontSize: 10 }}>{v || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+
+                      const fmt = (v: any) => (v == null || v === '' || v === -1) ? '—' : String(v);
+                      const bool = (v: boolean | undefined, yes = '✓ YES', no = '✗ NO') => v ? yes : no;
+                      const perm = (v: string) => ({ granted: '✓ GRANTED', denied: '✗ DENIED', prompt: '⚠ PROMPT', unknown: '? unknown' }[v] || v);
+
+                      return (
+                        <>
+                          <Section title="📍 NETWORK IDENTITY" rows={[
+                            ['IP', intrusion.ip, '#ff8899'],
+                            ['Country', intrusion.country, '#ddd'],
+                            ['Region', intrusion.region, '#ddd'],
+                            ['City', intrusion.city, '#ddd'],
+                            ['Coords', `${intrusion.lat?.toFixed(4)}, ${intrusion.lon?.toFixed(4)}`, '#aaa'],
+                            ['Timezone', intrusion.timezone, '#aaa'],
+                            ['TZ Offset', intrusion.timezoneOffset != null ? `UTC${intrusion.timezoneOffset <= 0 ? '+' : ''}${-intrusion.timezoneOffset / 60}h` : '—', '#aaa'],
+                            ['ISP', intrusion.isp, '#ddd'],
+                            ['Org', intrusion.org, '#ddd'],
+                          ]} />
+
+                          {(intrusion.webrtcIps?.length > 0) && (
+                            <Section title="🔓 WEBRTC IP LEAK" rows={
+                              intrusion.webrtcIps.map((ip, i) => [`IP #${i+1}`, ip, '#ff6600'] as [string, string, string])
+                            } />
+                          )}
+
+                          <Section title="🎯 ATTACK DATA" rows={[
+                            ['Attempts', String(intrusion.attempts), '#ffcc44'],
+                            ['IDs Tried', (intrusion.attemptedIds || []).map(id => `"${id}"`).join(', ') || '—', '#ff8899'],
+                            ['Used Paste', bool(intrusion.usedPaste, '⚠ YES — pasted it', '✓ typed manually'), intrusion.usedPaste ? '#ff6600' : '#aaa'],
+                            ['Type Time', intrusion.typeTimeMs > 0 ? `${intrusion.typeTimeMs}ms` : '—', '#aaa'],
+                            ['Referrer', fmt(intrusion.referrer) || 'Direct / None', '#aaa'],
+                            ['First Seen', intrusion.firstSeen ? new Date(intrusion.firstSeen).toLocaleString() : '—', '#777'],
+                            ['Last Seen', intrusion.lastSeen ? new Date(intrusion.lastSeen).toLocaleString() : '—', '#777'],
+                          ]} />
+
+                          <Section title="💻 DEVICE" rows={[
+                            ['Browser', intrusion.browser, '#ddd'],
+                            ['OS', intrusion.os, '#ddd'],
+                            ['Platform', intrusion.platform, '#aaa'],
+                            ['Language', intrusion.language, '#aaa'],
+                            ['All Languages', (intrusion.languages || []).join(', ') || '—', '#aaa'],
+                            ['Screen', intrusion.screenResolution, '#aaa'],
+                            ['Avail Screen', fmt(intrusion.availableScreen), '#aaa'],
+                            ['Viewport', fmt(intrusion.viewport), '#aaa'],
+                            ['Window', fmt(intrusion.windowSize), '#aaa'],
+                            ['Pixel Ratio', intrusion.devicePixelRatio ? `${intrusion.devicePixelRatio}x` : '—', '#aaa'],
+                            ['Color Depth', intrusion.colorDepth ? `${intrusion.colorDepth}-bit` : '—', '#aaa'],
+                            ['CPU Cores', String(intrusion.cores || '—'), '#aaa'],
+                            ['RAM', intrusion.memory ? `${intrusion.memory} GB` : '—', '#aaa'],
+                            ['Touch', intrusion.touchDevice ? `✓ ${intrusion.maxTouchPoints} points` : '✗ No touch', '#aaa'],
+                            ['Dark Mode', bool(intrusion.darkMode), '#aaa'],
+                            ['Reduced Motion', bool(intrusion.reducedMotion), '#aaa'],
+                            ['Cookies', bool(intrusion.cookieEnabled), '#aaa'],
+                            ['Do Not Track', fmt(intrusion.doNotTrack), '#aaa'],
+                            ['Plugins', (intrusion as any).plugins?.join(', ') || '—', '#777'],
+                          ]} />
+
+                          <Section title="🔌 NETWORK" rows={[
+                            ['Connection', fmt(intrusion.connectionType), '#ddd'],
+                            ['Downlink', intrusion.downlink ? `${intrusion.downlink} Mbps` : '—', '#aaa'],
+                            ['RTT', intrusion.rtt ? `${intrusion.rtt} ms` : '—', '#aaa'],
+                            ['Codecs', fmt(intrusion.supportedCodecs), '#777'],
+                          ]} />
+
+                          {intrusion.batteryLevel != null && intrusion.batteryLevel >= 0 && (
+                            <Section title="🔋 BATTERY" rows={[
+                              ['Level', `${intrusion.batteryLevel}%`, intrusion.batteryLevel < 20 ? '#ff4455' : '#ddd'],
+                              ['Charging', bool(intrusion.batteryCharging, '⚡ Yes', '✗ No'), '#aaa'],
+                            ]} />
+                          )}
+
+                          <Section title="🧬 FINGERPRINTS" rows={[
+                            ['Canvas Hash', fmt(intrusion.canvasHash), '#00cc88'],
+                            ['Audio Hash', fmt(intrusion.audioHash), '#00cc88'],
+                            ['WebGL GPU', fmt(intrusion.webglRenderer), '#88aaff'],
+                            ['WebGL Vendor', fmt(intrusion.webglVendor), '#88aaff'],
+                            ['WebGL Ver', fmt(intrusion.webglVersion), '#777'],
+                            ['GL Extensions', intrusion.webglExtensions ? String(intrusion.webglExtensions) : '—', '#777'],
+                          ]} />
+
+                          <Section title="🔐 PERMISSIONS" rows={[
+                            ['Geolocation', perm(intrusion.geoPermission), intrusion.geoPermission === 'granted' ? '#ff4455' : '#aaa'],
+                            ['Notifications', perm(intrusion.notificationPermission), '#aaa'],
+                            ['Camera', perm(intrusion.cameraPermission), intrusion.cameraPermission === 'granted' ? '#ff6600' : '#aaa'],
+                            ['Microphone', perm(intrusion.micPermission), intrusion.micPermission === 'granted' ? '#ff6600' : '#aaa'],
+                          ]} />
+
+                          <Section title="🕵️ EVASION" rows={[
+                            ['Incognito', bool(intrusion.isIncognito, '⚠ YES — private mode', '✓ Normal browser'), intrusion.isIncognito ? '#ff6600' : '#aaa'],
+                            ['Ad Blocker', bool(intrusion.hasAdBlocker, '⚠ YES', '✗ None detected'), intrusion.hasAdBlocker ? '#ffcc44' : '#aaa'],
+                          ]} />
+                        </>
+                      );
+                    })()}
+
                     <a
                       href={`https://www.google.com/maps?q=${intrusion.lat},${intrusion.lon}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: '#4499ff', fontSize: 10, display: 'block', marginTop: 8 }}
+                      style={{ color: '#4499ff', fontSize: 10, display: 'block', marginTop: 6 }}
                     >
                       📍 Open in Google Maps →
                     </a>

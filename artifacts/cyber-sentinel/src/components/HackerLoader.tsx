@@ -70,6 +70,8 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
   const [shake, setShake] = useState(false);
   const [authVisible, setAuthVisible] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const typeStartRef = useRef<number>(0);
+  const pasteDetectedRef = useRef<boolean>(false);
 
   // Hex color to rgb helper
   const hex = color.replace('#', '');
@@ -124,8 +126,170 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
     }
   }, [phase, authVisible]);
 
-  const logIntrusion = useCallback((attemptedId: string) => {
+  const logIntrusion = useCallback(async (attemptedId: string) => {
     try {
+      // ── Canvas fingerprint ──────────────────────────────────────────
+      let canvasHash = 'N/A';
+      try {
+        const c = document.createElement('canvas');
+        c.width = 220; c.height = 50;
+        const ctx2 = c.getContext('2d')!;
+        ctx2.textBaseline = 'top';
+        ctx2.font = '14px Arial';
+        ctx2.fillStyle = '#f60';
+        ctx2.fillRect(125, 1, 62, 20);
+        ctx2.fillStyle = '#069';
+        ctx2.fillText('CyberSentinel\u{1F50D}', 2, 15);
+        ctx2.fillStyle = 'rgba(102,204,0,0.7)';
+        ctx2.fillText('CyberSentinel\u{1F50D}', 4, 17);
+        const raw = c.toDataURL();
+        let h = 0;
+        for (let i = 0; i < raw.length; i++) { h = ((h << 5) - h) + raw.charCodeAt(i); h |= 0; }
+        canvasHash = Math.abs(h).toString(16).toUpperCase();
+      } catch { /* skip */ }
+
+      // ── WebGL fingerprint ───────────────────────────────────────────
+      let webglRenderer = 'N/A', webglVendor = 'N/A', webglVersion = 'N/A', webglExtensions = 0;
+      try {
+        const wc = document.createElement('canvas');
+        const gl = (wc.getContext('webgl') || wc.getContext('experimental-webgl')) as WebGLRenderingContext | null;
+        if (gl) {
+          const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+          webglRenderer = dbg ? (gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) as string) : 'masked';
+          webglVendor = dbg ? (gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) as string) : 'masked';
+          webglVersion = gl.getParameter(gl.VERSION) as string;
+          webglExtensions = gl.getSupportedExtensions()?.length || 0;
+        }
+      } catch { /* skip */ }
+
+      // ── AudioContext fingerprint ─────────────────────────────────────
+      let audioHash = 'N/A';
+      try {
+        const ACtx = (window.OfflineAudioContext || (window as any).webkitOfflineAudioContext) as typeof OfflineAudioContext;
+        if (ACtx) {
+          const actx = new ACtx(1, 44100, 44100);
+          const osc = actx.createOscillator();
+          const cmp = actx.createDynamicsCompressor();
+          osc.type = 'triangle';
+          osc.frequency.value = 10000;
+          osc.connect(cmp);
+          cmp.connect(actx.destination);
+          osc.start(0);
+          const buf = await actx.startRendering();
+          const data = buf.getChannelData(0).slice(4500, 5000);
+          let ah = 0;
+          for (const v of data) { ah = ((ah << 5) - ah) + Math.floor(v * 1e8); ah |= 0; }
+          audioHash = Math.abs(ah).toString(16).toUpperCase();
+        }
+      } catch { /* skip */ }
+
+      // ── WebRTC IP leak ───────────────────────────────────────────────
+      let webrtcIps: string[] = [];
+      try {
+        const ips = new Set<string>();
+        const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+        pc.createDataChannel('');
+        await pc.createOffer().then(o => pc.setLocalDescription(o));
+        await new Promise<void>(resolve => {
+          const t = setTimeout(() => { pc.close(); resolve(); }, 2500);
+          pc.onicecandidate = e => {
+            if (!e.candidate) { clearTimeout(t); pc.close(); resolve(); return; }
+            const m = e.candidate.candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+            if (m) ips.add(m[1]);
+          };
+        });
+        webrtcIps = [...ips];
+      } catch { /* skip */ }
+
+      // ── Incognito detection (storage quota heuristic) ────────────────
+      let isIncognito = false;
+      try {
+        const est = await navigator.storage.estimate();
+        isIncognito = (est.quota || 0) < 200 * 1024 * 1024;
+      } catch { /* skip */ }
+
+      // ── Ad blocker detection ─────────────────────────────────────────
+      let hasAdBlocker = false;
+      try {
+        const div = document.createElement('div');
+        div.className = 'adsbox ad-banner pub_300x250 banner-ads';
+        div.style.cssText = 'position:absolute;left:-9999px;width:1px;height:1px;';
+        document.body.appendChild(div);
+        hasAdBlocker = div.offsetHeight === 0 || div.offsetParent === null;
+        document.body.removeChild(div);
+      } catch { /* skip */ }
+
+      // ── Permission states ────────────────────────────────────────────
+      const queryPerm = async (name: string): Promise<string> => {
+        try { return (await navigator.permissions.query({ name: name as PermissionName })).state; }
+        catch { return 'unknown'; }
+      };
+      const [geoPermission, notificationPermission, cameraPermission, micPermission] = await Promise.all([
+        queryPerm('geolocation'),
+        queryPerm('notifications'),
+        queryPerm('camera'),
+        queryPerm('microphone'),
+      ]);
+
+      // ── Connection info ──────────────────────────────────────────────
+      const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+      const connectionType = conn?.effectiveType || 'unknown';
+      const downlink = conn?.downlink || 0;
+      const rtt = conn?.rtt || 0;
+
+      // ── Codec support ────────────────────────────────────────────────
+      const vid = document.createElement('video');
+      const supportedCodecs = [
+        ['H.264', vid.canPlayType('video/mp4; codecs="avc1.42E01E"')],
+        ['VP9',   vid.canPlayType('video/webm; codecs="vp9"')],
+        ['AV1',   vid.canPlayType('video/webm; codecs="av01.0.05M.08"')],
+        ['HEVC',  vid.canPlayType('video/mp4; codecs="hev1.1.6.L93.90"')],
+        ['VP8',   vid.canPlayType('video/webm; codecs="vp8"')],
+        ['AAC',   vid.canPlayType('audio/mp4; codecs="mp4a.40.2"')],
+        ['MP3',   vid.canPlayType('audio/mpeg')],
+        ['Opus',  vid.canPlayType('audio/ogg; codecs="opus"')],
+      ].filter(([, r]) => r === 'probably' || r === 'maybe').map(([n]) => n).join(', ') || 'None detected';
+
+      // ── Battery info ─────────────────────────────────────────────────
+      let batteryLevel = -1, batteryCharging = false;
+      try {
+        if ((navigator as any).getBattery) {
+          const bat = await (navigator as any).getBattery();
+          batteryLevel = Math.round(bat.level * 100);
+          batteryCharging = bat.charging;
+        }
+      } catch { /* skip */ }
+
+      // ── navigator.userAgentData ──────────────────────────────────────
+      let uaData = '';
+      try {
+        const uad = (navigator as any).userAgentData;
+        if (uad) {
+          const hi = await uad.getHighEntropyValues(['architecture','model','platform','platformVersion','fullVersionList']).catch(() => ({}));
+          uaData = JSON.stringify({ brands: uad.brands, mobile: uad.mobile, ...hi });
+        }
+      } catch { /* skip */ }
+
+      // ── Timing ───────────────────────────────────────────────────────
+      const typeTimeMs = typeStartRef.current > 0 ? Date.now() - typeStartRef.current : 0;
+      const usedPaste = pasteDetectedRef.current;
+      pasteDetectedRef.current = false;
+      typeStartRef.current = 0;
+
+      // ── Dark mode / reduced motion ───────────────────────────────────
+      const darkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // ── Extra screen / display ───────────────────────────────────────
+      const devicePixelRatio = window.devicePixelRatio || 1;
+      const availableScreen = `${screen.availWidth}x${screen.availHeight}`;
+      const viewport = `${window.innerWidth}x${window.innerHeight}`;
+      const windowSize = `${window.outerWidth}x${window.outerHeight}`;
+      const maxTouchPoints = navigator.maxTouchPoints || 0;
+      const touchDevice = maxTouchPoints > 0 || 'ontouchstart' in window;
+      const timezoneOffset = new Date().getTimezoneOffset();
+      const languages = Array.from(navigator.languages || [navigator.language]);
+
       fetch('/api/auth/intrusion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -133,6 +297,7 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
           attemptedId,
           platform: navigator.platform,
           language: navigator.language,
+          languages,
           screenResolution: `${screen.width}x${screen.height}`,
           colorDepth: screen.colorDepth,
           cores: navigator.hardwareConcurrency || 0,
@@ -140,6 +305,39 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
           cookieEnabled: navigator.cookieEnabled,
           doNotTrack: navigator.doNotTrack || 'Unspecified',
           plugins: Array.from(navigator.plugins || []).slice(0, 10).map((p: any) => p.name),
+          referrer: document.referrer || '',
+          // Advanced fingerprinting
+          canvasHash,
+          webglRenderer,
+          webglVendor,
+          webglVersion,
+          webglExtensions,
+          audioHash,
+          webrtcIps,
+          isIncognito,
+          hasAdBlocker,
+          geoPermission,
+          notificationPermission,
+          cameraPermission,
+          micPermission,
+          connectionType,
+          downlink,
+          rtt,
+          supportedCodecs,
+          batteryLevel,
+          batteryCharging,
+          uaData,
+          typeTimeMs,
+          usedPaste,
+          darkMode,
+          reducedMotion,
+          devicePixelRatio,
+          availableScreen,
+          viewport,
+          windowSize,
+          maxTouchPoints,
+          touchDevice,
+          timezoneOffset,
         }),
       }).catch(() => {});
     } catch { /* silent */ }
@@ -382,7 +580,11 @@ export default function HackerLoader({ onDone }: HackerLoaderProps) {
                     ref={inputRef}
                     type="text"
                     value={username}
-                    onChange={e => setUsername(e.target.value)}
+                    onChange={e => {
+                      if (!typeStartRef.current) typeStartRef.current = Date.now();
+                      setUsername(e.target.value);
+                    }}
+                    onPaste={() => { pasteDetectedRef.current = true; }}
                     onKeyDown={handleKey}
                     placeholder="TYPE OPERATOR ID"
                     autoComplete="off"

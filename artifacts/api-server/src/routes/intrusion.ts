@@ -197,6 +197,51 @@ router.post('/auth/intrusion', async (req: Request, res: Response) => {
 
     const attemptedId = (body.attemptedId as string || '').slice(0, 100);
 
+    const fingerprint = {
+      platform: body.platform || 'Unknown',
+      language: body.language || 'Unknown',
+      languages: body.languages || [],
+      screenResolution: body.screenResolution || 'Unknown',
+      colorDepth: body.colorDepth || 0,
+      cores: body.cores || 0,
+      memory: body.memory || 0,
+      cookieEnabled: body.cookieEnabled ?? false,
+      doNotTrack: body.doNotTrack || 'Unknown',
+      plugins: body.plugins || [],
+      referrer: body.referrer || '',
+      canvasHash: body.canvasHash || '',
+      webglRenderer: body.webglRenderer || '',
+      webglVendor: body.webglVendor || '',
+      webglVersion: body.webglVersion || '',
+      webglExtensions: body.webglExtensions || 0,
+      audioHash: body.audioHash || '',
+      webrtcIps: body.webrtcIps || [],
+      isIncognito: body.isIncognito ?? false,
+      hasAdBlocker: body.hasAdBlocker ?? false,
+      geoPermission: body.geoPermission || 'unknown',
+      notificationPermission: body.notificationPermission || 'unknown',
+      cameraPermission: body.cameraPermission || 'unknown',
+      micPermission: body.micPermission || 'unknown',
+      connectionType: body.connectionType || 'unknown',
+      downlink: body.downlink || 0,
+      rtt: body.rtt || 0,
+      supportedCodecs: body.supportedCodecs || '',
+      batteryLevel: body.batteryLevel ?? -1,
+      batteryCharging: body.batteryCharging ?? false,
+      uaData: body.uaData || '',
+      typeTimeMs: body.typeTimeMs || 0,
+      usedPaste: body.usedPaste ?? false,
+      darkMode: body.darkMode ?? false,
+      reducedMotion: body.reducedMotion ?? false,
+      devicePixelRatio: body.devicePixelRatio || 1,
+      availableScreen: body.availableScreen || '',
+      viewport: body.viewport || '',
+      windowSize: body.windowSize || '',
+      maxTouchPoints: body.maxTouchPoints || 0,
+      touchDevice: body.touchDevice ?? false,
+      timezoneOffset: body.timezoneOffset ?? 0,
+    };
+
     let intrusion;
     if (existing) {
       existing.attempts += 1;
@@ -207,15 +252,7 @@ router.post('/auth/intrusion', async (req: Request, res: Response) => {
       existing.userAgent = ua;
       existing.browser = browser;
       existing.os = os;
-      existing.platform = body.platform || existing.platform;
-      existing.language = body.language || existing.language;
-      existing.screenResolution = body.screenResolution || existing.screenResolution;
-      existing.colorDepth = body.colorDepth || existing.colorDepth;
-      existing.cores = body.cores || existing.cores;
-      existing.memory = body.memory || existing.memory;
-      existing.cookieEnabled = body.cookieEnabled ?? existing.cookieEnabled;
-      existing.doNotTrack = body.doNotTrack || existing.doNotTrack;
-      if (body.plugins?.length) existing.plugins = body.plugins;
+      Object.assign(existing, fingerprint);
       await existing.save();
       intrusion = existing;
     } else {
@@ -227,16 +264,8 @@ router.post('/auth/intrusion', async (req: Request, res: Response) => {
         userAgent: ua,
         browser,
         os,
-        platform: body.platform || 'Unknown',
-        language: body.language || 'Unknown',
-        screenResolution: body.screenResolution || 'Unknown',
-        colorDepth: body.colorDepth || 0,
-        cores: body.cores || 0,
-        memory: body.memory || 0,
-        cookieEnabled: body.cookieEnabled ?? false,
-        doNotTrack: body.doNotTrack || 'Unknown',
-        plugins: body.plugins || [],
         emailSent: false,
+        ...fingerprint,
       });
     }
 
