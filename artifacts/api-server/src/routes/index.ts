@@ -16,6 +16,7 @@ import reconRouter from "./recon";
 import trackerRouter from "./tracker";
 import osintRouter from "./osint";
 import stealthRouter from "./stealth";
+import pushRouter from "./push";
 
 const router: IRouter = Router();
 
@@ -36,5 +37,6 @@ router.use(reconRouter);
 router.use(trackerRouter);
 router.use(osintRouter);
 router.use(stealthRouter);
+router.use(pushRouter);
 
 export default router;

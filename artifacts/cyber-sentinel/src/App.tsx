@@ -39,6 +39,7 @@ import GlitchScreensaver from "@/components/GlitchScreensaver";
 import HackerCinema from "@/components/HackerCinema";
 import TypingSound from "@/components/TypingSound";
 import { useLocation } from "wouter";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 const queryClient = new QueryClient();
 
@@ -166,6 +167,9 @@ function Layout() {
 function App() {
   const [loaded, setLoaded] = useState(false);
   const handleDone = useCallback(() => setLoaded(true), []);
+
+  // Register push notifications silently after successful login
+  usePushNotifications(loaded);
 
   return (
     <ThemeProvider>

@@ -2,6 +2,8 @@ import { Router, type Request, type Response } from 'express';
 import nodemailer from 'nodemailer';
 import connectToDatabase from '../lib/mongodb';
 import Intrusion from '../lib/models/Intrusion';
+import PushSubscription from '../lib/models/PushSubscription';
+import { sendPush } from '../lib/push';
 
 const router = Router();
 
@@ -68,8 +70,12 @@ async function sendAlertEmail(intrusion: any, isNew: boolean) {
   if (!smtpEmail || !smtpPass) return;
 
   try {
+    // Use explicit host/port instead of service:'gmail' — more reliable on Render
+    // where some ports may be blocked. Port 587 + STARTTLS works on all major hosts.
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // STARTTLS (upgrades after connect)
       auth: { user: smtpEmail, pass: smtpPass },
     });
 
@@ -174,6 +180,26 @@ async function sendAlertEmail(intrusion: any, isNew: boolean) {
   }
 }
 
+async function sendIntrusionPush(intrusion: any, isNew: boolean) {
+  try {
+    const subs = await PushSubscription.find().lean();
+    if (!subs.length) return;
+    const payload = {
+      title: isNew ? '🚨 NEW INTRUSION DETECTED' : '⚠️ REPEAT INTRUSION',
+      body: `${intrusion.ip} — ${intrusion.city || 'Unknown'}, ${intrusion.country || 'Unknown'} (${intrusion.attempts} attempt${intrusion.attempts !== 1 ? 's' : ''})`,
+      icon: '/icon-192.svg',
+      url: '/intrusions',
+      tag: 'intrusion',
+    };
+    const results = await Promise.all(subs.map(sub => sendPush(sub as any, payload)));
+    // Remove expired/invalid subscriptions
+    const expired = subs.filter((_, i) => !results[i]);
+    if (expired.length) {
+      await PushSubscription.deleteMany({ endpoint: { $in: expired.map((s: any) => s.endpoint) } });
+    }
+  } catch { /* push is non-critical */ }
+}
+
 router.post('/auth/intrusion', async (req: Request, res: Response) => {
   try {
     await connectToDatabase();
@@ -269,7 +295,9 @@ router.post('/auth/intrusion', async (req: Request, res: Response) => {
       });
     }
 
+    // Fire email + push in parallel — both are best-effort, never block the response
     sendAlertEmail(intrusion, isNew).catch(() => {});
+    sendIntrusionPush(intrusion, isNew).catch(() => {});
 
     res.json({ logged: true, attempts: intrusion.attempts });
   } catch (err: any) {

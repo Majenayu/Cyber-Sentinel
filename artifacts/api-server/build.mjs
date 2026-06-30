@@ -100,6 +100,8 @@ async function buildAll() {
       "puppeteer",
       "puppeteer-core",
       "electron",
+      // Push notifications
+      "web-push",
       // AI SDK packages — pure HTTP, no native bindings, but large and slow to bundle
       "groq-sdk",
       "@mistralai/mistralai",

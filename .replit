@@ -50,6 +50,9 @@ CLOUDFLARE_R2_URL = "https://a036e69c21e628f9926b890a16d1302c.r2.cloudflarestora
 CLOUDFLARE_AI_ACCOUNT_ID = "a036e69c21e628f9926b890a16d1302c"
 NODE_ENV = "development"
 SMTP_EMAIL = "pgayushraipc@gmail.com"
+VAPID_PRIVATE_KEY = "Cr1EXPQz1Wshxv_4ZfCei_D2qwE7cIZ_yl7fYpr79so"
+VAPID_PUBLIC_KEY = "BOtEO1NrV3HrkrY15SPAVw2mz24rMIsYmu4bAED3BmydFjgMUh4Zr4W5HedzJ6aYSfbhdCwK_VJViPlu2OMq04M"
+VAPID_SUBJECT = "mailto:pgayushraipc@gmail.com"
 
 [userenv.development]
 PORT = "5000"
