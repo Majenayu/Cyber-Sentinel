@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { ghostFetch } from "../lib/ghost";
 const router = Router();
 
 router.get("/ip/reputation", async (req, res) => {
@@ -7,15 +8,12 @@ router.get("/ip/reputation", async (req, res) => {
 
   try {
     const [geoRes, abuseRes] = await Promise.allSettled([
-      fetch(`http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,proxy,hosting,query`, {
-        signal: AbortSignal.timeout(6000),
-      }),
-      fetch(`https://api.abuseipdb.com/api/v2/check?ipAddress=${ip}&maxAgeInDays=90&verbose`, {
+      ghostFetch(`http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,proxy,hosting,query`),
+      ghostFetch(`https://api.abuseipdb.com/api/v2/check?ipAddress=${ip}&maxAgeInDays=90&verbose`, {
         headers: {
           Key: process.env.ABUSEIPDB_KEY ?? "",
           Accept: "application/json",
         },
-        signal: AbortSignal.timeout(6000),
       }),
     ]);
 
@@ -23,9 +21,8 @@ router.get("/ip/reputation", async (req, res) => {
     const abuse = abuseRes.status === "fulfilled" && abuseRes.value.ok && process.env.ABUSEIPDB_KEY
       ? (await abuseRes.value.json())?.data : null;
 
-    const shodan = await fetch(`https://api.shodan.io/shodan/host/${ip}?key=PSKINdQe1GyxGgecKH6rIbNe46dzFwmm&minify=true`, {
-      signal: AbortSignal.timeout(6000),
-    }).then(r => r.ok ? r.json() : null).catch(() => null);
+    const shodan = await ghostFetch(`https://api.shodan.io/shodan/host/${ip}?key=PSKINdQe1GyxGgecKH6rIbNe46dzFwmm&minify=true`)
+      .then(r => r.ok ? r.json() : null).catch(() => null);
 
     res.json({
       ip,

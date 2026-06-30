@@ -1,8 +1,8 @@
 import { Router } from "express";
+import { ghostFetch } from "../lib/ghost";
 const router = Router();
 
 const PLATFORMS: Array<{ name: string; url: string; cat: string; reliable: boolean; notFoundStatus?: number }> = [
-  // Reliable: reliably return HTTP 404 for non-existent users
   { name: "GitHub", url: "https://github.com/{}", cat: "dev", reliable: true },
   { name: "GitLab", url: "https://gitlab.com/{}", cat: "dev", reliable: true },
   { name: "Reddit", url: "https://www.reddit.com/user/{}/about.json", cat: "social", reliable: true },
@@ -19,7 +19,6 @@ const PLATFORMS: Array<{ name: string; url: string; cat: string; reliable: boole
   { name: "Flickr", url: "https://www.flickr.com/people/{}/", cat: "creative", reliable: true },
   { name: "DockerHub", url: "https://hub.docker.com/u/{}/", cat: "dev", reliable: true },
   { name: "SourceForge", url: "https://sourceforge.net/u/{}/profile/", cat: "dev", reliable: true },
-  // Link-only: return 200 for any URL regardless of user existence
   { name: "Twitter/X", url: "https://twitter.com/{}", cat: "social", reliable: false },
   { name: "Instagram", url: "https://www.instagram.com/{}/", cat: "social", reliable: false },
   { name: "LinkedIn", url: "https://www.linkedin.com/in/{}", cat: "professional", reliable: false },
@@ -50,19 +49,15 @@ async function checkPlatform(p: typeof PLATFORMS[0], username: string) {
   }
 
   try {
-    const r = await fetch(url, {
+    const r = await ghostFetch(url, {
       method: "GET",
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.5",
       },
-      signal: AbortSignal.timeout(8000),
-      redirect: "manual",
     });
 
-    // Only HTTP 200 means definitively found — 3xx are ambiguous redirects
-    // For JSON APIs (Reddit, HackerNews, Gravatar), null body or empty = not found
     const found = r.status === 200;
 
     if (found && (p.name === "Reddit" || p.name === "HackerNews" || p.name === "Gravatar" || p.name === "Keybase")) {

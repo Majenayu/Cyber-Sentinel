@@ -1,6 +1,7 @@
 import { Router } from "express";
 import dns from "dns/promises";
 import net from "net";
+import { ghostFetch } from "../lib/ghost";
 const router = Router();
 
 function sanitizeDomain(d: string) {
@@ -56,9 +57,8 @@ router.post("/recon/whois", async (req, res) => {
   }
 
   try {
-    const r = await fetch(`https://rdap.org/domain/${encodeURIComponent(sanitized)}`, {
+    const r = await ghostFetch(`https://rdap.org/domain/${encodeURIComponent(sanitized)}`, {
       headers: { Accept: "application/json", "User-Agent": "CyberSentinel/1.0" },
-      signal: AbortSignal.timeout(12000),
     });
     if (!r.ok) {
       if (r.status === 404) throw new Error(`Domain "${sanitized}" not found in RDAP. The TLD may not be supported — try a common TLD like .com, .net, .org`);
@@ -125,12 +125,11 @@ router.post("/recon/port-check", async (req, res) => {
 });
 
 async function fetchCrtSh(sanitized: string): Promise<string[]> {
-  const r = await fetch(`https://crt.sh/?q=%.${encodeURIComponent(sanitized)}&output=json`, {
+  const r = await ghostFetch(`https://crt.sh/?q=%.${encodeURIComponent(sanitized)}&output=json`, {
     headers: {
       "User-Agent": "Mozilla/5.0 (compatible; CyberSentinel/1.0; +https://github.com)",
       "Accept": "application/json",
     },
-    signal: AbortSignal.timeout(20000),
   });
   if (!r.ok) throw new Error(`crt.sh returned ${r.status}`);
   const data: any[] = await r.json();
@@ -142,9 +141,8 @@ async function fetchCrtSh(sanitized: string): Promise<string[]> {
 }
 
 async function fetchHackerTarget(sanitized: string): Promise<string[]> {
-  const r = await fetch(`https://api.hackertarget.com/hostsearch/?q=${encodeURIComponent(sanitized)}`, {
+  const r = await ghostFetch(`https://api.hackertarget.com/hostsearch/?q=${encodeURIComponent(sanitized)}`, {
     headers: { "User-Agent": "CyberSentinel/1.0" },
-    signal: AbortSignal.timeout(15000),
   });
   if (!r.ok) throw new Error(`HackerTarget returned ${r.status}`);
   const text = await r.text();
@@ -198,9 +196,8 @@ router.post("/recon/ssl", async (req, res) => {
 
   const sanitized = String(domain).replace(/[^a-z0-9.\-]/gi, "");
   try {
-    const r = await fetch(
-      `https://api.ssllabs.com/api/v3/analyze?host=${encodeURIComponent(sanitized)}&fromCache=on&maxAge=12`,
-      { signal: AbortSignal.timeout(15000) }
+    const r = await ghostFetch(
+      `https://api.ssllabs.com/api/v3/analyze?host=${encodeURIComponent(sanitized)}&fromCache=on&maxAge=12`
     );
     if (!r.ok) {
       if (r.status === 429) throw new Error("SSL Labs rate limit — please wait 60 seconds before trying again");

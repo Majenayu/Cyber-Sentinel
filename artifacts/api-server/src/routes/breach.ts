@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { ghostFetch } from "../lib/ghost";
 const router = Router();
 
 router.get("/breach", async (req, res) => {
@@ -13,17 +14,14 @@ router.get("/breach", async (req, res) => {
     };
 
     const [breachRes, pasteRes, xonRes] = await Promise.allSettled([
-      fetch(`https://haveibeenpwned.com/api/v3/breachedaccount/${encodeURIComponent(email)}?truncateResponse=false`, {
+      ghostFetch(`https://haveibeenpwned.com/api/v3/breachedaccount/${encodeURIComponent(email)}?truncateResponse=false`, {
         headers: hibpHeaders,
-        signal: AbortSignal.timeout(10000),
       }),
-      fetch(`https://haveibeenpwned.com/api/v3/pasteaccount/${encodeURIComponent(email)}`, {
+      ghostFetch(`https://haveibeenpwned.com/api/v3/pasteaccount/${encodeURIComponent(email)}`, {
         headers: hibpHeaders,
-        signal: AbortSignal.timeout(10000),
       }),
-      fetch(`https://api.xposedornot.com/v1/check-email/${encodeURIComponent(email)}`, {
+      ghostFetch(`https://api.xposedornot.com/v1/check-email/${encodeURIComponent(email)}`, {
         headers: { "User-Agent": "CyberSentinel-SecurityDashboard" },
-        signal: AbortSignal.timeout(8000),
       }),
     ]);
 

@@ -2,6 +2,7 @@ import { Router } from "express";
 import https from "node:https";
 import http from "node:http";
 import { HttpsProxyAgent } from "https-proxy-agent";
+import { ghostState, enableGhost, disableGhost, findAndActivate } from "../lib/ghost";
 
 const router = Router();
 
@@ -221,6 +222,46 @@ router.post("/stealth/rotate-test", async (req, res) => {
   res.json({
     rotation: results,
     found: results.length,
+  });
+});
+
+// ─── Ghost Mode Endpoints ────────────────────────────────────────────────────
+
+// POST /api/ghost/on — find a working proxy and activate ghost mode
+router.post("/ghost/on", async (_req, res) => {
+  try {
+    const result = await findAndActivate();
+    if (!result) {
+      res.status(503).json({ error: "Could not find a working proxy right now. Try again in a minute." });
+      return;
+    }
+    enableGhost(result.proxy, result.exitIp);
+    res.json({
+      active: true,
+      exitIp: result.exitIp,
+      proxy: result.proxy,
+      message: "Ghost Mode activated. All recon, OSINT, IP lookup, and breach check calls now exit through this proxy IP.",
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? "Failed to activate Ghost Mode" });
+  }
+});
+
+// POST /api/ghost/off — deactivate ghost mode
+router.post("/ghost/off", (_req, res) => {
+  disableGhost();
+  res.json({ active: false, message: "Ghost Mode deactivated. Server is using its own IP again." });
+});
+
+// GET /api/ghost/status — current ghost state (for polling)
+router.get("/ghost/status", (_req, res) => {
+  res.json({
+    active: ghostState.active,
+    exitIp: ghostState.exitIp,
+    proxy: ghostState.proxy,
+    activatedAt: ghostState.activatedAt,
+    rotationCount: ghostState.rotationCount,
+    nextRotation: ghostState.nextRotation,
   });
 });
 
