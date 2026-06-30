@@ -35,10 +35,21 @@ function parseUserAgent(ua: string): { browser: string; os: string } {
   return { browser, os };
 }
 
+function isPrivateIp(ip: string): boolean {
+  if (ip === '127.0.0.1' || ip === '::1' || ip === 'localhost') return true;
+  if (ip.startsWith('10.')) return true;
+  if (ip.startsWith('192.168.')) return true;
+  // 172.16.0.0 – 172.31.255.255 (RFC 1918) — NOT the full 172.x.x.x range
+  const m = ip.match(/^172\.(\d+)\./);
+  if (m && Number(m[1]) >= 16 && Number(m[1]) <= 31) return true;
+  if (ip.startsWith('fc') || ip.startsWith('fd')) return true; // IPv6 ULA
+  return false;
+}
+
 async function getIpInfo(ip: string) {
   try {
     const cleanIp = ip.replace('::ffff:', '').split(',')[0].trim();
-    if (cleanIp === '127.0.0.1' || cleanIp === '::1' || cleanIp.startsWith('172.') || cleanIp.startsWith('10.') || cleanIp.startsWith('192.168.')) {
+    if (isPrivateIp(cleanIp)) {
       return { country: 'Local Network', region: 'Local', city: 'Local', isp: 'localhost', org: 'localhost', lat: 0, lon: 0, timezone: 'Local', ip: cleanIp };
     }
     const res = await fetch(`http://ip-api.com/json/${cleanIp}?fields=status,country,regionName,city,isp,org,lat,lon,timezone,query`, { signal: AbortSignal.timeout(4000) });

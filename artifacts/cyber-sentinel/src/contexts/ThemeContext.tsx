@@ -19,11 +19,11 @@ export type ThemeId = typeof THEMES[number]['id'];
 
 interface ThemeCtx { theme: ThemeId; setTheme: (t: ThemeId) => void; }
 
-const ThemeContext = createContext<ThemeCtx>({ theme: 'matrix', setTheme: () => {} });
+const ThemeContext = createContext<ThemeCtx>({ theme: 'blood-red', setTheme: () => {} });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<ThemeId>(() => {
-    try { return (localStorage.getItem('cs-theme') as ThemeId) || 'matrix'; } catch { return 'matrix'; }
+    try { return (localStorage.getItem('cs-theme') as ThemeId) || 'blood-red'; } catch { return 'blood-red'; }
   });
 
   const setTheme = (t: ThemeId) => {
@@ -33,7 +33,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'matrix') {
+    if (theme === 'blood-red') {
       root.removeAttribute('data-theme');
     } else {
       root.setAttribute('data-theme', theme);

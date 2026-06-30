@@ -21,8 +21,11 @@ router.get("/ip/reputation", async (req, res) => {
     const abuse = abuseRes.status === "fulfilled" && abuseRes.value.ok && process.env.ABUSEIPDB_KEY
       ? (await abuseRes.value.json())?.data : null;
 
-    const shodan = await ghostFetch(`https://api.shodan.io/shodan/host/${ip}?key=PSKINdQe1GyxGgecKH6rIbNe46dzFwmm&minify=true`)
-      .then(r => r.ok ? r.json() : null).catch(() => null);
+    const shodanKey = process.env.SHODAN_API_KEY;
+    const shodan = shodanKey
+      ? await ghostFetch(`https://api.shodan.io/shodan/host/${ip}?key=${shodanKey}&minify=true`)
+          .then(r => r.ok ? r.json() : null).catch(() => null)
+      : null;
 
     res.json({
       ip,

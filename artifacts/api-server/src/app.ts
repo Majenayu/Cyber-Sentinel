@@ -10,6 +10,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app: Express = express();
 
+// Trust the first proxy hop (Render load balancer, Cloudflare, etc.)
+// This makes req.ip and x-forwarded-for work correctly in production.
+app.set('trust proxy', 1);
+
 // CORS — in production, lock to the RENDER_EXTERNAL_URL or ALLOWED_ORIGIN env var
 const allowedOrigins: string[] = [];
 if (process.env.ALLOWED_ORIGIN) {

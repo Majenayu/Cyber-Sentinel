@@ -50,45 +50,9 @@
 }
 
 /* ═══════════════════════════════════════════════
-   DEFAULT THEME — Matrix Green
+   DEFAULT THEME — Blood Red
    ═══════════════════════════════════════════════ */
 :root {
-  --background: 220 15% 4%;
-  --foreground: 120 10% 85%;
-  --card: 220 15% 6%;
-  --card-foreground: 120 10% 85%;
-  --card-border: 120 20% 12%;
-  --popover: 220 15% 6%;
-  --popover-foreground: 120 10% 85%;
-  --popover-border: 120 20% 12%;
-  --border: 120 20% 12%;
-  --input: 120 20% 15%;
-  --primary: 120 100% 40%;
-  --primary-foreground: 220 20% 4%;
-  --primary-border: hsl(120 100% 32%);
-  --secondary: 120 20% 12%;
-  --secondary-foreground: 120 100% 40%;
-  --secondary-border: hsl(120 20% 10%);
-  --accent: 120 30% 10%;
-  --accent-foreground: 120 100% 40%;
-  --accent-border: hsl(120 30% 8%);
-  --muted: 220 15% 8%;
-  --muted-foreground: 120 5% 50%;
-  --muted-border: hsl(220 15% 6%);
-  --destructive: 0 100% 60%;
-  --destructive-foreground: 0 0% 100%;
-  --destructive-border: hsl(0 100% 48%);
-  --ring: 120 100% 40%;
-  --radius: 0.25rem;
-  --app-font-sans: 'Inter', sans-serif;
-  --app-font-serif: Georgia, serif;
-  --app-font-mono: 'JetBrains Mono', Menlo, monospace;
-}
-
-/* ═══════════════════════════════════════════════
-   THEME — Blood Red
-   ═══════════════════════════════════════════════ */
-:root[data-theme="blood-red"] {
   --background: 0 20% 4%;
   --foreground: 0 8% 85%;
   --card: 0 15% 6%;
@@ -111,7 +75,43 @@
   --muted: 0 15% 8%;
   --muted-foreground: 0 5% 50%;
   --muted-border: hsl(0 15% 6%);
+  --destructive: 0 100% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --destructive-border: hsl(0 100% 48%);
   --ring: 0 100% 48%;
+  --radius: 0.25rem;
+  --app-font-sans: 'Inter', sans-serif;
+  --app-font-serif: Georgia, serif;
+  --app-font-mono: 'JetBrains Mono', Menlo, monospace;
+}
+
+/* ═══════════════════════════════════════════════
+   THEME — Matrix Green
+   ═══════════════════════════════════════════════ */
+:root[data-theme="matrix"] {
+  --background: 220 15% 4%;
+  --foreground: 120 10% 85%;
+  --card: 220 15% 6%;
+  --card-foreground: 120 10% 85%;
+  --card-border: 120 20% 12%;
+  --popover: 220 15% 6%;
+  --popover-foreground: 120 10% 85%;
+  --popover-border: 120 20% 12%;
+  --border: 120 20% 12%;
+  --input: 120 20% 15%;
+  --primary: 120 100% 40%;
+  --primary-foreground: 220 20% 4%;
+  --primary-border: hsl(120 100% 32%);
+  --secondary: 120 20% 12%;
+  --secondary-foreground: 120 100% 40%;
+  --secondary-border: hsl(120 20% 10%);
+  --accent: 120 30% 10%;
+  --accent-foreground: 120 100% 40%;
+  --accent-border: hsl(120 30% 8%);
+  --muted: 220 15% 8%;
+  --muted-foreground: 120 5% 50%;
+  --muted-border: hsl(220 15% 6%);
+  --ring: 120 100% 40%;
 }
 
 /* ═══════════════════════════════════════════════
