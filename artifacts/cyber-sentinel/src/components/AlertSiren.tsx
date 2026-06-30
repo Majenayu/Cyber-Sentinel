@@ -1,49 +1,110 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+
+// ── Audio context singleton ─────────────────────────────────────────────────
+// Mobile browsers block AudioContext unless it was created (or resumed) inside
+// a user-gesture handler. We create it lazily on first tap, then keep it alive.
+let sharedCtx: AudioContext | null = null;
+
+function getAudioContext(): AudioContext | null {
+  try {
+    if (!sharedCtx || sharedCtx.state === 'closed') {
+      sharedCtx = new AudioContext();
+    }
+    return sharedCtx;
+  } catch {
+    return null;
+  }
+}
+
+function unlockAudio() {
+  // Called on any user tap — resumes a suspended context so future siren
+  // calls (triggered by polling, not a gesture) can still play.
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+}
+
+function playSiren() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  // If still suspended (mobile never tapped), try to resume; if it fails the
+  // sound just won't play — no crash.
+  const play = () => {
+    try {
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+
+      // Two-tone wail: low → high → low → high
+      const osc = ctx.createOscillator();
+      osc.connect(gain);
+      osc.type = 'sawtooth';
+
+      const t = ctx.currentTime;
+      osc.frequency.setValueAtTime(180, t);
+      osc.frequency.exponentialRampToValueAtTime(900, t + 0.45);
+      osc.frequency.exponentialRampToValueAtTime(180, t + 0.90);
+      osc.frequency.exponentialRampToValueAtTime(900, t + 1.35);
+      osc.frequency.exponentialRampToValueAtTime(180, t + 1.80);
+
+      // Loud enough for phone speakers
+      gain.gain.setValueAtTime(0.55, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 2.1);
+
+      osc.start(t);
+      osc.stop(t + 2.1);
+    } catch {}
+  };
+
+  if (ctx.state === 'suspended') {
+    ctx.resume().then(play).catch(() => {});
+  } else {
+    play();
+  }
+}
 
 export default function AlertSiren() {
   const [active, setActive] = useState(false);
-  const [lastCount, setLastCount] = useState<number | null>(null);
-  const audioRef = useRef<AudioContext | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastCountRef = useRef<number | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Unlock audio on any tap anywhere in the document
+  useEffect(() => {
+    document.addEventListener('click',      unlockAudio, { once: false, passive: true });
+    document.addEventListener('touchstart', unlockAudio, { once: false, passive: true });
+    document.addEventListener('keydown',    unlockAudio, { once: false, passive: true });
+    return () => {
+      document.removeEventListener('click',      unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('keydown',    unlockAudio);
+    };
+  }, []);
 
   const { data: intrusions = [] } = useQuery<any[]>({
     queryKey: ['intrusions'],
-    queryFn: async () => { const r = await fetch('/api/auth/intrusions'); if (!r.ok) throw new Error('F'); return r.json(); },
-    refetchInterval: 15_000,
+    queryFn: async () => {
+      const r = await fetch('/api/auth/intrusions');
+      if (!r.ok) throw new Error('fetch failed');
+      return r.json();
+    },
+    refetchInterval: 8_000, // check every 8 s instead of 15 — faster alert
   });
-
-  function playSiren() {
-    try {
-      const ctx = new AudioContext();
-      audioRef.current = ctx;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(220, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.5);
-      osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 1.0);
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 1.5);
-      osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 2.0);
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2.5);
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 2.5);
-      osc.onended = () => ctx.close();
-    } catch {}
-  }
 
   useEffect(() => {
     const count = intrusions.length;
-    if (lastCount === null) { setLastCount(count); return; }
-    if (count > lastCount) {
+    if (lastCountRef.current === null) {
+      lastCountRef.current = count;
+      return;
+    }
+    if (count > lastCountRef.current) {
       setActive(true);
       playSiren();
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setActive(false), 3500);
     }
-    setLastCount(count);
+    lastCountRef.current = count;
   }, [intrusions.length]);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
@@ -52,17 +113,17 @@ export default function AlertSiren() {
 
   return (
     <div className="fixed inset-0 z-[200] pointer-events-none flex items-center justify-center">
+      {/* Background pulse */}
       <div
         className="absolute inset-0 animate-pulse"
-        style={{ background: 'radial-gradient(ellipse at center, rgba(255,0,0,0.18) 0%, rgba(255,0,0,0.08) 50%, transparent 70%)' }}
+        style={{ background: 'radial-gradient(ellipse at center, rgba(255,0,0,0.22) 0%, rgba(255,0,0,0.10) 50%, transparent 70%)' }}
       />
-      <div className="absolute inset-x-0 top-0 h-1 bg-red-500 animate-pulse" style={{ boxShadow: '0 0 20px #ff0000' }} />
-      <div className="absolute inset-x-0 bottom-0 h-1 bg-red-500 animate-pulse" style={{ boxShadow: '0 0 20px #ff0000' }} />
+      {/* Top + bottom border flash */}
+      <div className="absolute inset-x-0 top-0 h-1 bg-red-500 animate-pulse" style={{ boxShadow: '0 0 24px #ff0000' }} />
+      <div className="absolute inset-x-0 bottom-0 h-1 bg-red-500 animate-pulse" style={{ boxShadow: '0 0 24px #ff0000' }} />
 
-      <div
-        className="relative text-center font-mono"
-        style={{ animation: 'sirenPulse 0.4s ease-in-out infinite' }}
-      >
+      {/* Center text */}
+      <div className="relative text-center font-mono" style={{ animation: 'sirenPulse 0.4s ease-in-out infinite' }}>
         <div className="text-red-400 text-4xl font-black tracking-widest mb-2" style={{ textShadow: '0 0 30px #ff0000' }}>
           ⚠ INTRUSION DETECTED ⚠
         </div>
@@ -72,7 +133,7 @@ export default function AlertSiren() {
       <style>{`
         @keyframes sirenPulse {
           0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(1.02); }
+          50%       { opacity: 0.65; transform: scale(1.03); }
         }
       `}</style>
     </div>
