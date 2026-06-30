@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Shield, AlertTriangle, Globe, Monitor, Clock, RefreshCw, Wifi } from 'lucide-react';
-import Globe3D from '@/components/Globe3D';
+import ThreatMapLeaflet from '@/components/ThreatMapLeaflet';
 
 interface Intrusion {
   _id: string;
@@ -73,8 +73,8 @@ export default function IntrusionsPage() {
         </button>
       </div>
 
-      {/* Threat Globe */}
-      <Globe3D height={380} />
+      {/* Live Threat Map */}
+      <ThreatMapLeaflet height={480} />
 
       {/* Stats bar */}
       <div className="grid grid-cols-3 gap-3">

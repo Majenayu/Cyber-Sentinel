@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Globe, Search, AlertTriangle, Loader2, MapPin, Wifi } from 'lucide-react';
+import MiniMap from '@/components/MiniMap';
 
 export default function IpRepPage() {
   const [ip, setIp] = useState('');
@@ -50,116 +51,135 @@ export default function IpRepPage() {
           ))}
         </div>
 
-        {error && <div className="flex items-center gap-2 text-red-400 text-xs border border-red-500/30 bg-red-950/20 rounded px-4 py-3"><AlertTriangle size={14} />{error}</div>}
+        {error && (
+          <div className="flex items-center gap-2 text-red-400 text-xs border border-red-500/30 bg-red-950/20 rounded px-4 py-3">
+            <AlertTriangle size={14} />{error}
+          </div>
+        )}
 
         {result && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {result.geo && (
-              <div className="bg-card/50 border border-border rounded-lg overflow-hidden">
-                <div className="px-4 py-2 border-b border-border bg-black/20 text-xs font-bold text-primary tracking-widest uppercase flex items-center gap-2">
-                  <MapPin size={12} /> Geolocation
-                </div>
-                <div className="p-4 space-y-2 text-xs">
-                  {[
-                    ['IP', result.ip],
-                    ['Country', `${result.geo.country} (${result.geo.countryCode})`],
-                    ['Region', result.geo.region],
-                    ['City', result.geo.city],
-                    ['Coordinates', `${result.geo.lat}, ${result.geo.lon}`],
-                    ['Timezone', result.geo.timezone],
-                    ['ISP', result.geo.isp],
-                    ['Organization', result.geo.org],
-                    ['ASN', result.geo.asn],
-                    ['Proxy/VPN', String(result.geo.proxy)],
-                    ['Hosting', String(result.geo.hosting)],
-                  ].map(([k, v]) => (
-                    <div key={k} className="flex justify-between border-b border-border/40 pb-2 last:border-0">
-                      <span className="text-muted-foreground">{k}</span>
-                      <span className={`text-primary font-mono ${k === 'Proxy/VPN' && v === 'true' ? 'text-yellow-400' : ''}`}>{v}</span>
-                    </div>
-                  ))}
-                  <a href={`https://www.google.com/maps?q=${result.geo.lat},${result.geo.lon}`} target="_blank" rel="noopener noreferrer"
-                    className="inline-block text-[10px] text-primary/60 hover:text-primary mt-1">
-                    Open in Google Maps →
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {result.abuse && (
-              <div className="bg-card/50 border border-border rounded-lg overflow-hidden">
-                <div className="px-4 py-2 border-b border-border bg-black/20 text-xs font-bold text-primary tracking-widest uppercase flex items-center gap-2">
-                  <AlertTriangle size={12} /> AbuseIPDB Score
-                </div>
-                <div className="p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Abuse Confidence</span>
-                    <span className={`text-2xl font-bold font-mono ${result.abuse.abuseScore > 50 ? 'text-red-400' : result.abuse.abuseScore > 20 ? 'text-yellow-400' : 'text-green-400'}`}>
-                      {result.abuse.abuseScore}%
-                    </span>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {result.geo && (
+                <div className="bg-card/50 border border-border rounded-lg overflow-hidden">
+                  <div className="px-4 py-2 border-b border-border bg-black/20 text-xs font-bold text-primary tracking-widest uppercase flex items-center gap-2">
+                    <MapPin size={12} /> Geolocation
                   </div>
-                  <div className="w-full bg-secondary rounded-full h-2">
-                    <div className={`h-2 rounded-full ${result.abuse.abuseScore > 50 ? 'bg-red-500' : result.abuse.abuseScore > 20 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                      style={{ width: `${result.abuse.abuseScore}%` }} />
-                  </div>
-                  <div className="space-y-1.5 text-xs">
+                  <div className="p-4 space-y-2 text-xs">
                     {[
-                      ['Total Reports', String(result.abuse.totalReports)],
-                      ['Distinct Reporters', String(result.abuse.numDistinctUsers)],
-                      ['Last Reported', result.abuse.lastReportedAt ? new Date(result.abuse.lastReportedAt).toLocaleDateString() : 'Never'],
-                      ['Usage Type', result.abuse.usageType],
-                      ['Domain', result.abuse.domain],
-                      ['Tor Exit Node', String(result.abuse.isTor)],
-                      ['Whitelisted', String(result.abuse.isWhitelisted)],
+                      ['IP', result.ip],
+                      ['Country', `${result.geo.country} (${result.geo.countryCode})`],
+                      ['Region', result.geo.region],
+                      ['City', result.geo.city],
+                      ['Coordinates', `${result.geo.lat}, ${result.geo.lon}`],
+                      ['Timezone', result.geo.timezone],
+                      ['ISP', result.geo.isp],
+                      ['Organization', result.geo.org],
+                      ['ASN', result.geo.asn],
+                      ['Proxy/VPN', String(result.geo.proxy)],
+                      ['Hosting', String(result.geo.hosting)],
                     ].map(([k, v]) => (
-                      <div key={k} className="flex justify-between border-b border-border/40 pb-1.5 last:border-0">
+                      <div key={k} className="flex justify-between border-b border-border/40 pb-2 last:border-0">
                         <span className="text-muted-foreground">{k}</span>
-                        <span className="text-primary font-mono">{v}</span>
+                        <span className={`text-primary font-mono ${k === 'Proxy/VPN' && v === 'true' ? 'text-yellow-400' : ''}`}>{v}</span>
                       </div>
                     ))}
+                    <a href={`https://www.google.com/maps?q=${result.geo.lat},${result.geo.lon}`} target="_blank" rel="noopener noreferrer"
+                      className="inline-block text-[10px] text-primary/60 hover:text-primary mt-1">
+                      Open in Google Maps →
+                    </a>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {result.shodan && (
-              <div className="bg-card/50 border border-border rounded-lg overflow-hidden md:col-span-2">
+              {result.abuse && (
+                <div className="bg-card/50 border border-border rounded-lg overflow-hidden">
+                  <div className="px-4 py-2 border-b border-border bg-black/20 text-xs font-bold text-primary tracking-widest uppercase flex items-center gap-2">
+                    <AlertTriangle size={12} /> AbuseIPDB Score
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Abuse Confidence</span>
+                      <span className={`text-2xl font-bold font-mono ${result.abuse.abuseScore > 50 ? 'text-red-400' : result.abuse.abuseScore > 20 ? 'text-yellow-400' : 'text-green-400'}`}>
+                        {result.abuse.abuseScore}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-secondary rounded-full h-2">
+                      <div className={`h-2 rounded-full ${result.abuse.abuseScore > 50 ? 'bg-red-500' : result.abuse.abuseScore > 20 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                        style={{ width: `${result.abuse.abuseScore}%` }} />
+                    </div>
+                    <div className="space-y-1.5 text-xs">
+                      {[
+                        ['Total Reports', String(result.abuse.totalReports)],
+                        ['Distinct Reporters', String(result.abuse.numDistinctUsers)],
+                        ['Last Reported', result.abuse.lastReportedAt ? new Date(result.abuse.lastReportedAt).toLocaleDateString() : 'Never'],
+                        ['Usage Type', result.abuse.usageType],
+                        ['Domain', result.abuse.domain],
+                        ['Tor Exit Node', String(result.abuse.isTor)],
+                        ['Whitelisted', String(result.abuse.isWhitelisted)],
+                      ].map(([k, v]) => (
+                        <div key={k} className="flex justify-between border-b border-border/40 pb-1.5 last:border-0">
+                          <span className="text-muted-foreground">{k}</span>
+                          <span className="text-primary font-mono">{v}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {result.shodan && (
+                <div className="bg-card/50 border border-border rounded-lg overflow-hidden md:col-span-2">
+                  <div className="px-4 py-2 border-b border-border bg-black/20 text-xs font-bold text-primary tracking-widest uppercase flex items-center gap-2">
+                    <Wifi size={12} /> Shodan Data
+                  </div>
+                  <div className="p-4 space-y-3">
+                    <div className="flex flex-wrap gap-3 text-xs">
+                      <div><span className="text-muted-foreground">OS: </span><span className="text-primary">{result.shodan.os ?? 'Unknown'}</span></div>
+                      <div><span className="text-muted-foreground">Updated: </span><span className="text-primary">{result.shodan.lastUpdate ? new Date(result.shodan.lastUpdate).toLocaleDateString() : 'n/a'}</span></div>
+                    </div>
+                    {result.shodan.ports?.length > 0 && (
+                      <div>
+                        <div className="text-[10px] text-muted-foreground mb-2 tracking-widest uppercase">Open Ports</div>
+                        <div className="flex flex-wrap gap-1">
+                          {result.shodan.ports.map((p: number) => (
+                            <span key={p} className="text-[10px] px-2 py-0.5 bg-primary/10 border border-primary/20 rounded text-primary font-mono">{p}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {result.shodan.vulns?.length > 0 && (
+                      <div>
+                        <div className="text-[10px] text-red-400 mb-2 tracking-widest uppercase">Known Vulnerabilities</div>
+                        <div className="flex flex-wrap gap-1">
+                          {result.shodan.vulns.map((v: string) => (
+                            <span key={v} className="text-[10px] px-2 py-0.5 bg-red-950/30 border border-red-500/30 rounded text-red-400">{v}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {!result.abuse && <div className="text-xs text-yellow-400/70">Add ABUSEIPDB_KEY secret for abuse score data.</div>}
+                  </div>
+                </div>
+              )}
+
+              {!result.abuse && !result.shodan && result.geo && (
+                <div className="bg-card/50 border border-border rounded-lg p-4 text-xs text-muted-foreground">
+                  Add <code className="bg-black/30 px-1 rounded text-primary">ABUSEIPDB_KEY</code> secret for abuse scoring.
+                </div>
+              )}
+            </div>
+
+            {/* IP Location Map */}
+            {result.geo && result.geo.lat && result.geo.lon && (
+              <div className="bg-card/50 border border-border rounded-lg overflow-hidden">
                 <div className="px-4 py-2 border-b border-border bg-black/20 text-xs font-bold text-primary tracking-widest uppercase flex items-center gap-2">
-                  <Wifi size={12} /> Shodan Data
+                  <MapPin size={12} /> IP Location Map
+                  <span className="text-muted-foreground font-normal text-[10px] ml-auto">
+                    Scroll to zoom · Click marker for coordinates
+                  </span>
                 </div>
-                <div className="p-4 space-y-3">
-                  <div className="flex flex-wrap gap-3 text-xs">
-                    <div><span className="text-muted-foreground">OS: </span><span className="text-primary">{result.shodan.os ?? 'Unknown'}</span></div>
-                    <div><span className="text-muted-foreground">Updated: </span><span className="text-primary">{result.shodan.lastUpdate ? new Date(result.shodan.lastUpdate).toLocaleDateString() : 'n/a'}</span></div>
-                  </div>
-                  {result.shodan.ports?.length > 0 && (
-                    <div>
-                      <div className="text-[10px] text-muted-foreground mb-2 tracking-widest uppercase">Open Ports</div>
-                      <div className="flex flex-wrap gap-1">
-                        {result.shodan.ports.map((p: number) => (
-                          <span key={p} className="text-[10px] px-2 py-0.5 bg-primary/10 border border-primary/20 rounded text-primary font-mono">{p}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {result.shodan.vulns?.length > 0 && (
-                    <div>
-                      <div className="text-[10px] text-red-400 mb-2 tracking-widest uppercase">Known Vulnerabilities</div>
-                      <div className="flex flex-wrap gap-1">
-                        {result.shodan.vulns.map((v: string) => (
-                          <span key={v} className="text-[10px] px-2 py-0.5 bg-red-950/30 border border-red-500/30 rounded text-red-400">{v}</span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {!result.abuse && <div className="text-xs text-yellow-400/70">Add ABUSEIPDB_KEY secret for abuse score data.</div>}
-                </div>
-              </div>
-            )}
-
-            {!result.abuse && !result.shodan && result.geo && (
-              <div className="bg-card/50 border border-border rounded-lg p-4 text-xs text-muted-foreground">
-                Add <code className="bg-black/30 px-1 rounded text-primary">ABUSEIPDB_KEY</code> secret for abuse scoring.
+                <MiniMap lat={result.geo.lat} lon={result.geo.lon} ip={result.ip} height={300} />
               </div>
             )}
           </div>
