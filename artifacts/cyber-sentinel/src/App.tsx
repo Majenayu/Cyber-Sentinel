@@ -39,7 +39,7 @@ import GlitchScreensaver from "@/components/GlitchScreensaver";
 import HackerCinema from "@/components/HackerCinema";
 import TypingSound from "@/components/TypingSound";
 import { useLocation } from "wouter";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { PushBell } from "@/components/PushBell";
 
 const queryClient = new QueryClient();
 
@@ -47,7 +47,7 @@ function Wrap({ title, children }: { title: string; children: React.ReactNode })
   return <ErrorBoundary fallbackTitle={title}>{children}</ErrorBoundary>;
 }
 
-function Layout() {
+function Layout({ active }: { active: boolean }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -114,6 +114,7 @@ function Layout() {
           onCommandPalette={() => setCmdOpen(true)}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(c => !c)}
+          active={active}
         />
       </div>
 
@@ -126,9 +127,12 @@ function Layout() {
             <Menu size={18} />
           </button>
           <span className="font-mono font-bold text-primary text-sm">CyberSentinel_</span>
-          <button onClick={() => setCmdOpen(true)} className="ml-auto p-2 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors font-mono text-xs">
-            Ctrl+K
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <PushBell active={active} variant="compact" />
+            <button onClick={() => setCmdOpen(true)} className="p-2 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/50 transition-colors font-mono text-xs">
+              Ctrl+K
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto h-full overflow-hidden flex flex-col">
@@ -168,16 +172,13 @@ function App() {
   const [loaded, setLoaded] = useState(false);
   const handleDone = useCallback(() => setLoaded(true), []);
 
-  // Register push notifications silently after successful login
-  usePushNotifications(loaded);
-
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           {!loaded && <HackerLoader onDone={handleDone} />}
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Layout />
+            <Layout active={loaded} />
           </WouterRouter>
           <Toaster />
         </TooltipProvider>

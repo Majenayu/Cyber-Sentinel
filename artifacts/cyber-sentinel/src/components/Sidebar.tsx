@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { PushBell } from './PushBell';
 import { Link, useLocation } from 'wouter';
 import {
   Database, Wrench, FileCode, Bot, Settings, Activity, ShieldAlert,
@@ -19,6 +20,7 @@ interface SidebarProps {
   onCommandPalette?: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  active?: boolean;
 }
 
 function SkullIcon({ size = 20 }: { size?: number }) {
@@ -90,7 +92,7 @@ const OSINT_NAV = [
   { href: '/stealth', label: 'Stealth Mode', icon: EyeOff },
 ];
 
-export default function Sidebar({ onNavigate, onCommandPalette, collapsed: externalCollapsed, onToggleCollapse }: SidebarProps) {
+export default function Sidebar({ onNavigate, onCommandPalette, collapsed: externalCollapsed, onToggleCollapse, active }: SidebarProps) {
   const [pathname] = useLocation();
   const { theme } = useTheme();
   const [secOpen, setSecOpen] = useState(true);
@@ -209,8 +211,10 @@ export default function Sidebar({ onNavigate, onCommandPalette, collapsed: exter
 
         <NavItem href="/settings" label="Settings" icon={Settings} />
 
+        {!collapsed && <PushBell active={active ?? false} variant="full" />}
+
         {!collapsed && (
-          <div className="mt-2 text-[8px] text-muted-foreground/30 uppercase tracking-tighter text-center">
+          <div className="mt-1 text-[8px] text-muted-foreground/30 uppercase tracking-tighter text-center">
             V2.0.0-INTERNAL // CYBERSENTINEL
           </div>
         )}
