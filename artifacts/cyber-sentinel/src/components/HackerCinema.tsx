@@ -32,7 +32,7 @@ interface Props { active: boolean; onClose: () => void; }
 export default function HackerCinema({ active, onClose }: Props) {
   const [lines, setLines] = useState<string[]>([]);
   const [cursor, setCursor] = useState('');
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

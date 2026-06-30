@@ -146,7 +146,7 @@ export default function Sidebar({ onNavigate, onCommandPalette, collapsed: exter
             <span className="text-base truncate">CyberSentinel_</span>
           </div>
         )}
-        {collapsed && <SkullIcon size={20} className="text-primary mx-auto" />}
+        {collapsed && <span className="text-primary mx-auto"><SkullIcon size={20} /></span>}
         <button onClick={toggleCollapse}
           className={cn("text-muted-foreground hover:text-primary transition-colors shrink-0", collapsed && "mx-auto")}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>

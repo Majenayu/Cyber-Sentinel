@@ -5,7 +5,7 @@ export default function AlertSiren() {
   const [active, setActive] = useState(false);
   const [lastCount, setLastCount] = useState<number | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const { data: intrusions = [] } = useQuery<any[]>({
     queryKey: ['intrusions'],

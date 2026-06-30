@@ -4,9 +4,9 @@ const IDLE_MS = 120_000; // 2 minutes
 
 export default function GlitchScreensaver() {
   const [active, setActive] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animRef = useRef<number>();
+  const animRef = useRef<number | undefined>(undefined);
 
   const reset = useCallback(() => {
     clearTimeout(timerRef.current);

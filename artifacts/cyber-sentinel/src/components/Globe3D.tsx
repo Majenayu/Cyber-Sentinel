@@ -76,7 +76,7 @@ interface Props { height?: number; }
 export default function Globe3D({ height = 320 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rotY = useRef(0.4);
-  const animRef = useRef<number>();
+  const animRef = useRef<number | undefined>(undefined);
 
   const { data: intrusions = [], isFetching, refetch } = useQuery<Intrusion[]>({
     queryKey: ['intrusions'],
