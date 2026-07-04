@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { startScheduler } from "./lib/scheduler";
 
 // API_PORT is the dedicated port var for this service (avoids conflict with the Vite frontend
 // which owns the global PORT env var in development). In production on Render/Railway, set
@@ -19,6 +20,10 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // ── Autonomous research scheduler ─────────────────────────────────────────
+  // Fires daily at 3:00 AM to scrape security resources and grow the General KB.
+  startScheduler();
 
   // ── Keep-alive self-ping ──────────────────────────────────────────────────
   // Render free tier spins down after ~15 min of inactivity. Ping our own

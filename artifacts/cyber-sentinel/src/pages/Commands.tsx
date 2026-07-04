@@ -7,7 +7,7 @@ function cn(...inputs: (string | boolean | undefined | null)[]) {
   return twMerge(clsx(inputs));
 }
 
-const CATEGORIES = ['recon', 'exploitation', 'post-exploitation', 'password', 'network', 'web', 'active-directory', 'shells', 'reporting', 'uncategorized'];
+const CATEGORIES = ['recon', 'exploitation', 'post-exploitation', 'password', 'network', 'web', 'active-directory', 'shells', 'reporting', 'general', 'uncategorized'];
 
 function substituteTarget(command: string, target: string): string {
   if (!target) return command;

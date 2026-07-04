@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plus, FileText, Trash2, Edit, Save, X, ExternalLink, Loader2, ChevronLeft, Tag, Sparkles, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Link, Globe, Download, Upload, Wand2 } from 'lucide-react';
+import { Search, Plus, FileText, Trash2, Edit, Save, X, ExternalLink, Loader2, ChevronLeft, Tag, Sparkles, CheckCircle, AlertCircle, ChevronDown, ChevronUp, Link, Globe, Download, Upload, Wand2, BrainCircuit, RefreshCw, Clock, Database } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ReactMarkdown from 'react-markdown';
@@ -195,6 +195,257 @@ function AnalyzeModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
   );
 }
 
+// ── Research Modal ─────────────────────────────────────────────────────────────
+interface ResearchStatus {
+  lastRun: {
+    runAt: string; finishedAt?: string; status: string; triggeredBy: string;
+    sourcesChecked: number; kbEntriesCreated: number; toolsCreated: number; commandsCreated: number;
+    errors: string[]; discoveries: Array<{ source: string; title: string }>;
+  } | null;
+  nextScheduledRun: string;
+  totalGeneralKb: number;
+  sourcesInPool: number;
+  sourcesPool: Array<{ url: string; topic: string; tags: string[] }>;
+}
+
+interface ResearchEvent {
+  type: string; total?: number; current?: number; sourceUrl?: string; sourceTitle?: string;
+  toolsAdded?: number; commandsAdded?: number; kbCreated?: number; error?: string;
+  message?: string; // terminal error from the backend
+  summary?: { sources: number; kb: number; tools: number; commands: number };
+}
+
+function ResearchModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [status, setStatus] = useState<ResearchStatus | null>(null);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [current, setCurrent] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [currentSource, setCurrentSource] = useState('');
+  const [discoveries, setDiscoveries] = useState<Array<{ url: string; title: string; tools: number; commands: number }>>([]);
+  const [summary, setSummary] = useState<{ sources: number; kb: number; tools: number; commands: number } | null>(null);
+  const [showPool, setShowPool] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const fetchStatus = async () => {
+    setLoadingStatus(true);
+    try {
+      const res = await fetch('/api/research/status');
+      const data = await res.json();
+      setStatus(data);
+    } catch {}
+    setLoadingStatus(false);
+  };
+
+  useEffect(() => { fetchStatus(); }, []);
+
+  const start = async () => {
+    setRunning(true); setDone(false); setError(null); setDiscoveries([]); setSummary(null); setCurrent(0); setTotal(0); setCurrentSource('');
+    abortRef.current = new AbortController();
+    try {
+      const res = await fetch('/api/research/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: abortRef.current.signal });
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done: streamDone, value } = await reader.read();
+        if (streamDone) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event: ResearchEvent = JSON.parse(line.slice(6));
+            if (event.type === 'start') { setTotal(event.total ?? 0); }
+            else if (event.type === 'source_start') { setCurrent(event.current ?? 0); setCurrentSource(event.sourceTitle ?? event.sourceUrl ?? ''); }
+            else if (event.type === 'source_done') {
+              setDiscoveries(prev => [...prev, { url: event.sourceUrl ?? '', title: event.sourceTitle ?? event.sourceUrl ?? '', tools: event.toolsAdded ?? 0, commands: event.commandsAdded ?? 0 }]);
+            }
+            else if (event.type === 'source_error') {
+              // Show per-source failures in the discoveries list with an error marker
+              setDiscoveries(prev => [...prev, { url: event.sourceUrl ?? '', title: `⚠ ${event.sourceUrl ?? 'unknown'} — ${event.error ?? 'failed'}`, tools: 0, commands: 0 }]);
+            }
+            else if (event.type === 'done') { setSummary(event.summary ?? null); setDone(true); setRunning(false); onDone(); }
+            else if (event.type === 'error') { setError(event.message ?? event.error ?? 'Unknown error'); setRunning(false); }
+          } catch {}
+        }
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') setError(err.message);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+
+  const formatRelative = (iso: string) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
+
+  const formatNext = (iso: string) => {
+    const diff = new Date(iso).getTime() - Date.now();
+    const hrs = Math.floor(diff / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    return `${hrs}h ${mins}m`;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+      <div className="bg-card border border-border rounded-lg w-full max-w-lg font-mono shadow-2xl shadow-primary/10 flex flex-col max-h-[88vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+          <div className="flex items-center gap-2">
+            <BrainCircuit size={16} className="text-primary" />
+            <span className="font-bold text-sm text-primary">AI.AUTO_RESEARCH</span>
+            <span className="text-[10px] text-muted-foreground border border-border px-1.5 py-0.5 rounded">GENERAL KB</span>
+          </div>
+          {!running && <button onClick={onClose} className="text-muted-foreground hover:text-primary transition-colors"><X size={16} /></button>}
+        </div>
+
+        <div className="p-4 space-y-4 overflow-y-auto flex-1">
+          {/* Status card */}
+          {!loadingStatus && status && !running && !done && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-black/40 border border-primary/20 rounded p-3">
+                  <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1"><Clock size={9} /> Last Run</div>
+                  {status.lastRun ? (
+                    <>
+                      <div className="text-xs font-bold text-primary">{formatRelative(status.lastRun.runAt)}</div>
+                      <div className={cn('text-[10px] mt-0.5', status.lastRun.status === 'done' ? 'text-green-500/70' : status.lastRun.status === 'error' ? 'text-destructive/70' : 'text-yellow-500/70')}>{status.lastRun.status} · {status.lastRun.triggeredBy}</div>
+                    </>
+                  ) : <div className="text-xs text-muted-foreground">Never run</div>}
+                </div>
+                <div className="bg-black/40 border border-primary/20 rounded p-3">
+                  <div className="text-[10px] text-muted-foreground mb-1 flex items-center gap-1"><RefreshCw size={9} /> Next Scheduled</div>
+                  <div className="text-xs font-bold text-primary">3:00 AM</div>
+                  <div className="text-[10px] text-muted-foreground/60 mt-0.5">in {formatNext(status.nextScheduledRun)}</div>
+                </div>
+              </div>
+
+              {status.lastRun && (
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'General KB', value: status.totalGeneralKb, icon: Database },
+                    { label: 'Tools Found', value: status.lastRun.toolsCreated },
+                    { label: 'Commands', value: status.lastRun.commandsCreated },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="bg-black/30 border border-border rounded p-2 text-center">
+                      <div className="text-base font-bold text-primary">{value}</div>
+                      <div className="text-[10px] text-muted-foreground">{label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="text-xs text-muted-foreground border border-border/40 rounded p-3 bg-black/20 space-y-1 leading-relaxed">
+                <p>The AI will autonomously browse <span className="text-primary">{status.sourcesInPool} security resources</span> — OWASP, GTFOBins, PortSwigger, MITRE ATT&CK, PayloadsAllTheThings, and more — then extract tools and commands into your <span className="text-primary">General</span> knowledge category.</p>
+                <p className="text-muted-foreground/60 text-[10px]">Runs {status.sourcesInPool > 3 ? '3 sources per session' : 'all sources'}, rotates daily. You can also trigger it manually below.</p>
+              </div>
+
+              {/* Source pool toggle */}
+              <button onClick={() => setShowPool(p => !p)} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors">
+                {showPool ? <ChevronUp size={10} /> : <ChevronDown size={10} />} {showPool ? 'Hide' : 'Show'} source pool ({status.sourcesInPool} sites)
+              </button>
+              {showPool && (
+                <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                  {status.sourcesPool.map(s => (
+                    <div key={s.url} className="flex items-center gap-2 text-[10px] p-1.5 border border-border/30 rounded bg-black/20">
+                      <Globe size={9} className="text-primary/60 shrink-0" />
+                      <a href={s.url} target="_blank" rel="noreferrer" className="text-primary/70 hover:text-primary truncate flex-1">{new URL(s.url).hostname}</a>
+                      <span className="text-muted-foreground/40">{s.tags.slice(0, 2).join(', ')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {error && <div className="flex items-start gap-2 text-destructive text-xs p-3 border border-destructive/30 rounded bg-destructive/10"><AlertCircle size={14} className="shrink-0 mt-0.5" /><span>{error}</span></div>}
+            </div>
+          )}
+
+          {/* Running progress */}
+          {(running || done) && (
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] text-muted-foreground">
+                  <span className="truncate flex-1 mr-2">{running ? (currentSource ? `Researching: ${currentSource}` : 'Starting…') : 'Complete'}</span>
+                  <span className="shrink-0">{current}/{total} — {pct}%</span>
+                </div>
+                <div className="h-1.5 bg-secondary rounded-full overflow-hidden">
+                  <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+
+              {done && summary && (
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: 'Sources', value: summary.sources },
+                    { label: 'KB Added', value: summary.kb },
+                    { label: 'Tools', value: summary.tools },
+                    { label: 'Commands', value: summary.commands },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="bg-black/40 border border-primary/20 rounded p-2 text-center">
+                      <div className="text-lg font-bold text-primary">{value}</div>
+                      <div className="text-[10px] text-muted-foreground">{label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {discoveries.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Discovered</div>
+                  <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+                    {discoveries.map((d, i) => (
+                      <div key={i} className="flex items-start gap-2 text-[10px] p-2 rounded border border-border/50 bg-black/20">
+                        <CheckCircle size={10} className="text-primary shrink-0 mt-0.5" />
+                        <div className="min-w-0">
+                          <div className="truncate text-foreground/80">{d.title}</div>
+                          <div className="text-muted-foreground">{d.tools > 0 && `${d.tools} tool(s)`}{d.tools > 0 && d.commands > 0 && ' · '}{d.commands > 0 && `${d.commands} cmd(s)`}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {error && <div className="flex items-start gap-2 text-destructive text-xs p-3 border border-destructive/30 rounded bg-destructive/10"><AlertCircle size={14} className="shrink-0 mt-0.5" /><span>{error}</span></div>}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-border shrink-0 flex gap-2 justify-end">
+          {!running && !done && (
+            <>
+              <button onClick={onClose} className="px-3 py-1.5 text-xs rounded hover:bg-secondary transition-colors">Close</button>
+              <button onClick={start} className="px-4 py-1.5 text-xs font-bold bg-primary text-black rounded hover:bg-primary/80 flex items-center gap-1.5 transition-colors">
+                <BrainCircuit size={12} /> Run Research Now
+              </button>
+            </>
+          )}
+          {running && (
+            <button onClick={() => { abortRef.current?.abort(); setRunning(false); }} className="px-3 py-1.5 text-xs border border-destructive/50 text-destructive rounded hover:bg-destructive/10 transition-colors">Stop</button>
+          )}
+          {done && (
+            <button onClick={onClose} className="px-4 py-1.5 text-xs font-bold bg-primary text-black rounded hover:bg-primary/80 transition-colors">Done</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface ScrapeState { loading: boolean; error: string | null; }
 
 function UrlIngestRow({ onScraped }: { onScraped: (data: { title: string; content: string; suggestedTags: string[]; url: string }) => void }) {
@@ -258,6 +509,7 @@ export default function VaultPage() {
   const [showList, setShowList] = useState(true);
   const [activeTag, setActiveTag] = useState<string | null>(() => new URLSearchParams(search).get('tag'));
   const [showAnalyze, setShowAnalyze] = useState(false);
+  const [showResearch, setShowResearch] = useState(false);
   const [isSimplifying, setIsSimplifying] = useState(false);
   const [simplifyingForm, setSimplifyingForm] = useState(false);
   const [viewMode, setViewMode] = useState<'original' | 'simplified'>('original');
@@ -401,6 +653,7 @@ export default function VaultPage() {
   return (
     <div className="flex h-full overflow-hidden font-mono">
       {showAnalyze && <AnalyzeModal onClose={() => setShowAnalyze(false)} onDone={() => fetchEntries()} />}
+      {showResearch && <ResearchModal onClose={() => setShowResearch(false)} onDone={() => fetchEntries()} />}
 
       {/* List panel */}
       <div className={cn("border-r border-border bg-card/30 flex flex-col shrink-0 transition-all", "md:w-72 md:flex", showList ? "flex flex-col w-full md:w-72 absolute md:static inset-0 z-10 bg-background" : "hidden md:flex")}>
@@ -409,6 +662,7 @@ export default function VaultPage() {
             <h2 className="font-semibold flex items-center gap-2 text-xs md:text-sm"><FileText size={16} className="text-primary" /> Knowledge</h2>
             <div className="flex items-center gap-1.5">
               <button onClick={exportVault} title="Export vault as JSON" className="h-7 px-2 text-xs border border-border text-muted-foreground hover:text-primary hover:border-primary/40 rounded flex items-center gap-1 transition-colors"><Upload size={11} /></button>
+              <button onClick={() => setShowResearch(true)} title="AI: autonomous daily research into General KB" className="h-7 px-2 text-xs border border-primary/30 text-primary/80 hover:bg-primary/10 hover:text-primary rounded flex items-center gap-1 transition-colors"><BrainCircuit size={11} /> Research</button>
               <button onClick={() => setShowAnalyze(true)} title="AI: auto-tag, extract tools & commands" className="h-7 px-2 text-xs border border-primary/40 text-primary hover:bg-primary/20 rounded flex items-center gap-1 transition-colors"><Sparkles size={11} /> AI</button>
               <button onClick={() => { setIsCreating(true); setIsEditing(false); setSelectedId(null); setShowList(false); }} className="h-7 px-2 text-xs border border-primary/50 text-primary hover:bg-primary/20 rounded flex items-center gap-1 transition-colors"><Plus size={12} /> New</button>
             </div>

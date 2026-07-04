@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wrench, ExternalLink, ChevronLeft, Loader2, Terminal, Code2, Trash2, Plus, X, Save } from 'lucide-react';
 
-const TOOL_CATEGORIES = ['recon', 'web', 'exploitation', 'post-exploitation', 'passwords', 'active-directory', 'network', 'forensics', 'wireless', 'misc'];
+const TOOL_CATEGORIES = ['recon', 'web', 'exploitation', 'post-exploitation', 'passwords', 'active-directory', 'network', 'forensics', 'wireless', 'general', 'misc'];
 
 function renderCheatsheet(content: string) {
   const parts = content.split(/(```[\s\S]*?```)/g);

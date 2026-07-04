@@ -15,7 +15,7 @@ const KnowledgeSchema: Schema = new Schema({
   title: { type: String, required: true },
   content: { type: String, required: true },
   simplifiedContent: { type: String, default: null },
-  category: { type: String, enum: ['tool', 'technique', 'lesson', 'command'], default: 'lesson' },
+  category: { type: String, enum: ['tool', 'technique', 'lesson', 'command', 'general'], default: 'lesson' },
   tags: [{ type: String }],
   source: { type: String, default: null },
   sources: { type: [String], default: [] },
