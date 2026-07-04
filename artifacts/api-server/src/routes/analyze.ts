@@ -14,10 +14,19 @@ function canonicalSlug(raw: string): string {
 }
 
 function buildPrompt(title: string, content: string): string {
+  // Smart slice: take the first 5000 chars + last 3000 chars so commands
+  // that appear late in long documents (e.g. curl/xxd sections) are included.
+  let excerpt = content;
+  if (content.length > 8000) {
+    const head = content.slice(0, 5000);
+    const tail = content.slice(-3000);
+    excerpt = head + '\n\n[... middle omitted ...]\n\n' + tail;
+  }
+
   return (
-    'You are a senior penetration tester helping organize a personal knowledge base.\n\n' +
+    'You are a cybersecurity knowledge base assistant helping a penetration tester / CTF player organise their notes.\n\n' +
     'ENTRY TITLE: ' + title + '\n' +
-    'ENTRY CONTENT (first portion):\n' + content.slice(0, 6000) + '\n\n' +
+    'ENTRY CONTENT:\n' + excerpt + '\n\n' +
     'Your job is to EXTRACT metadata from this entry — do NOT rewrite or summarize the content.\n\n' +
     'Respond ONLY with valid JSON. No markdown wrapper. Exactly this structure:\n\n' +
     '{\n' +
@@ -26,10 +35,10 @@ function buildPrompt(title: string, content: string): string {
     '    {\n' +
     '      "name": "ToolName",\n' +
     '      "slug": "tool-name",\n' +
-    '      "category": "recon|web|password|exploitation|post-exploitation|network|other",\n' +
-    '      "description": "One or two plain-English sentences. What does this tool do and why would a pentester use it? Example style: Nmap is a network scanner that discovers open ports on a target — like knocking on every door of a building to see which ones are unlocked.",\n' +
-    '      "cheatsheet": "Write in clean markdown. Include these sections:\\n## What it does\\n2-3 plain English sentences explaining the tool.\\n\\n## Real-world scenario\\nA concrete example: you have target IP 10.10.10.5, what do you do with this tool?\\n\\n## Linux (bash)\\nCode block with 3-4 practical examples, each with a comment explaining what it does.\\n\\n## Windows (PowerShell)\\nCode block with equivalent Windows commands.\\n\\n## Key flags explained\\nBullet list of important flags in plain English — e.g. -sV: detect what software version is running on each port.",\n' +
-    '      "officialUrl": "url string or null"\n' +
+    '      "category": "recon|web|password|exploitation|post-exploitation|network|forensics|crypto|reversing|osint|other",\n' +
+    '      "description": "One or two plain-English sentences. What does this tool do and why would a security researcher / CTF player use it?",\n' +
+    '      "cheatsheet": "Write in clean markdown. Include these sections:\\n## What it does\\n2-3 plain English sentences explaining the tool.\\n\\n## Real-world / CTF scenario\\nA concrete example of when and how you would use this tool.\\n\\n## Usage examples\\nCode block with 3-5 practical examples, each with a comment explaining what it does.\\n\\n## Key options / flags\\nBullet list of important settings or flags in plain English.",\n' +
+    '      "officialUrl": "If a URL for this tool appears anywhere in the entry text, use it verbatim. Otherwise null."\n' +
     '    }\n' +
     '  ],\n' +
     '  "commands": [\n' +
@@ -37,14 +46,15 @@ function buildPrompt(title: string, content: string): string {
     '      "title": "Short descriptive action title",\n' +
     '      "command": "exact command string",\n' +
     '      "description": "WHAT: what this command does in plain English. WHEN: the real scenario when you use it. EXAMPLE: a concrete example or expected result.",\n' +
-    '      "category": "recon|web|password|exploitation|post-exploitation|network|other"\n' +
+    '      "category": "recon|web|password|exploitation|post-exploitation|network|forensics|crypto|reversing|osint|other"\n' +
     '    }\n' +
     '  ]\n' +
     '}\n\n' +
     'STRICT RULES:\n' +
-    '- tags: 2-6 lowercase keywords that describe the topic of this entry\n' +
-    '- tools: ONLY if the entry clearly covers a specific named pentesting tool. Return [] if none.\n' +
-    '- commands: extract every real usable command or one-liner. Max 10. The description MUST use WHAT/WHEN/EXAMPLE format.\n' +
+    '- tags: 2-8 lowercase keywords describing the topic (e.g. javascript, deobfuscation, encoding, ctf, curl, base64)\n' +
+    '- tools: Extract EVERY named tool, website, online service, or utility mentioned — this includes web-based tools (e.g. obfuscator.io, beautifier.io), CLI tools (curl, xxd), browser tools, decoders, encoders, and any other named resource the entry discusses. Do NOT skip a tool just because it is not a traditional network scanner. Return [] only if there are truly zero named tools.\n' +
+    '- For each tool, scan the entry text for a URL that belongs to that tool and use it as officialUrl.\n' +
+    '- commands: Extract every real usable shell command or one-liner shown in the entry. Max 15. The description MUST use WHAT/WHEN/EXAMPLE format.\n' +
     '- Do NOT invent commands that are not in the source text.\n' +
     '- Do NOT return cleanedContent or cleanedTitle — only the fields listed above.'
   );
