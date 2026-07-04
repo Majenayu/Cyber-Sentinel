@@ -20,10 +20,10 @@ router.get('/knowledge', async (req, res) => {
       id: e._id.toString(),
       title: e.title,
       content: e.content,
-      simplifiedContent: (e as any).simplifiedContent ?? null,
+      simplifiedContent: e.simplifiedContent ?? null,
       tags: e.tags ?? [],
       source: e.source ?? null,
-      sources: (e as any).sources ?? [],
+      sources: e.sources ?? [],
       createdAt: e.createdAt,
       updatedAt: e.updatedAt,
     })));
@@ -162,14 +162,22 @@ router.post('/knowledge/:id/simplify', async (req, res) => {
 router.post('/knowledge', async (req, res) => {
   try {
     await connectToDatabase();
-    const { title, content, tags, source } = req.body;
-    const entry = await Knowledge.create({ title, content, category: 'lesson', tags: tags ?? [], source: source ?? null });
+    const { title, content, tags, source, sources } = req.body;
+    const entry = await Knowledge.create({
+      title,
+      content,
+      category: 'lesson',
+      tags: tags ?? [],
+      source: source ?? null,
+      sources: Array.isArray(sources) ? sources.filter(Boolean) : [],
+    });
     res.status(201).json({
       id: entry._id.toString(),
       title: entry.title,
       content: entry.content,
       tags: entry.tags,
       source: entry.source ?? null,
+      sources: (entry as any).sources ?? [],
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
     });
@@ -187,10 +195,10 @@ router.get('/knowledge/:id', async (req, res) => {
       id: entry._id.toString(),
       title: entry.title,
       content: entry.content,
-      simplifiedContent: (entry as any).simplifiedContent ?? null,
+      simplifiedContent: entry.simplifiedContent ?? null,
       tags: entry.tags ?? [],
       source: entry.source ?? null,
-      sources: (entry as any).sources ?? [],
+      sources: entry.sources ?? [],
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
     });
@@ -202,16 +210,20 @@ router.get('/knowledge/:id', async (req, res) => {
 router.patch('/knowledge/:id', async (req, res) => {
   try {
     await connectToDatabase();
+    // Sanitise sources on update too
+    if (Array.isArray(req.body.sources)) {
+      req.body.sources = req.body.sources.filter(Boolean);
+    }
     const entry = await Knowledge.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
     if (!entry) { res.status(404).json({ error: 'Not found' }); return; }
     res.json({
       id: entry._id.toString(),
       title: entry.title,
       content: entry.content,
-      simplifiedContent: (entry as any).simplifiedContent ?? null,
+      simplifiedContent: entry.simplifiedContent ?? null,
       tags: entry.tags ?? [],
       source: entry.source ?? null,
-      sources: (entry as any).sources ?? [],
+      sources: entry.sources ?? [],
       createdAt: entry.createdAt,
       updatedAt: entry.updatedAt,
     });

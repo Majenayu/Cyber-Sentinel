@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileCode, Search, Plus, Trash2, Edit, Save, X, Copy, Terminal, Check, Loader2, Code2, ChevronLeft, Target, Printer } from 'lucide-react';
+import { FileCode, Search, Plus, Trash2, Edit, Save, X, Copy, Terminal, Check, Loader2, Code2, ChevronLeft, Target, Printer, Sparkles } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -160,6 +160,8 @@ export default function CommandsPage() {
   const [target, setTarget] = useState('');
   const [showCheatsheet, setShowCheatsheet] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [isDeduping, setIsDeduping] = useState(false);
+  const [dedupResult, setDedupResult] = useState<{ commandsRemoved: number; toolsRemoved: number } | null>(null);
 
   const fetchCommands = async () => {
     const res = await fetch('/api/commands');
@@ -218,6 +220,22 @@ export default function CommandsPage() {
     setTimeout(() => setCopiedId(null), 2000);
     fetch(`/api/commands/${id}/use`, { method: 'POST' }).catch(() => {});
     setCommands(prev => prev.map(c => c.id === id ? { ...c, useCount: (c.useCount ?? 0) + 1, lastUsed: new Date().toISOString() } : c));
+  };
+
+  const handleDeduplicate = async () => {
+    if (!confirm('Remove duplicate commands from the database? This cannot be undone.')) return;
+    setIsDeduping(true);
+    setDedupResult(null);
+    try {
+      const res = await fetch('/api/analyze/deduplicate', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Dedup failed');
+      setDedupResult(data);
+      await fetchCommands();
+    } catch (err: any) {
+      alert(`Deduplicate failed: ${err.message}`);
+    }
+    setIsDeduping(false);
   };
 
   const printCheatsheet = () => {
@@ -338,8 +356,25 @@ export default function CommandsPage() {
                 <input placeholder="Search commands..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-8 pr-3 py-1.5 bg-black/50 border border-border rounded text-xs focus:outline-none focus:border-primary" />
               </div>
             </div>
+            <button
+              onClick={handleDeduplicate}
+              disabled={isDeduping}
+              title="Remove duplicate commands from the database"
+              className="h-8 px-2.5 text-xs border border-border text-muted-foreground hover:text-primary hover:border-primary/40 rounded flex items-center gap-1 transition-colors shrink-0 disabled:opacity-40"
+            >
+              {isDeduping ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              {isDeduping ? 'Deduping…' : 'Dedup'}
+            </button>
             <button onClick={() => { resetForm(); setIsFormOpen(true); }} className="h-8 px-3 text-xs border border-primary/50 text-primary hover:bg-primary/20 rounded flex items-center gap-1 transition-colors shrink-0"><Plus size={13} /> New</button>
           </div>
+
+          {/* Dedup result notification */}
+          {dedupResult && (
+            <div className="flex items-center justify-between px-3 py-1.5 bg-primary/10 border border-primary/20 rounded text-[10px] text-primary">
+              <span>✓ Removed {dedupResult.commandsRemoved} duplicate command{dedupResult.commandsRemoved !== 1 ? 's' : ''}{dedupResult.toolsRemoved > 0 ? ` and ${dedupResult.toolsRemoved} duplicate tool${dedupResult.toolsRemoved !== 1 ? 's' : ''}` : ''}</span>
+              <button onClick={() => setDedupResult(null)} className="text-primary/60 hover:text-primary ml-2"><X size={10} /></button>
+            </div>
+          )}
 
           {/* Target variable input */}
           <div className="flex items-center gap-2">

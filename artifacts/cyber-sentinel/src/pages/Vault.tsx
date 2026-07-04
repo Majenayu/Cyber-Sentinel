@@ -197,18 +197,19 @@ function AnalyzeModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
 
 interface ScrapeState { loading: boolean; error: string | null; }
 
-function UrlIngestRow({ onScraped }: { onScraped: (data: { title: string; content: string; suggestedTags: string[] }) => void }) {
+function UrlIngestRow({ onScraped }: { onScraped: (data: { title: string; content: string; suggestedTags: string[]; url: string }) => void }) {
   const [url, setUrl] = useState('');
   const [state, setState] = useState<ScrapeState>({ loading: false, error: null });
 
   const scrape = async () => {
     if (!url.trim()) return;
+    const scrapedUrl = url.trim();
     setState({ loading: true, error: null });
     try {
-      const res = await fetch('/api/scrape/url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: url.trim() }) });
+      const res = await fetch('/api/scrape/url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: scrapedUrl }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Scrape failed');
-      onScraped(data);
+      onScraped({ ...data, url: scrapedUrl });
       setUrl('');
     } catch (err: any) {
       setState({ loading: false, error: err.message });
@@ -335,16 +336,21 @@ export default function VaultPage() {
     if (window.innerWidth < 768) setShowList(false);
   };
 
-  const handleScraped = (data: { title: string; content: string; suggestedTags: string[] }) => {
-    const currentSources = formData.sources.filter(s => s.trim());
-    setFormData(prev => ({
-      ...prev,
-      title: prev.title || data.title,
-      content: prev.content ? prev.content + '\n\n---\n\n' + data.content : data.content,
-      tags: prev.tags
-        ? prev.tags
-        : data.suggestedTags.join(', '),
-    }));
+  const handleScraped = (data: { title: string; content: string; suggestedTags: string[]; url: string }) => {
+    setFormData(prev => {
+      // Add the scraped URL to sources — avoid duplicates
+      const existing = prev.sources.filter(s => s.trim());
+      const newSources = existing.includes(data.url) ? existing : [...existing, data.url];
+      // Keep at least one empty slot if nothing was there
+      const sources = newSources.length > 0 ? newSources : [''];
+      return {
+        ...prev,
+        title: prev.title || data.title,
+        content: prev.content ? prev.content + '\n\n---\n\n' + data.content : data.content,
+        tags: prev.tags ? prev.tags : data.suggestedTags.join(', '),
+        sources,
+      };
+    });
   };
 
   const addSourceField = () => setFormData(prev => ({ ...prev, sources: [...prev.sources, ''] }));

@@ -225,11 +225,67 @@ router.post('/scrape/url', async (req, res) => {
     const mainContent = $('article, main, .content, .post, .entry, #content, #main').first();
     const contentEl = mainContent.length ? mainContent : $('body');
 
-    const rawText = contentEl.text().replace(/\s+/g, ' ').trim();
-    const content = rawText.slice(0, 8000);
+    // ── Extract external tool/resource links ─────────────────────────────────
+    const extractedLinks: Array<{ text: string; href: string }> = [];
+    const seenHrefs = new Set<string>();
+    const baseHostname = new URL(url).hostname.replace(/^www\./, '');
+    const JUNK_TEXT = /^(click here|here|this|link|source|read more|more|see|view|download|github|tweet|share|back|next|previous|\d+)$/i;
 
-    const suggestedTags: string[] = [];
-    const lowerContent = content.toLowerCase();
+    contentEl.find('a[href]').each((_i, el) => {
+      const href = $(el).attr('href') ?? '';
+      const text = $(el).text().trim().replace(/\s+/g, ' ');
+      if (!href || !text || text.length < 3 || text.length > 80) return;
+      if (JUNK_TEXT.test(text)) return;
+      let abs: string;
+      try { abs = new URL(href, url).toString(); } catch { return; }
+      if (!abs.startsWith('http')) return;
+      // Skip same-domain links and anchors
+      const linkHost = new URL(abs).hostname.replace(/^www\./, '');
+      if (linkHost === baseHostname) return;
+      if (seenHrefs.has(abs)) return;
+      seenHrefs.add(abs);
+      extractedLinks.push({ text, href: abs });
+    });
+
+    // ── Extract code blocks ──────────────────────────────────────────────────
+    const codeBlocks: string[] = [];
+    const seenCode = new Set<string>();
+    contentEl.find('pre, code').each((_i, el) => {
+      // Skip inline code inside <pre> (already captured by parent)
+      if ($(el).is('code') && $(el).closest('pre').length) return;
+      const code = $(el).text().trim();
+      if (!code || code.length < 8 || code.length > 2000) return;
+      const norm = code.replace(/\s+/g, ' ');
+      if (seenCode.has(norm)) return;
+      seenCode.add(norm);
+      codeBlocks.push(code);
+    });
+
+    // ── Build structured markdown content ────────────────────────────────────
+    const rawText = contentEl.text().replace(/\s+/g, ' ').trim();
+    const mainText = rawText.slice(0, 6000);
+
+    const sections: string[] = [];
+    if (metaDesc) sections.push(metaDesc);
+    sections.push(mainText);
+
+    if (extractedLinks.length > 0) {
+      const linkLines = extractedLinks
+        .slice(0, 30)
+        .map(l => `- [${l.text}](${l.href})`);
+      sections.push('## Tools & Resources\n' + linkLines.join('\n'));
+    }
+
+    if (codeBlocks.length > 0) {
+      const codeSection = codeBlocks
+        .slice(0, 20)
+        .map(c => '```\n' + c + '\n```')
+        .join('\n\n');
+      sections.push('## Commands & Code\n' + codeSection);
+    }
+
+    const content = sections.join('\n\n');
+    const lowerContent = rawText.toLowerCase();
 
     const tagKeywords: Record<string, string[]> = {
       nmap: ['nmap', 'port scan'],
@@ -251,9 +307,10 @@ router.post('/scrape/url', async (req, res) => {
 
     res.json({
       title: title.slice(0, 200),
-      content: metaDesc ? `${metaDesc}\n\n${content}` : content,
+      content,
+      url,
       suggestedTags: suggestedTags.slice(0, 8),
-      wordCount: content.split(/\s+/).length,
+      wordCount: mainText.split(/\s+/).length,
     });
   } catch (err: any) {
     if (err.name === 'AbortError') {

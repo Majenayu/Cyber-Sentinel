@@ -7,6 +7,7 @@ export interface IKnowledge extends Document {
   category: string;
   tags: string[];
   source?: string;
+  sources: string[];
   createdAt: Date;
 }
 
@@ -17,6 +18,7 @@ const KnowledgeSchema: Schema = new Schema({
   category: { type: String, enum: ['tool', 'technique', 'lesson', 'command'], default: 'lesson' },
   tags: [{ type: String }],
   source: { type: String, default: null },
+  sources: { type: [String], default: [] },
   createdAt: { type: Date, default: Date.now },
 });
 
