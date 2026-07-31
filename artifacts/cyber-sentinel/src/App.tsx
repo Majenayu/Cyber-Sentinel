@@ -27,6 +27,7 @@ import TyposquatPage from "@/pages/TyposquatPage";
 import SkillTree from "@/pages/SkillTree";
 import TrackerPage from "@/pages/TrackerPage";
 import StealthPage from "@/pages/StealthPage";
+import TerminalPage from "@/pages/TerminalPage";
 import Sidebar from "@/components/Sidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Menu } from "lucide-react";
@@ -77,7 +78,7 @@ function Layout({ active }: { active: boolean }) {
       }
       if (gSequence.current[0] === 'g') {
         const shortcuts: Record<string, string> = {
-          d: '/', c: '/chat', k: '/vault', t: '/tools', m: '/commands', i: '/intrusions',
+          d: '/', c: '/chat', k: '/vault', t: '/tools', m: '/commands', i: '/intrusions', x: '/terminal',
         };
         const target = shortcuts[e.key.toLowerCase()];
         if (target) { navigate(target); gSequence.current = []; return; }
@@ -160,6 +161,7 @@ function Layout({ active }: { active: boolean }) {
             <Route path="/skill-tree" component={() => <Wrap title="Skill Tree"><SkillTree /></Wrap>} />
             <Route path="/tracker" component={() => <Wrap title="QR Tracker"><TrackerPage /></Wrap>} />
             <Route path="/stealth" component={() => <Wrap title="Stealth Mode"><StealthPage /></Wrap>} />
+            <Route path="/terminal" component={() => <Wrap title="Terminal"><TerminalPage /></Wrap>} />
             <Route component={NotFound} />
           </Switch>
         </div>

@@ -1,6 +1,8 @@
+import { createServer } from "http";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/scheduler";
+import { attachTerminalWs } from "./routes/terminal";
 
 // API_PORT is the dedicated port var for this service (avoids conflict with the Vite frontend
 // which owns the global PORT env var in development). In production on Render/Railway, set
@@ -13,7 +15,12 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid API_PORT value: "${rawPort}"`);
 }
 
-app.listen(port, (err) => {
+const server = createServer(app);
+
+// ── WebSocket terminal ────────────────────────────────────────────────────────
+attachTerminalWs(server);
+
+server.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);

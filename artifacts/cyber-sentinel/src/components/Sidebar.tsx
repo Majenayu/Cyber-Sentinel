@@ -68,6 +68,7 @@ const MAIN_NAV = [
   { href: '/tools', label: 'Tool Reference', icon: Wrench, shortcut: 'G T' },
   { href: '/commands', label: 'Saved Commands', icon: FileCode, shortcut: 'G M' },
   { href: '/intrusions', label: 'Intrusion Log', icon: ShieldAlert, shortcut: 'G I' },
+  { href: '/terminal', label: 'Terminal', icon: Terminal, shortcut: 'G X' },
 ];
 
 const SECURITY_NAV = [
