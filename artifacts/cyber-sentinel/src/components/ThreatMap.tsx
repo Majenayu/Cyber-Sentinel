@@ -25,8 +25,8 @@ function latLonToXY(lat: number, lon: number, w: number, h: number) {
 
 export default function ThreatMap() {
   const { theme } = useTheme();
-  const color = THEMES[theme]?.color ?? '#00cc33';
-  const rgb = color.replace('#', '').match(/.{2}/g)!.map(h => parseInt(h, 16)).join(',');
+  const color = (THEMES.find(t => t.id === theme)?.color) ?? '#00cc33';
+  const rgb = color.replace('#', '').match(/.{2}/g)!.map((h: string) => parseInt(h, 16)).join(',');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [dims, setDims] = useState({ w: 600, h: 300 });

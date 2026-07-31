@@ -287,6 +287,7 @@ router.post('/scrape/url', async (req, res) => {
     const content = sections.join('\n\n');
     const lowerContent = rawText.toLowerCase();
 
+    const suggestedTags: string[] = [];
     const tagKeywords: Record<string, string[]> = {
       nmap: ['nmap', 'port scan'],
       recon: ['reconnaissance', 'recon', 'enumeration'],

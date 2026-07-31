@@ -56,7 +56,7 @@ async function getIpInfo(ip: string) {
     }
     const res = await fetch(`http://ip-api.com/json/${cleanIp}?fields=status,country,regionName,city,isp,org,lat,lon,timezone,query`, { signal: AbortSignal.timeout(4000) });
     if (!res.ok) throw new Error('ip-api error');
-    const data = await res.json();
+    const data = await res.json() as any;
     if (data.status !== 'success') throw new Error('ip-api failed');
     return { country: data.country || 'Unknown', region: data.regionName || 'Unknown', city: data.city || 'Unknown', isp: data.isp || 'Unknown', org: data.org || 'Unknown', lat: data.lat || 0, lon: data.lon || 0, timezone: data.timezone || 'Unknown', ip: data.query || cleanIp };
   } catch {
@@ -283,8 +283,8 @@ router.post('/auth/intrusion', async (req: Request, res: Response) => {
       intrusion = existing;
     } else {
       intrusion = await Intrusion.create({
-        ip,
         ...ipInfo,
+        ip,
         attempts: 1,
         attemptedIds: attemptedId ? [attemptedId] : [],
         userAgent: ua,

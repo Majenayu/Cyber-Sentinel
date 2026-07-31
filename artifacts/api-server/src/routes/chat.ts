@@ -112,7 +112,7 @@ router.post('/chat/sessions/:id/messages/stream', async (req, res) => {
           const errText = await mistralRes.text().catch(() => '');
           throw new Error(`Mistral: ${mistralRes.status} ${errText.slice(0, 120)}`);
         }
-        const data = await mistralRes.json();
+        const data = await mistralRes.json() as any;
         fullContent = data.choices?.[0]?.message?.content ?? '';
         // Stream word-by-word for animation
         const words = fullContent.split(' ');
@@ -201,10 +201,10 @@ router.post('/chat/sessions/:id/messages', async (req, res) => {
 });
 
 /** Enhance prompt — rewrites a rough query into precise pentesting language */
-router.post('/chat/enhance-prompt', async (req, res) => {
+router.post('/chat/enhance-prompt', async (req, res): Promise<void> => {
   try {
     const { prompt } = req.body;
-    if (!prompt?.trim()) return res.status(400).json({ error: 'prompt required' });
+    if (!prompt?.trim()) { res.status(400).json({ error: 'prompt required' }); return; }
     // Use enhancePrompt from groq.ts which has the assistant-primer technique
     const enhanced = await enhancePrompt(prompt.trim());
     res.json({ enhanced });

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Terminal, Database, Wrench, Bot, Activity, ShieldCheck, CheckCircle, XCircle, Loader2, ShieldAlert } from 'lucide-react';
 import { Link, useLocation } from 'wouter';
-import { useGetStats } from '@workspace/api-client-react';
+import { useGetStats, getGetStatsQueryKey } from '@workspace/api-client-react';
 import { useQuery } from '@tanstack/react-query';
 
 interface ProviderSnapshot { key: string; label: string; configured: boolean; }
@@ -9,7 +9,7 @@ interface UsageData { providers: ProviderSnapshot[]; }
 interface HealthStatus { database: string; encryption: string; }
 
 export default function Dashboard() {
-  const { data: stats, isLoading } = useGetStats({ query: { refetchInterval: 30_000 } });
+  const { data: stats, isLoading } = useGetStats({ query: { queryKey: getGetStatsQueryKey(), refetchInterval: 30_000 } });
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [providers, setProviders] = useState<ProviderSnapshot[]>([]);
   const [healthLoading, setHealthLoading] = useState(true);

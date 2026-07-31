@@ -251,7 +251,7 @@ router.get("/tracker/honeypot/:id/stats", async (req, res) => {
     label: track.label,
     template: track.honeypotTemplate ?? "pixel",
     hits: track.hits.length,
-    log: track.hits.map(h => ({
+    log: track.hits.map((h: any) => ({
       ip: h.ip,
       userAgent: h.userAgent,
       referer: h.referer,

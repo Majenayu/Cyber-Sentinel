@@ -119,20 +119,20 @@ async function callGroqVision(apiKey: string, model: string, base64: string, mim
     throw new Error(`${model} returned ${response.status}: ${errText.slice(0, 200)}`);
   }
 
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content;
+  const data = await response.json() as any;
+  const content = data.choices?.[0]?.message?.content as string | undefined;
   if (!content) throw new Error(`${model} returned empty content`);
   return content;
 }
 
 /** POST /api/analyze/image — Groq vision analysis of an attached screenshot */
-router.post('/analyze/image', async (req, res) => {
+router.post('/analyze/image', async (req, res): Promise<void> => {
   try {
     const { base64, mimeType } = req.body;
-    if (!base64 || !mimeType) return res.status(400).json({ error: 'base64 and mimeType required' });
+    if (!base64 || !mimeType) { res.status(400).json({ error: 'base64 and mimeType required' }); return; }
 
     const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) return res.status(500).json({ error: 'GROQ_API_KEY not set' });
+    if (!apiKey) { res.status(500).json({ error: 'GROQ_API_KEY not set' }); return; }
 
     // Try primary model, fall back to secondary vision model
     const models = ['llama-3.2-11b-vision-preview', 'llama-3.2-90b-vision-preview'];
@@ -141,7 +141,7 @@ router.post('/analyze/image', async (req, res) => {
     for (const model of models) {
       try {
         const analysis = await callGroqVision(apiKey, model, base64, mimeType);
-        return res.json({ analysis, model });
+        res.json({ analysis, model }); return;
       } catch (err: any) {
         lastError = err.message;
         // Try next model

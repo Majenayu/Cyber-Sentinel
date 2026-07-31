@@ -54,6 +54,8 @@ interface Intrusion {
   usedPaste: boolean;
   darkMode: boolean;
   reducedMotion: boolean;
+  cookieEnabled: boolean;
+  doNotTrack: string | null;
   devicePixelRatio: number;
   availableScreen: string;
   viewport: string;

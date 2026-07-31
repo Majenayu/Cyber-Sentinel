@@ -260,7 +260,7 @@ export default function ChatPage() {
           // Compress/resize image via Canvas before sending (keeps base64 < 4MB)
           const compressImage = (src: string, maxDim = 1280, quality = 0.88): Promise<{ base64: string; mimeType: string }> =>
             new Promise((resolve) => {
-              const img = new Image();
+              const img = new window.Image();
               img.onload = () => {
                 const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
                 const w = Math.round(img.width * scale);

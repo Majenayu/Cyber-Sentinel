@@ -120,10 +120,10 @@ async function runSimplify(title: string, content: string): Promise<string> {
 }
 
 /** Preview-simplify: clean content without saving (used from the edit form) */
-router.post('/knowledge/simplify-preview', async (req, res) => {
+router.post('/knowledge/simplify-preview', async (req, res): Promise<void> => {
   try {
     const { title, content } = req.body;
-    if (!content?.trim()) return res.status(400).json({ error: 'content required' });
+    if (!content?.trim()) { res.status(400).json({ error: 'content required' }); return; }
     const simplified = await runSimplify(title ?? 'Entry', content);
     res.json({ content: simplified });
   } catch (error: any) {

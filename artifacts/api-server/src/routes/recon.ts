@@ -169,10 +169,10 @@ async function fetchHackerTarget(sanitized: string): Promise<string[]> {
   if (!r.ok) throw new Error(`HackerTarget returned ${r.status}`);
   const text = await r.text();
   if (text.includes("error") || text.includes("API count")) throw new Error(text.trim());
-  const subdomains = [...new Set(
+  const subdomains = [...new Set<string>(
     text.split("\n")
-      .map(line => line.split(",")[0]?.trim())
-      .filter(s => s && s.endsWith(sanitized) && s !== sanitized)
+      .map((line: string) => line.split(",")[0]?.trim())
+      .filter((s: string | undefined): s is string => !!s && s.endsWith(sanitized) && s !== sanitized)
   )].sort();
   return subdomains;
 }

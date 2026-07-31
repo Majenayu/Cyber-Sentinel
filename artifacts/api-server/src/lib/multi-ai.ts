@@ -89,7 +89,7 @@ function makeMistralProvider(apiKey: string): AIProvider {
             if (res.status === 401 || res.status === 403) break;
             continue;
           }
-          const data = await res.json();
+          const data = await res.json() as any;
           const content = data.choices?.[0]?.message?.content ?? '';
           if (!content) { lastErr = new Error(`Mistral ${model}: empty response`); continue; }
           return content;

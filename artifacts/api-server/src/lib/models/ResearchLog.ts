@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface IResearchLog extends Document {
+export interface IResearchLog extends Omit<Document, 'errors'> {
   runAt: Date;
   status: 'running' | 'done' | 'error';
   triggeredBy: 'scheduler' | 'manual';
@@ -8,7 +8,7 @@ export interface IResearchLog extends Document {
   kbEntriesCreated: number;
   toolsCreated: number;
   commandsCreated: number;
-  errors: string[];
+  errors: any[];
   discoveries: Array<{ source: string; title: string; tags: string[] }>;
   finishedAt?: Date;
 }
