@@ -6,16 +6,11 @@ import '@xterm/xterm/css/xterm.css';
 import { TerminalIcon, Wifi, WifiOff, RefreshCw, Maximize2, Minimize2 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 
-// Resolve the WebSocket URL relative to the API server
+// WebSocket goes through Vite's proxy (/ws/terminal → localhost:8080)
+// so it uses the same origin/port as the frontend — no cross-port routing.
 function getWsUrl() {
-  const apiBase = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
-  if (apiBase.startsWith('http')) {
-    return apiBase.replace(/^http/, 'ws').replace(/\/$/, '') + '/ws/terminal';
-  }
-  // Same-origin: use current host but point at API port 8080
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = location.hostname;
-  return `${proto}//${host}:8080/ws/terminal`;
+  return `${proto}//${location.host}/ws/terminal`;
 }
 
 // Theme-aware xterm colour palettes

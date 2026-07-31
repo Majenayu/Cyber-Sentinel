@@ -31,7 +31,7 @@ export function attachTerminalWs(server: Server) {
     // Use 'script' as a PTY shim so colours, readline, history all work
     const shell = spawn(
       "script",
-      ["-q", "-c", "bash --login", "/dev/null"],
+      ["-q", "-c", "bash -i", "/dev/null"],
       {
         env: {
           ...process.env,
@@ -39,7 +39,7 @@ export function attachTerminalWs(server: Server) {
           COLORTERM: "truecolor",
           HOME: process.env.HOME ?? "/root",
           SHELL: "/bin/bash",
-          PS1: "\\[\\033[01;32m\\][CyberSentinel]\\[\\033[00m\\] \\[\\033[01;34m\\]\\w\\[\\033[00m\\]$ ",
+          PS1: "\\[\\033[01;32m\\][CS]\\[\\033[00m\\] \\[\\033[01;34m\\]\\w\\[\\033[00m\\]$ ",
         },
         cwd: process.env.HOME ?? "/",
       }
