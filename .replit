@@ -1,5 +1,9 @@
 modules = ["nodejs-20", "web", "nix"]
 
+# Clicking "Run" installs all dependencies automatically.
+# This means importing on any account works without agent credits.
+run = "bash scripts/setup.sh"
+
 [deployment]
 router = "application"
 deploymentTarget = "autoscale"
