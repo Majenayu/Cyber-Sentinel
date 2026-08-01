@@ -3,6 +3,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/scheduler";
 import { attachTerminalWs } from "./routes/terminal";
+import { attachRemoteTerminalWs } from "./routes/remote-terminal";
 
 // ── Required-secrets guard ────────────────────────────────────────────────────
 // Exit cleanly (no crash-loop) when secrets haven't been added yet.
@@ -35,6 +36,7 @@ const server = createServer(app);
 
 // ── WebSocket terminal ────────────────────────────────────────────────────────
 attachTerminalWs(server);
+attachRemoteTerminalWs(server);
 
 server.listen(port, (err?: Error) => {
   if (err) {

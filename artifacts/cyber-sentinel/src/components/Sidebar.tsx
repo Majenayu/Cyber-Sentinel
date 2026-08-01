@@ -5,7 +5,7 @@ import {
   Database, Wrench, FileCode, Bot, Settings, Activity, ShieldAlert,
   Terminal, Bug, Globe, ShieldOff, Key, Zap, Hash, Users, Radar,
   AlertTriangle, GitBranch, Mail, Fingerprint, Search, ChevronLeft, ChevronRight,
-  Music, Radio
+  Music, Radio, MonitorDot
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -69,6 +69,7 @@ const MAIN_NAV = [
   { href: '/commands', label: 'Saved Commands', icon: FileCode, shortcut: 'G M' },
   { href: '/intrusions', label: 'Intrusion Log', icon: ShieldAlert, shortcut: 'G I' },
   { href: '/terminal', label: 'Terminal', icon: Terminal, shortcut: 'G X' },
+  { href: '/remote-terminal', label: 'Remote Terminal', icon: MonitorDot, shortcut: 'G R' },
 ];
 
 const SECURITY_NAV = [

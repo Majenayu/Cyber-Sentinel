@@ -27,6 +27,7 @@ import TyposquatPage from "@/pages/TyposquatPage";
 import SkillTree from "@/pages/SkillTree";
 import TrackerPage from "@/pages/TrackerPage";
 import TerminalPage from "@/pages/TerminalPage";
+import RemoteTerminalPage from "@/pages/RemoteTerminalPage";
 import Sidebar from "@/components/Sidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Menu } from "lucide-react";
@@ -160,6 +161,7 @@ function Layout({ active }: { active: boolean }) {
             <Route path="/skill-tree" component={() => <Wrap title="Skill Tree"><SkillTree /></Wrap>} />
             <Route path="/tracker" component={() => <Wrap title="QR Tracker"><TrackerPage /></Wrap>} />
             <Route path="/terminal" component={() => <Wrap title="Terminal"><TerminalPage /></Wrap>} />
+            <Route path="/remote-terminal" component={() => <Wrap title="Remote Terminal"><RemoteTerminalPage /></Wrap>} />
             <Route component={NotFound} />
           </Switch>
         </div>
