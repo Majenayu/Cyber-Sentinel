@@ -29,9 +29,55 @@ export function attachTerminalWs(server: Server) {
     logger.info({ sessions: sessionCount }, "Terminal session opened");
 
     // Use 'script' as a PTY shim so colours, readline, history all work
+    // Custom bashrc giving the terminal proper PATH and Windows command aliases
+    const bashrc = `
+# ── PATH: add iproute2 so 'ip' works ─────────────────────────────────
+export PATH="/nix/store/30yhi8slm1993fabx0052whmsv86x3zm-iproute2-6.11.0/sbin:/nix/store/30yhi8slm1993fabx0052whmsv86x3zm-iproute2-6.11.0/bin:$PATH"
+
+# ── Prompt ────────────────────────────────────────────────────────────
+export PS1="\\[\\033[01;32m\\][CS]\\[\\033[00m\\] \\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ "
+
+# ── Windows command aliases (map to Linux equivalents) ────────────────
+alias ipconfig='ip addr show'
+alias ipconfig/all='ip addr show'
+alias ifconfig='ip addr show'
+alias cls='clear'
+alias dir='ls -la'
+alias type='cat'
+alias del='rm'
+alias copy='cp'
+alias move='mv'
+alias md='mkdir'
+alias rd='rmdir'
+alias nslookup='dig'
+netstat() { ss "$@"; }
+
+# ── command_not_found_handle: suggest Linux equivalent ────────────────
+command_not_found_handle() {
+  local cmd="$1"
+  echo -e "\\033[31mbash: $cmd: command not found\\033[0m"
+  local lower
+  lower=$(echo "$cmd" | tr '[:upper:]' '[:lower:]')
+  case "$lower" in
+    ipconfig*)  echo -e "\\033[33mHint: use 'ip addr show' or 'ip a' for network interfaces\\033[0m" ;;
+    ifconfig*)  echo -e "\\033[33mHint: use 'ip addr show' or 'ip a'\\033[0m" ;;
+    tracert*)   echo -e "\\033[33mHint: use 'traceroute <host>'\\033[0m" ;;
+    netstat*)   echo -e "\\033[33mHint: use 'ss -tulnp' for listening ports\\033[0m" ;;
+    cls)        clear ;;
+    dir)        ls -la ;;
+    nmap*)      echo -e "\\033[33mHint: nmap may not be installed. Try 'nc -zv <host> <port>'\\033[0m" ;;
+  esac
+  return 127
+}
+export -f command_not_found_handle 2>/dev/null || true
+`;
+
+    const rcFile = `/tmp/cs-terminal-${Date.now()}.bashrc`;
+    require("fs").writeFileSync(rcFile, bashrc);
+
     const shell = spawn(
       "script",
-      ["-q", "-c", "bash -i", "/dev/null"],
+      ["-q", "-c", `bash --rcfile ${rcFile} -i`, "/dev/null"],
       {
         env: {
           ...process.env,
@@ -39,7 +85,6 @@ export function attachTerminalWs(server: Server) {
           COLORTERM: "truecolor",
           HOME: process.env.HOME ?? "/root",
           SHELL: "/bin/bash",
-          PS1: "\\[\\033[01;32m\\][CS]\\[\\033[00m\\] \\[\\033[01;34m\\]\\w\\[\\033[00m\\]$ ",
         },
         cwd: process.env.HOME ?? "/",
       }

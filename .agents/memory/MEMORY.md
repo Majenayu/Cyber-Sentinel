@@ -6,6 +6,7 @@
 - [SSE error contract](sse-error-contract.md) — all streaming error events must use { error: string } shape (not { text: "⚠..." }); Chat.tsx handles parsed.error with isError flag for red styling
 - [SSRF redirect fix](ssrf-scrape.md) — scrape.ts uses redirect:'manual' + per-hop validateScrapeUrl loop (max 5 hops); never use redirect:'follow'
 - [Artifact workflow port conflicts](artifact-workflow-ports.md) — artifact workflows inherit PORT from [userenv.development]; api-server must use API_PORT ?? "8080" not PORT fallback
+- [iproute2 nix path](iproute2-nix-path.md) — nix store has multiple iproute2 builds; only 30yhi8slm1993fabx0052whmsv86x3zm-iproute2-6.11.0 is x86_64; others are 32-bit
 - [Vision API / body size](vision-body-limit.md) — express.json() default 100kb limit silently drops base64 image bodies; must set limit:'20mb'; compress images client-side via Canvas before sending
 - [Security tool routes](security-routes.md) — cve/iprep/breach/recon/tracker/osint routes mounted in routes/index.ts; Globe3D is canvas-based (no three.js); ABUSEIPDB_KEY + HIBP_API_KEY are optional secrets for full IP rep + breach data
 - [Autonomous research system](auto-research.md) — daily 3AM scheduler scrapes 15 curated security sites; run lock prevents concurrent runs; never accept sources from request body (SSRF); 'general' category added to KB/Tools/Commands
