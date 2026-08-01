@@ -6,7 +6,7 @@ import '@xterm/xterm/css/xterm.css';
 import {
   MonitorDot, Wifi, WifiOff, Unplug, Maximize2, Minimize2,
   Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Sparkles, X,
-  Clipboard, Send,
+  Clipboard, ClipboardCopy, Send,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -296,7 +296,9 @@ export default function RemoteTerminalPage() {
               const idx = sugSelRef.current >= 0 ? sugSelRef.current : 0;
               const pick = suggestionsRef.current[idx];
               if (pick) {
-                sock.send(JSON.stringify({ type: 'data', data: '\x15' })); // Ctrl+U erase line
+                // Erase current input with backspaces (works on Windows CMD + Linux bash)
+                const backspaces = '\b \b'.repeat(inputBufRef.current.length);
+                if (backspaces) sock.send(JSON.stringify({ type: 'data', data: backspaces }));
                 sock.send(JSON.stringify({ type: 'data', data: pick.name }));
                 inputBufRef.current  = pick.name;
                 suggestionsRef.current = [];
@@ -427,12 +429,29 @@ export default function RemoteTerminalPage() {
   const acceptSuggestion = useCallback((pick: Suggestion) => {
     const sock = wsRef.current;
     if (!sock || sock.readyState !== WebSocket.OPEN) return;
-    sock.send(JSON.stringify({ type: 'data', data: '\x15' }));
+    // Erase current input with backspaces — works on Windows CMD and Linux bash
+    const backspaces = '\b \b'.repeat(inputBufRef.current.length);
+    if (backspaces) sock.send(JSON.stringify({ type: 'data', data: backspaces }));
     sock.send(JSON.stringify({ type: 'data', data: pick.name }));
     inputBufRef.current = pick.name;
     dismissSuggestions();
     xtermRef.current?.focus();
   }, [dismissSuggestions]);
+
+  // ── Copy selected text from terminal ──────────────────────────────────
+  const copySelection = useCallback(async () => {
+    const term = xtermRef.current;
+    if (!term) return;
+    const sel = term.getSelection();
+    if (!sel) { setPasteMsg('Select text first'); setTimeout(() => setPasteMsg(''), 2000); return; }
+    try {
+      await navigator.clipboard.writeText(sel);
+      setPasteMsg(`Copied ${sel.length} chars`);
+    } catch {
+      setPasteMsg('Clipboard blocked — try Ctrl+C');
+    }
+    setTimeout(() => setPasteMsg(''), 2500);
+  }, []);
 
   // ── Paste from clipboard → terminal ───────────────────────────────────
   const pasteFromClipboard = useCallback(async () => {
@@ -502,6 +521,12 @@ export default function RemoteTerminalPage() {
             <badge.Icon size={13} className={connState === 'connecting' ? 'animate-spin' : ''} />
             <span className="hidden sm:inline">{badge.label}</span>
           </div>
+          {connState === 'connected' && (
+            <button onClick={copySelection} title="Copy selected text from terminal"
+              className="flex items-center gap-1 px-2 py-1 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/40 text-xs font-mono transition-colors">
+              <ClipboardCopy size={12} /> <span className="hidden sm:inline">Copy</span>
+            </button>
+          )}
           {connState === 'connected' && (
             <button onClick={pasteFromClipboard} title="Paste clipboard into terminal"
               className="flex items-center gap-1 px-2 py-1 rounded border border-primary/30 text-primary/70 hover:bg-primary/10 text-xs font-mono transition-colors">
