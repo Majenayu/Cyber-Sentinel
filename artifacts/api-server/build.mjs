@@ -41,6 +41,10 @@ async function buildAll() {
       "xxhash-addon",
       "bufferutil",
       "utf-8-validate",
+      // ws must be external — when bundled by esbuild its WebSocketServer doesn't
+      // properly intercept the http.Server 'upgrade' event, causing Express to also
+      // handle the request and send an HTTP response that corrupts the WS stream.
+      "ws",
       "ssh2",
       "cpu-features",
       "dtrace-provider",

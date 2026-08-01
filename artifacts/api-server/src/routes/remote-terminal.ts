@@ -29,7 +29,8 @@ const MAX_SESSIONS = 5;
 let sessionCount = 0;
 
 export function attachRemoteTerminalWs(server: Server) {
-  const wss = new WebSocketServer({ server, path: "/ws/remote-terminal" });
+  // noServer + perMessageDeflate: false — same pattern as terminal.ts (see comments there)
+  const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
 
   wss.on("connection", (ws: WebSocket) => {
     if (sessionCount >= MAX_SESSIONS) {
@@ -81,6 +82,14 @@ export function attachRemoteTerminalWs(server: Server) {
       const { hostname, username, password, cols = 80, rows = 24 } = cfg;
       logger.info({ hostname, username }, "Remote terminal: connecting via Cloudflare tunnel");
 
+      // Helper: send a status line to the xterm without it being raw PTY data
+      function statusLine(msg: string) {
+        if (ws.readyState === WebSocket.OPEN)
+          ws.send(`\r\n\x1b[33m[→] ${msg}\x1b[0m\r\n`);
+      }
+
+      statusLine(`Launching Cloudflare Tunnel proxy to ${hostname}…`);
+
       // ── Spawn cloudflared as a ProxyCommand (stdio = SSH transport) ───
       cfProc = spawn(CF_PATH, ["access", "ssh", "--hostname", hostname], {
         stdio: ["pipe", "pipe", "pipe"],
@@ -117,6 +126,7 @@ export function attachRemoteTerminalWs(server: Server) {
 
       ssh.on("ready", () => {
         logger.info({ hostname, username }, "SSH ready — opening PTY shell");
+        statusLine("Tunnel established — opening shell…");
         ssh!.shell({ term: "xterm-256color", cols, rows }, (err, sh) => {
           if (err) {
             ws.send(JSON.stringify({ type: "error", message: `Shell error: ${err.message}` }));
@@ -183,5 +193,6 @@ export function attachRemoteTerminalWs(server: Server) {
     });
   });
 
-  logger.info("Remote terminal WebSocket attached at /ws/remote-terminal");
+  logger.info("Remote terminal WebSocket server ready (noServer mode)");
+  return wss;
 }

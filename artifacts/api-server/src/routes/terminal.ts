@@ -17,7 +17,12 @@ const MAX_SESSIONS = 10;
 let sessionCount = 0;
 
 export function attachTerminalWs(server: Server) {
-  const wss = new WebSocketServer({ server, path: "/ws/terminal" });
+  // noServer: true — we route upgrade events manually in index.ts so that multiple
+  // WebSocketServer instances on the same http.Server don't each send their own
+  // HTTP response (101 + 400) to a single upgrade request, which corrupts the stream.
+  // perMessageDeflate: false — prevents RSV1 mismatch when Vite's proxy forwards
+  // compressed frames from the browser to this server.
+  const wss = new WebSocketServer({ noServer: true, perMessageDeflate: false });
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     if (sessionCount >= MAX_SESSIONS) {
@@ -288,5 +293,6 @@ export -f command_not_found_handle 2>/dev/null || true
     });
   });
 
-  logger.info("Terminal WebSocket server attached at /ws/terminal");
+  logger.info("Terminal WebSocket server ready (noServer mode)");
+  return wss;
 }

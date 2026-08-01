@@ -85,6 +85,11 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      "/ws/remote-terminal": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
   preview: {

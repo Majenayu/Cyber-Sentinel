@@ -34,9 +34,31 @@ if (Number.isNaN(port) || port <= 0) {
 
 const server = createServer(app);
 
-// ── WebSocket terminal ────────────────────────────────────────────────────────
-attachTerminalWs(server);
-attachRemoteTerminalWs(server);
+// ── WebSocket routing ─────────────────────────────────────────────────────────
+// Both WebSocketServers use noServer:true so they never send their own HTTP
+// response to upgrade events. We intercept the single 'upgrade' event here and
+// hand it off to exactly ONE server — preventing the double-response bug where
+// the matching server sends 101 and the non-matching one immediately sends 400,
+// corrupting the WebSocket stream.
+const terminalWss       = attachTerminalWs(server);
+const remoteTerminalWss = attachRemoteTerminalWs(server);
+
+server.on("upgrade", (req, socket, head) => {
+  const pathname = req.url ?? "";
+
+  if (pathname === "/ws/terminal") {
+    terminalWss.handleUpgrade(req, socket, head, (ws) => {
+      terminalWss.emit("connection", ws, req);
+    });
+  } else if (pathname === "/ws/remote-terminal") {
+    remoteTerminalWss.handleUpgrade(req, socket, head, (ws) => {
+      remoteTerminalWss.emit("connection", ws, req);
+    });
+  } else {
+    // Unknown path — destroy cleanly without sending any HTTP response
+    socket.destroy();
+  }
+});
 
 server.listen(port, (err?: Error) => {
   if (err) {
