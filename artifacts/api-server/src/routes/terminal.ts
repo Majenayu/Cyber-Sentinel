@@ -44,9 +44,26 @@ export function attachTerminalWs(server: Server) {
 
     // Use 'script' as a PTY shim so colours, readline, history all work
     // Custom bashrc giving the terminal proper PATH and Windows command aliases
+    const sizeFile = `/tmp/cs-size-${Date.now()}.txt`;
+    let shellSizeFile = sizeFile;
+
     const bashrc = `
 # ── PATH: add iproute2 so 'ip' works ─────────────────────────────────
 export PATH="/nix/store/30yhi8slm1993fabx0052whmsv86x3zm-iproute2-6.11.0/sbin:/nix/store/30yhi8slm1993fabx0052whmsv86x3zm-iproute2-6.11.0/bin:$PATH"
+
+# ── Silent resize: apply pending size from file on each prompt ────────
+# The server writes "cols N rows M" to _CS_SIZE_FILE on window resize.
+# PROMPT_COMMAND picks it up silently — no stty lines appear in the terminal.
+_CS_SIZE_FILE="${sizeFile}"
+_cs_apply_size() {
+  local _sz
+  _sz=$(cat "$_CS_SIZE_FILE" 2>/dev/null)
+  if [ -n "$_sz" ]; then
+    stty \$_sz 2>/dev/null
+    : > "$_CS_SIZE_FILE"
+  fi
+}
+PROMPT_COMMAND="_cs_apply_size"
 
 # ── Prompt ────────────────────────────────────────────────────────────
 export PS1="\\[\\033[01;32m\\][CS]\\[\\033[00m\\] \\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ "
@@ -174,6 +191,7 @@ export -f command_not_found_handle 2>/dev/null || true
             SHELL: "/bin/bash",
             COLUMNS: String(cols),
             LINES: String(rows),
+            _CS_SIZE_FILE: sizeFile,
           },
           cwd: process.env.HOME ?? "/",
         }
@@ -223,10 +241,10 @@ export -f command_not_found_handle 2>/dev/null || true
           if (!shellStarted) {
             // First resize — spawn shell with the real terminal dimensions
             spawnShell(cols, rows);
-          } else if (shell?.stdin.writable) {
-            // Subsequent resize — update readline's idea of terminal width.
-            // stty is silent (no output), so this doesn't clutter the terminal.
-            shell.stdin.write(`stty cols ${cols} rows ${rows} 2>/dev/null\r`);
+          } else {
+            // Subsequent resize — write to size file; PROMPT_COMMAND picks it
+            // up silently on the next prompt (no stty lines in the terminal).
+            try { writeFileSync(shellSizeFile, `cols ${cols} rows ${rows}`); } catch { /* ignore */ }
           }
           return;
         }
