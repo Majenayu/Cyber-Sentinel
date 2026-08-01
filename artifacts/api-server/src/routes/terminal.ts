@@ -9,8 +9,8 @@
  */
 import { IncomingMessage, Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
-import { spawn } from "child_process";
-import { writeFileSync, unlinkSync } from "fs";
+import { spawn, exec } from "child_process";
+import { writeFileSync } from "fs";
 import { logger } from "../lib/logger";
 
 const MAX_SESSIONS = 10;
@@ -39,7 +39,7 @@ export PATH="/nix/store/30yhi8slm1993fabx0052whmsv86x3zm-iproute2-6.11.0/sbin:/n
 export PS1="\\[\\033[01;32m\\][CS]\\[\\033[00m\\] \\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ "
 
 # ── Windows / macOS command aliases ──────────────────────────────────
-alias ipconfig='ip addr show'
+# NOTE: ipconfig is defined as a function below (alias + function same name = syntax error)
 alias ifconfig='ip addr show'
 alias cls='clear'
 alias dir='ls -la'
@@ -168,11 +168,33 @@ export -f command_not_found_handle 2>/dev/null || true
     ws.on("message", (msg: Buffer | string) => {
       const data = Buffer.isBuffer(msg) ? msg : Buffer.from(msg as string);
 
-      // JSON control messages: { type: "resize", cols, rows }
+      // JSON control messages
       try {
         const ctrl = JSON.parse(data.toString("utf8"));
+
         if (ctrl.type === "resize") {
           // node-pty not available; resize is a no-op but we ack it silently
+          return;
+        }
+
+        if (ctrl.type === "get_commands") {
+          // Return every executable visible on $PATH — used by the frontend
+          // for universal command suggestions beyond the hardcoded database.
+          exec(
+            "compgen -c 2>/dev/null | sort -u",
+            { shell: "/bin/bash" },
+            (_err, stdout) => {
+              if (ws.readyState === WebSocket.OPEN) {
+                const commands = stdout
+                  .split("\n")
+                  .map((c) => c.trim())
+                  .filter((c) => c.length > 0 && c.length < 64);
+                ws.send(
+                  JSON.stringify({ type: "commands_list", commands })
+                );
+              }
+            }
+          );
           return;
         }
       } catch {

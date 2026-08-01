@@ -110,6 +110,9 @@ export default function TerminalPage() {
   const summaryTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sugSelRef          = useRef(-1);       // keyboard-selected suggestion index
 
+  // System commands fetched from server (compgen -c) — all executables on $PATH
+  const systemCommandsRef = useRef<string[]>([]);
+
   // UI state
   const [connected, setConnected]           = useState(false);
   const [connecting, setConnecting]         = useState(false);
@@ -126,6 +129,97 @@ export default function TerminalPage() {
   const palette  = getPalette(theme);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
+
+  /**
+   * Detect common syntax mistakes and return a correction suggestion.
+   * Examples: "ipconfig/all" → "ipconfig /all", "ping-4" → "ping -4"
+   */
+  const getSyntaxFix = useCallback((input: string): Suggestion | null => {
+    const t = input.trim();
+    if (!t || t.includes(' ')) return null; // only single-word mistakes
+
+    // cmd/flag → cmd /flag  (slash without space, e.g. ipconfig/all)
+    const slashM = t.match(/^([a-zA-Z][a-zA-Z0-9_-]*)\/(.+)$/);
+    if (slashM) {
+      const fixed = `${slashM[1]} /${slashM[2]}`;
+      return {
+        name: fixed,
+        desc: `⚡ Syntax fix: "${t}" → "${fixed}"  (add space before /)`,
+        category: 'fix',
+      };
+    }
+
+    // cmd-flag → cmd -flag  (dash without space, e.g. ping-4, ls-la)
+    // Exclude legitimate hyphenated command names (e.g. traceroute, git-log)
+    const dashM = t.match(/^([a-zA-Z]{2,})-([0-9].*)$/);
+    if (dashM) {
+      const fixed = `${dashM[1]} -${dashM[2]}`;
+      return {
+        name: fixed,
+        desc: `⚡ Syntax fix: "${t}" → "${fixed}"  (add space before flag)`,
+        category: 'fix',
+      };
+    }
+
+    // cmd--flag → cmd --flag
+    const dblDashM = t.match(/^([a-zA-Z][a-zA-Z0-9_-]*)--([a-zA-Z].+)$/);
+    if (dblDashM) {
+      const fixed = `${dblDashM[1]} --${dblDashM[2]}`;
+      return {
+        name: fixed,
+        desc: `⚡ Syntax fix: "${t}" → "${fixed}"`,
+        category: 'fix',
+      };
+    }
+
+    return null;
+  }, []);
+
+  /**
+   * Combined suggestions: syntax fixes first, then DB entries, then any
+   * matching executables from the server's compgen list.
+   */
+  const getExtendedSuggestions = useCallback((input: string, max = 7): Suggestion[] => {
+    const trimmed = input.trim();
+    if (!trimmed) return [];
+
+    const results: Suggestion[] = [];
+
+    // 1. Syntax fix hint (always first if applicable)
+    const fix = getSyntaxFix(trimmed);
+    if (fix) results.push(fix);
+
+    // 2. Rich DB suggestions
+    const dbSugs = getSuggestions(trimmed, max);
+    for (const s of dbSugs) {
+      if (!results.find(r => r.name === s.name)) results.push(s);
+    }
+
+    // 3. System commands fallback (fill up to max)
+    if (results.length < max && systemCommandsRef.current.length > 0) {
+      const firstWord = trimmed.toLowerCase().split(/\s+/)[0];
+      const alreadyHave = new Set(results.map(r => r.name));
+      let added = 0;
+      for (const cmd of systemCommandsRef.current) {
+        if (added >= max - results.length) break;
+        if (
+          cmd !== firstWord &&
+          cmd.startsWith(firstWord) &&
+          !alreadyHave.has(cmd)
+        ) {
+          results.push({
+            name: cmd,
+            desc: 'Available on this system — run with --help for details',
+            category: 'system',
+          });
+          alreadyHave.add(cmd);
+          added++;
+        }
+      }
+    }
+
+    return results.slice(0, max);
+  }, [getSyntaxFix]);
 
   /** Show translation banner briefly */
   const flashTranslation = useCallback((note: string) => {
@@ -158,11 +252,27 @@ export default function TerminalPage() {
       setError('');
       const term = xtermRef.current;
       if (term) ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+      // Request full list of executables for universal suggestions
+      ws.send(JSON.stringify({ type: 'get_commands' }));
     };
 
     ws.onmessage = (ev) => {
       const term = xtermRef.current;
       if (!term) return;
+
+      // ── Intercept JSON control messages before writing to terminal ─────
+      if (typeof ev.data === 'string' && ev.data.trimStart().startsWith('{')) {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === 'commands_list' && Array.isArray(msg.commands)) {
+            // Store system commands; dedupe against DB keys
+            systemCommandsRef.current = (msg.commands as string[]).filter(
+              (c: string) => typeof c === 'string' && c.length > 0
+            );
+            return; // Don't write JSON to terminal
+          }
+        } catch { /* not a control message — fall through */ }
+      }
 
       // Write raw bytes / text to xterm
       if (ev.data instanceof ArrayBuffer) {
@@ -269,7 +379,7 @@ export default function TerminalPage() {
 
       // ── Tab: accept top suggestion ────────────────────────────
       if (data === '\t') {
-        const sugs = getSuggestions(inputBufRef.current, 6);
+        const sugs = getExtendedSuggestions(inputBufRef.current, 7);
         const idx  = sugSelRef.current >= 0 ? sugSelRef.current : 0;
         if (sugs.length > 0) {
           const pick = sugs[idx];
@@ -277,7 +387,7 @@ export default function TerminalPage() {
           ws?.send('\x15');
           ws?.send(pick.name);
           inputBufRef.current = pick.name;
-          setSuggestions(getSuggestions(pick.name, 6));
+          setSuggestions(getExtendedSuggestions(pick.name, 7));
           setSugSelected(-1);
           sugSelRef.current = -1;
           return;
@@ -289,7 +399,7 @@ export default function TerminalPage() {
 
       // ── Arrow Up/Down: navigate suggestions ───────────────────
       if (data === '\x1b[A' || data === '\x1b[B') {
-        const sugs = getSuggestions(inputBufRef.current, 6);
+        const sugs = getExtendedSuggestions(inputBufRef.current, 7);
         if (sugs.length > 0) {
           const dir   = data === '\x1b[A' ? -1 : 1;
           const next  = Math.max(-1, Math.min(sugs.length - 1, sugSelRef.current + dir));
