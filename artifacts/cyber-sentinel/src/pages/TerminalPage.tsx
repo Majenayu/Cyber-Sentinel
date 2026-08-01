@@ -271,6 +271,12 @@ export default function TerminalPage() {
         setSuggestions(aiSugs.map(s => ({ ...s, ai: true })));
         setSugSelected(-1);
         sugSelRef.current = -1;
+      } else {
+        // AI timed out or returned nothing — fall back to static suggestions
+        const fallback = getExtendedSuggestions(snapshot, 7);
+        setSuggestions(fallback);
+        setSugSelected(-1);
+        sugSelRef.current = -1;
       }
     }, 350);
   }, []);
@@ -389,6 +395,7 @@ export default function TerminalPage() {
       allowProposedApi: true,
       scrollback: 5000,
       convertEol: false,
+      copyOnSelect: true,   // auto-copy on text selection
     });
 
     const fitAddon   = new FitAddon();
@@ -466,6 +473,24 @@ export default function TerminalPage() {
         }
         // No suggestions: forward for shell history
         ws?.send(data);
+        return;
+      }
+
+      // ── Ctrl+V: paste from clipboard ──────────────────────────
+      if (data === '\x16') {
+        navigator.clipboard.readText().then(text => {
+          if (!text) return;
+          // Update input buffer with pasted text
+          inputBufRef.current += text;
+          ws?.send(text);
+          setSuggestions(getExtendedSuggestions(inputBufRef.current, 7));
+          setSugSelected(-1);
+          sugSelRef.current = -1;
+          triggerAiSuggest(inputBufRef.current);
+        }).catch(() => {
+          // Clipboard permission denied — forward raw (let shell handle it)
+          ws?.send(data);
+        });
         return;
       }
 

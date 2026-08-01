@@ -29,6 +29,19 @@ export function attachTerminalWs(server: Server) {
     sessionCount++;
     logger.info({ sessions: sessionCount }, "Terminal session opened");
 
+    // Shell is spawned lazily on first resize message so COLUMNS/LINES match
+    // the actual xterm viewport from the start.
+    let shell: ReturnType<typeof spawn> | null = null;
+    let shellStarted = false;
+    let sessionDecremented = false;
+
+    function decrementOnce() {
+      if (!sessionDecremented) {
+        sessionDecremented = true;
+        sessionCount = Math.max(0, sessionCount - 1);
+      }
+    }
+
     // Use 'script' as a PTY shim so colours, readline, history all work
     // Custom bashrc giving the terminal proper PATH and Windows command aliases
     const bashrc = `
@@ -145,33 +158,55 @@ export -f command_not_found_handle 2>/dev/null || true
     const rcFile = `/tmp/cs-terminal-${Date.now()}.bashrc`;
     writeFileSync(rcFile, bashrc);
 
-    const shell = spawn(
-      "script",
-      ["-q", "-c", `bash --rcfile ${rcFile} -i`, "/dev/null"],
-      {
-        env: {
-          ...process.env,
-          TERM: "xterm-256color",
-          COLORTERM: "truecolor",
-          HOME: process.env.HOME ?? "/root",
-          SHELL: "/bin/bash",
-        },
-        cwd: process.env.HOME ?? "/",
-      }
-    );
+    // ── Lazy shell spawn — called on first resize message so COLUMNS/LINES
+    //    match the actual xterm viewport, fixing the "same-line" wrapping bug.
+    function spawnShell(cols: number, rows: number) {
+      shellStarted = true;
+      const s = spawn(
+        "script",
+        ["-q", "-c", `bash --rcfile ${rcFile} -i`, "/dev/null"],
+        {
+          env: {
+            ...process.env,
+            TERM: "xterm-256color",
+            COLORTERM: "truecolor",
+            HOME: process.env.HOME ?? "/root",
+            SHELL: "/bin/bash",
+            COLUMNS: String(cols),
+            LINES: String(rows),
+          },
+          cwd: process.env.HOME ?? "/",
+        }
+      );
 
-    // ── shell → client ──────────────────────────────────────────────
-    shell.stdout.on("data", (data: Buffer) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      }
-    });
+      // ── shell → client ────────────────────────────────────────────
+      s.stdout.on("data", (data: Buffer) => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(data);
+      });
+      s.stderr.on("data", (data: Buffer) => {
+        if (ws.readyState === WebSocket.OPEN) ws.send(data);
+      });
 
-    shell.stderr.on("data", (data: Buffer) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(data);
-      }
-    });
+      s.on("exit", (code) => {
+        logger.info({ code }, "Terminal shell exited");
+        decrementOnce();
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(`\r\n\x1b[33m[CyberSentinel] Session ended (exit ${code ?? 0}).\x1b[0m\r\n`);
+          ws.close();
+        }
+      });
+
+      s.on("error", (err) => {
+        logger.error({ err }, "Terminal shell error");
+        decrementOnce();
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(`\r\n\x1b[31m[CyberSentinel] Shell error: ${err.message}\x1b[0m\r\n`);
+          ws.close();
+        }
+      });
+
+      shell = s;
+    }
 
     // ── client → shell ──────────────────────────────────────────────
     ws.on("message", (msg: Buffer | string) => {
@@ -182,13 +217,22 @@ export -f command_not_found_handle 2>/dev/null || true
         const ctrl = JSON.parse(data.toString("utf8"));
 
         if (ctrl.type === "resize") {
-          // node-pty not available; resize is a no-op but we ack it silently
+          const cols = Math.max(40, Math.min(500, Number(ctrl.cols) || 220));
+          const rows = Math.max(10, Math.min(200, Number(ctrl.rows) || 50));
+
+          if (!shellStarted) {
+            // First resize — spawn shell with the real terminal dimensions
+            spawnShell(cols, rows);
+          } else if (shell?.stdin.writable) {
+            // Subsequent resize — update readline's idea of terminal width.
+            // stty is silent (no output), so this doesn't clutter the terminal.
+            shell.stdin.write(`stty cols ${cols} rows ${rows} 2>/dev/null\r`);
+          }
           return;
         }
 
         if (ctrl.type === "get_commands") {
-          // Return every executable visible on $PATH — used by the frontend
-          // for universal command suggestions beyond the hardcoded database.
+          // Return every executable visible on $PATH for universal suggestions.
           exec(
             "compgen -c 2>/dev/null | sort -u",
             { shell: "/bin/bash" },
@@ -198,9 +242,7 @@ export -f command_not_found_handle 2>/dev/null || true
                   .split("\n")
                   .map((c) => c.trim())
                   .filter((c) => c.length > 0 && c.length < 64);
-                ws.send(
-                  JSON.stringify({ type: "commands_list", commands })
-                );
+                ws.send(JSON.stringify({ type: "commands_list", commands }));
               }
             }
           );
@@ -210,39 +252,21 @@ export -f command_not_found_handle 2>/dev/null || true
         // Not JSON — raw keystroke, pass through
       }
 
-      if (shell.stdin.writable) {
+      if (shell?.stdin.writable) {
         shell.stdin.write(data);
       }
     });
 
     // ── cleanup ──────────────────────────────────────────────────────
-    shell.on("exit", (code) => {
-      logger.info({ code }, "Terminal shell exited");
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(`\r\n\x1b[33m[CyberSentinel] Session ended (exit ${code ?? 0}).\x1b[0m\r\n`);
-        ws.close();
-      }
-      sessionCount = Math.max(0, sessionCount - 1);
-    });
-
-    shell.on("error", (err) => {
-      logger.error({ err }, "Terminal shell error");
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(`\r\n\x1b[31m[CyberSentinel] Shell error: ${err.message}\x1b[0m\r\n`);
-        ws.close();
-      }
-      sessionCount = Math.max(0, sessionCount - 1);
-    });
-
     ws.on("close", () => {
       logger.info("Terminal WebSocket closed");
-      if (!shell.killed) shell.kill("SIGHUP");
-      sessionCount = Math.max(0, sessionCount - 1);
+      decrementOnce();
+      if (shell && !shell.killed) shell.kill("SIGHUP");
     });
 
     ws.on("error", (err) => {
       logger.warn({ err }, "Terminal WebSocket error");
-      if (!shell.killed) shell.kill("SIGHUP");
+      if (shell && !shell.killed) shell.kill("SIGHUP");
     });
   });
 
