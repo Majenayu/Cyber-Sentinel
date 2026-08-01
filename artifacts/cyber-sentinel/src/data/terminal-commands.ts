@@ -758,9 +758,16 @@ export const ARGUMENT_COMPLETIONS: ArgCompletion[] = [
   { full: 'hashcat -m 1000 hash.txt wordlist.txt',   desc: 'Crack NTLM (Windows password) hashes with a wordlist.', category: 'security' },
   { full: 'hashcat -m 0 -a 3 hash.txt ?a?a?a?a?a?a', desc: 'Brute-force all 6-character combinations against MD5 hashes.', category: 'security' },
   // ── hydra ──────────────────────────────────────────────────────────────
-  { full: 'hydra -l admin -P wordlist.txt ssh://192.168.1.1',    desc: 'Brute-force SSH login for user "admin" using a password list.', category: 'security' },
-  { full: 'hydra -l admin -P wordlist.txt http-get://target.com',desc: 'Brute-force HTTP basic authentication with a password list.', category: 'security' },
-  { full: 'hydra -L users.txt -P pass.txt ftp://192.168.1.1',   desc: 'Try many user+password combinations against an FTP server.', category: 'security' },
+  { full: 'hydra -l admin -P wordlist.txt ssh://192.168.1.1',                                                                                            desc: 'Brute-force SSH login for user "admin" using a password list.', category: 'security' },
+  { full: 'hydra -l admin -P wordlist.txt http-get://target.com',                                                                                        desc: 'Brute-force HTTP basic authentication with a password list.', category: 'security' },
+  { full: 'hydra -L users.txt -P pass.txt ftp://192.168.1.1',                                                                                            desc: 'Try many user+password combinations against an FTP server.', category: 'security' },
+  { full: 'hydra -l admin -P /usr/share/wordlists/rockyou.txt http-post-form "target.com/login:username=^USER^&password=^PASS^:Invalid"',                 desc: 'Brute-force a website login form (POST). Replace field names and error text to match the target page.', category: 'security' },
+  { full: 'hydra -l admin -P /usr/share/wordlists/rockyou.txt http-post-form "target.com/login:user=^USER^&pass=^PASS^:Login failed"',                    desc: 'Crack a web login form — adjust username/password field names and the failure message.', category: 'security' },
+  { full: 'hydra -l admin -P /usr/share/wordlists/rockyou.txt http-get://target.com/admin',                                                              desc: 'Brute-force an HTTP Basic Auth protected admin page.', category: 'security' },
+  { full: 'hydra -l admin -P rockyou.txt http-post-form "target.com/login:username=^USER^&password=^PASS^:incorrect"',                                   desc: 'Web login brute-force using rockyou wordlist. Tweak field names and error string for each site.', category: 'security' },
+  { full: 'hydra -L users.txt -P pass.txt http-post-form "target.com/login:username=^USER^&password=^PASS^:Wrong"',                                      desc: 'Try many usernames and passwords against a web login form.', category: 'security' },
+  { full: 'hydra -l root -P /usr/share/wordlists/rockyou.txt mysql://192.168.1.1',                                                                       desc: 'Brute-force a MySQL database login remotely.', category: 'security' },
+  { full: 'hydra -l admin -P wordlist.txt rdp://192.168.1.1',                                                                                            desc: 'Brute-force Windows Remote Desktop (RDP) credentials.', category: 'security' },
   // ── gobuster ───────────────────────────────────────────────────────────
   { full: 'gobuster dir -u http://target.com -w /usr/share/wordlists/dirb/common.txt', desc: 'Find hidden directories on a web server using a wordlist.', category: 'security' },
   { full: 'gobuster dns -d target.com -w subdomains.txt',        desc: 'Enumerate DNS subdomains of a domain using a wordlist.', category: 'security' },
@@ -824,18 +831,31 @@ export const ARGUMENT_COMPLETIONS: ArgCompletion[] = [
 
 /**
  * Get argument-completion suggestions when the user has typed a command + partial argument.
- * e.g.  "ping goo"   → ["ping google.com", "ping google.com -c 4", ...]
- *       "nmap -s"    → ["nmap -sV ...", "nmap -sS ...", "nmap -sn ...", ...]
+ *
+ * Priority:
+ *  1. Prefix match  — "ping goo"  → ["ping google.com", ...]
+ *  2. Command fallback — "ping xyz123" → still shows all "ping …" completions
+ *     so the operator can see what arguments are available even mid-word.
  */
 export function getArgumentSuggestions(input: string, max = 6): Array<{ name: string; desc: string; category: string }> {
   const trimmed = input.trim();
   if (!trimmed || !trimmed.includes(' ')) return []; // only activate when args present
 
   const lower = trimmed.toLowerCase();
-  return ARGUMENT_COMPLETIONS
-    .filter(c => c.full.toLowerCase().startsWith(lower))
-    .slice(0, max)
-    .map(c => ({ name: c.full, desc: c.desc, category: c.category }));
+  const cmd   = lower.split(/\s+/)[0]; // first word (the command)
+
+  // 1. Exact prefix match — highest priority
+  const prefixMatches = ARGUMENT_COMPLETIONS.filter(c => c.full.toLowerCase().startsWith(lower));
+  if (prefixMatches.length > 0) {
+    return prefixMatches.slice(0, max).map(c => ({ name: c.full, desc: c.desc, category: c.category }));
+  }
+
+  // 2. Command fallback — show all known completions for this command so the
+  //    user can see what arguments are available even if their partial arg
+  //    doesn't match any completion yet.
+  const cmdPrefix = cmd + ' ';
+  const cmdMatches = ARGUMENT_COMPLETIONS.filter(c => c.full.toLowerCase().startsWith(cmdPrefix));
+  return cmdMatches.slice(0, max).map(c => ({ name: c.full, desc: c.desc, category: c.category }));
 }
 
 /**
