@@ -124,9 +124,18 @@ command_not_found_handle() {
   local lower
   lower=$(echo "$cmd" | tr '[:upper:]' '[:lower:]')
   case "$lower" in
-    tracert*)  echo -e "\\033[33mHint: use 'traceroute <host>'\\033[0m" ;;
-    nmap*)     echo -e "\\033[33mHint: nmap may not be installed. Try 'nc -zv <host> <port>'\\033[0m" ;;
-    ping-*)    echo -e "\\033[33mHint: use 'ping <host>' — the CS ping wrapper handles fallback\\033[0m" ;;
+    tracert*)     echo -e "\\033[33m[CS] Hint: Windows tracert → use 'traceroute <host>' on Linux\\033[0m" ;;
+    ping-*)       echo -e "\\033[33m[CS] Hint: use 'ping <host>' — the CS ping wrapper handles fallback\\033[0m" ;;
+    ipconfig*)    echo -e "\\033[33m[CS] Hint: Windows ipconfig → use 'ip addr show' or 'ifconfig' here\\033[0m" ;;
+    ifconfig*)    echo -e "\\033[33m[CS] Hint: use 'ip addr show' — ifconfig is aliased to it\\033[0m" ;;
+    netstat*)     echo -e "\\033[33m[CS] Hint: use 'ss -tulnp' — netstat is aliased to ss here\\033[0m" ;;
+    metasploit*)  echo -e "\\033[33m[CS] Hint: run 'msfconsole' to launch the Metasploit Framework\\033[0m" ;;
+    burpsuite*)   echo -e "\\033[33m[CS] Hint: Burp Suite needs a graphical display (GUI) — not available in this terminal\\033[0m" ;;
+    wireshark*)   echo -e "\\033[33m[CS] Hint: Wireshark needs a GUI — use 'tcpdump' for packet capture here\\033[0m" ;;
+    python*)      echo -e "\\033[33m[CS] Hint: try 'python3 --version' — Python 3 is available\\033[0m" ;;
+    apt*|apt-get*)echo -e "\\033[33m[CS] Hint: this system uses Nix. Try 'nix-env -i <package>' to install software\\033[0m" ;;
+    docker*)      echo -e "\\033[33m[CS] Hint: Docker is not available in this container environment\\033[0m" ;;
+    git*)         echo -e "\\033[33m[CS] Hint: try 'which git' — git may be available\\033[0m" ;;
   esac
   return 127
 }

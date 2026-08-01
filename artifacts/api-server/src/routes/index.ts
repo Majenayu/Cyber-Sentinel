@@ -18,6 +18,7 @@ import osintRouter from "./osint";
 import stealthRouter from "./stealth";
 import pushRouter from "./push";
 import researchRouter from "./research";
+import terminalSuggestRouter from "./terminal-suggest";
 
 const router: IRouter = Router();
 
@@ -40,5 +41,6 @@ router.use(osintRouter);
 router.use(stealthRouter);
 router.use(pushRouter);
 router.use(researchRouter);
+router.use(terminalSuggestRouter);
 
 export default router;

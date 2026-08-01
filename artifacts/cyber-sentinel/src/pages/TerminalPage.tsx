@@ -5,7 +5,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import {
   TerminalIcon, Wifi, WifiOff, RefreshCw,
-  Maximize2, Minimize2, ArrowRightLeft, Info, X,
+  Maximize2, Minimize2, ArrowRightLeft, Info, X, Sparkles, Loader2,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
@@ -17,6 +17,23 @@ import {
 function getWsUrl() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${proto}//${location.host}/ws/terminal`;
+}
+
+// ── AI suggestion fetcher ─────────────────────────────────────────────────
+async function fetchAiSuggestions(input: string): Promise<Array<{ name: string; desc: string; category: string }>> {
+  try {
+    const res = await fetch('/api/terminal/suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ input }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.suggestions) ? data.suggestions : [];
+  } catch {
+    return [];
+  }
 }
 
 // ── Theme-aware xterm palettes ────────────────────────────────────────────
@@ -90,7 +107,7 @@ const MOBILE_KEYS = [
 ];
 
 // ── Types ─────────────────────────────────────────────────────────────────
-interface Suggestion { name: string; desc: string; category: string; usage?: string; }
+interface Suggestion { name: string; desc: string; category: string; usage?: string; ai?: boolean; }
 interface SummaryState { command: string; info: CommandInfo; translated: string | null; }
 
 // ── Component ─────────────────────────────────────────────────────────────
@@ -113,6 +130,10 @@ export default function TerminalPage() {
   // System commands fetched from server (compgen -c) — all executables on $PATH
   const systemCommandsRef = useRef<string[]>([]);
 
+  // AI debounce refs
+  const aiDebounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aiInputRef      = useRef(''); // last input sent to AI (prevents stale updates)
+
   // UI state
   const [connected, setConnected]           = useState(false);
   const [connecting, setConnecting]         = useState(false);
@@ -123,6 +144,7 @@ export default function TerminalPage() {
   const [translation, setTranslation]       = useState<string | null>(null); // banner
   const [summary, setSummary]               = useState<SummaryState | null>(null);
   const [showSummary, setShowSummary]       = useState(false);
+  const [aiLoading, setAiLoading]           = useState(false);
 
   const { theme } = useTheme();
   const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || window.innerWidth < 768;
@@ -226,6 +248,32 @@ export default function TerminalPage() {
 
     return results.slice(0, max);
   }, [getSyntaxFix]);
+
+  /**
+   * Trigger a debounced AI suggestion fetch.
+   * Static suggestions already show instantly; AI results swap in after ~350ms.
+   */
+  const triggerAiSuggest = useCallback((input: string) => {
+    if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
+    const trimmed = input.trim();
+    if (!trimmed || trimmed.length < 2) { setAiLoading(false); return; }
+
+    setAiLoading(true);
+    aiInputRef.current = trimmed;
+
+    aiDebounceRef.current = setTimeout(async () => {
+      const snapshot = trimmed; // capture so we can discard stale responses
+      const aiSugs = await fetchAiSuggestions(snapshot);
+      // Only apply if the user hasn't moved on to a different input
+      if (aiInputRef.current !== snapshot) return;
+      setAiLoading(false);
+      if (aiSugs.length > 0) {
+        setSuggestions(aiSugs.map(s => ({ ...s, ai: true })));
+        setSugSelected(-1);
+        sugSelRef.current = -1;
+      }
+    }, 350);
+  }, []);
 
   /** Show translation banner briefly */
   const flashTranslation = useCallback((note: string) => {
@@ -377,6 +425,9 @@ export default function TerminalPage() {
         cmdRunningRef.current = raw.length > 0;
         outputBufRef.current  = '';
         inputBufRef.current   = '';
+        if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
+        aiInputRef.current = '';
+        setAiLoading(false);
         setSuggestions([]);
         setSugSelected(-1);
         sugSelRef.current = -1;
@@ -420,6 +471,9 @@ export default function TerminalPage() {
 
       // ── Escape: close suggestions ─────────────────────────────
       if (data === '\x1b') {
+        if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
+        aiInputRef.current = '';
+        setAiLoading(false);
         setSuggestions([]);
         setSugSelected(-1);
         sugSelRef.current = -1;
@@ -429,8 +483,11 @@ export default function TerminalPage() {
 
       // ── Ctrl+C: clear state ───────────────────────────────────
       if (data === '\x03') {
+        if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
+        aiInputRef.current    = '';
         inputBufRef.current   = '';
         cmdRunningRef.current = false;
+        setAiLoading(false);
         setSuggestions([]);
         setSugSelected(-1);
         sugSelRef.current = -1;
@@ -441,9 +498,11 @@ export default function TerminalPage() {
       // ── Backspace ─────────────────────────────────────────────
       if (data === '\x7f' || data === '\b') {
         inputBufRef.current = inputBufRef.current.slice(0, -1);
-        setSuggestions(getExtendedSuggestions(inputBufRef.current, 7));
+        const staticSugs = getExtendedSuggestions(inputBufRef.current, 7);
+        setSuggestions(staticSugs);
         sugSelRef.current = -1;
         setSugSelected(-1);
+        triggerAiSuggest(inputBufRef.current);
         ws?.send(data);
         return;
       }
@@ -451,10 +510,11 @@ export default function TerminalPage() {
       // ── Printable character ───────────────────────────────────
       if (data >= ' ') {
         inputBufRef.current += data;
-        const sugs = getExtendedSuggestions(inputBufRef.current, 7);
-        setSuggestions(sugs);
+        const staticSugs = getExtendedSuggestions(inputBufRef.current, 7);
+        setSuggestions(staticSugs);
         sugSelRef.current = -1;
         setSugSelected(-1);
+        triggerAiSuggest(inputBufRef.current);
       }
 
       // Always forward to server
@@ -599,23 +659,44 @@ export default function TerminalPage() {
         />
 
         {/* ── Suggestion overlay ─────────────────────────────────────────── */}
-        {suggestions.length > 0 && (
+        {(suggestions.length > 0 || aiLoading) && (
           <div
-            className="absolute bottom-0 left-0 right-0 border-t font-mono z-20 max-h-52 overflow-y-auto"
-            style={{ borderColor: accentColor + '30', background: bgColor + 'f0' }}
+            className="absolute bottom-0 left-0 right-0 border-t font-mono z-20 max-h-56 overflow-y-auto"
+            style={{ borderColor: accentColor + '30', background: bgColor + 'f4' }}
           >
             {/* Header row */}
             <div
-              className="flex items-center justify-between px-3 py-1 border-b text-[10px] uppercase tracking-widest select-none"
-              style={{ borderColor: accentColor + '20', color: accentColor + '70' }}
+              className="flex items-center justify-between px-3 py-1 border-b text-[10px] uppercase tracking-widest select-none sticky top-0"
+              style={{ borderColor: accentColor + '20', color: accentColor + '70', background: bgColor + 'fa' }}
             >
               <span className="flex items-center gap-1.5">
-                <Info size={9} />
-                Suggestions · Tab to accept · ↑↓ to navigate · Esc to dismiss
+                {aiLoading ? (
+                  <>
+                    <Loader2 size={9} className="animate-spin" />
+                    <span style={{ color: accentColor + 'aa' }}>AI thinking…</span>
+                  </>
+                ) : suggestions[0]?.ai ? (
+                  <>
+                    <Sparkles size={9} style={{ color: accentColor }} />
+                    <span style={{ color: accentColor + 'cc' }}>AI Suggestions</span>
+                    <span className="opacity-40 ml-1 normal-case tracking-normal">· Tab=accept · ↑↓=navigate · Esc=dismiss</span>
+                  </>
+                ) : (
+                  <>
+                    <Info size={9} />
+                    <span>Suggestions · Tab=accept · ↑↓=navigate · Esc=dismiss</span>
+                  </>
+                )}
               </span>
               <button
-                className="hover:opacity-70 transition-opacity"
-                onPointerDown={(e) => { e.preventDefault(); setSuggestions([]); xtermRef.current?.focus(); }}
+                className="hover:opacity-70 transition-opacity ml-2 shrink-0"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
+                  setAiLoading(false);
+                  setSuggestions([]);
+                  xtermRef.current?.focus();
+                }}
               >
                 <X size={10} />
               </button>
@@ -625,7 +706,7 @@ export default function TerminalPage() {
               const selected = i === sugSelected;
               return (
                 <div
-                  key={s.name}
+                  key={s.name + i}
                   className="flex items-start gap-3 px-3 py-2 cursor-pointer transition-colors select-none"
                   style={{
                     background: selected ? accentColor + '18' : 'transparent',
@@ -635,38 +716,46 @@ export default function TerminalPage() {
                 >
                   {/* Command name */}
                   <span
-                    className="font-bold text-sm shrink-0 w-36 truncate"
+                    className="font-bold text-sm shrink-0 min-w-0 max-w-[45%] truncate"
                     style={{ color: selected ? accentColor : accentColor + 'cc' }}
+                    title={s.name}
                   >
                     {s.name}
                   </span>
 
                   {/* Description */}
-                  <span className="text-xs text-muted-foreground/80 flex-1 leading-5 line-clamp-2">
+                  <span className="text-xs text-muted-foreground/80 flex-1 leading-5 line-clamp-2 min-w-0">
                     {s.desc}
                   </span>
 
-                  {/* Category badge */}
-                  <span
-                    className="text-[10px] shrink-0 px-1.5 py-0.5 rounded border"
-                    style={{ borderColor: accentColor + '25', color: accentColor + '70' }}
-                  >
-                    {CATEGORY_LABELS[s.category] ?? s.category}
-                  </span>
+                  {/* Badges */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {s.ai && (
+                      <span
+                        className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded"
+                        style={{ background: accentColor + '22', color: accentColor + 'cc' }}
+                      >
+                        <Sparkles size={7} />AI
+                      </span>
+                    )}
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded border"
+                      style={{ borderColor: accentColor + '25', color: accentColor + '60' }}
+                    >
+                      {CATEGORY_LABELS[s.category] ?? s.category}
+                    </span>
+                  </div>
                 </div>
               );
             })}
 
-            {/* Usage hint for selected suggestion */}
-            {sugSelected >= 0 && suggestions[sugSelected]?.usage && (
-              <div
-                className="px-3 py-1.5 border-t text-[11px] font-mono"
-                style={{ borderColor: accentColor + '20', color: accentColor + '90' }}
-              >
-                <span className="opacity-60">Example: </span>
-                <span>{suggestions[sugSelected].usage}</span>
+            {/* Loading placeholder rows while AI is fetching */}
+            {aiLoading && suggestions.length === 0 && [1,2,3].map(n => (
+              <div key={n} className="flex items-center gap-3 px-3 py-2 select-none opacity-30 animate-pulse">
+                <div className="h-3 rounded w-32" style={{ background: accentColor + '40' }} />
+                <div className="h-3 rounded flex-1" style={{ background: accentColor + '25' }} />
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>
