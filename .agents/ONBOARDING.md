@@ -1,18 +1,23 @@
 # Agent Onboarding — CyberSentinel
 
-> **IMPORTANT — Read this file first and stop exploring.**
-> This file contains everything you need. Do NOT read README.md, package.json, setup.sh, replit.nix, or any other files before asking the user what they want. Every extra file read costs AI credits. Ask first, act second.
+> ⚠️ **STOP. Read this file and nothing else. Do NOT open README.md, package.json, replit.md, setup.sh, replit.nix, or any other file. Do NOT run `ls`, `find`, or any shell command. Every file read and every shell command costs the user AI credits. This file has everything you need.**
 
 ---
 
 ## On import — the only correct flow
 
-1. Ask the user ONE question: do they want to (a) get the app running, (b) make specific changes, or (c) leave it as imported?
-2. If they say **leave it as imported** → mark the task complete immediately. Do nothing else.
-3. If they say **get it running** → follow the "Running the app" section below.
-4. If they say **make changes** → ask what changes and proceed.
+1. **Ask ONE question immediately** (use AskQuestion tool):
+   > "What would you like to do with CyberSentinel?"
+   > Options: (a) Get it running on Replit, (b) Make specific changes, (c) Leave it as imported
 
-Do NOT run `pnpm install`, set env vars, start workflows, read files, or verify anything before the user answers.
+2. Wait for the answer. Do nothing else before you get it.
+
+3. Based on the answer:
+   - **Leave it as imported** → call `markTaskComplete` immediately. Do nothing else.
+   - **Get it running** → follow the "Running the app" section below.
+   - **Make changes** → ask what changes, then proceed.
+
+**Never read any file or run any command before the user answers the question.**
 
 ---
 
@@ -37,7 +42,7 @@ Login operator ID: **`Majen`**
 pnpm install
 ```
 
-**Step 2 — Secrets** (check first, only request what's missing):
+**Step 2 — Secrets** (check first with `viewEnvVars`, only request what's missing):
 
 | Key | Required | Purpose |
 |---|---|---|
@@ -46,12 +51,6 @@ pnpm install
 | `MISTRAL_API_KEY` | No | Enables Best-AI mode |
 | `SESSION_SECRET` | No | Signs session cookies |
 | `CYBERSENTINEL_API_SECRET` | No | API lock — production only |
-
-```javascript
-// Check which secrets exist before requesting any
-const status = await viewEnvVars({ type: "secret" });
-console.log(JSON.stringify(status));
-```
 
 **Step 3 — `.replit` config** — should already be correct. Only rewrite if preview is blank:
 - `[[ports]] localPort = 25629` → `externalPort = 80`
