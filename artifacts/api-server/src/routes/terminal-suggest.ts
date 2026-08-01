@@ -41,40 +41,81 @@ Respond ONLY with a valid JSON array — no markdown, no explanation, no code fe
 function buildWindowsPrompt(username: string) {
   const user = username || 'pgayu';
   const htbBase = `C:\\Users\\${user}\\Downloads\\hack-the-box`;
+  const sl = `${htbBase}\\SecLists-master`;  // actual folder name on disk
   return `You are a Windows CMD/PowerShell terminal autocomplete engine for a cybersecurity (Hack The Box / CTF) operator.
 The operator's Windows machine: username="${user}", HTB tools folder="${htbBase}"
 
-Known wordlist and tool paths on this system:
-  Passwords/usernames:
-    ${htbBase}\\rockyou.txt
-    ${htbBase}\\passwords.txt
-    ${htbBase}\\usernames.txt
-    ${htbBase}\\common-passwords.txt
-    ${htbBase}\\top1000.txt
-    ${htbBase}\\SecLists\\Passwords\\rockyou.txt
-    ${htbBase}\\SecLists\\Usernames\\top-usernames-shortlist.txt
-  Directory wordlists (gobuster/dirb):
-    ${htbBase}\\directory-list-2.3-medium.txt
-    ${htbBase}\\directory-list-2.3-small.txt
-    ${htbBase}\\common.txt
-    ${htbBase}\\SecLists\\Discovery\\Web-Content\\directory-list-2.3-medium.txt
-    ${htbBase}\\SecLists\\Discovery\\Web-Content\\common.txt
-  Tools (may be native Windows or WSL):
-    Hydra:    hydra  (or wsl hydra)
-    John:     john   (or wsl john / john.exe from ${htbBase}\\JohnTheRipper\\)
-    Hashcat:  hashcat.exe  (or ${htbBase}\\hashcat\\hashcat.exe)
-    Gobuster: gobuster  (or wsl gobuster)
-    Nmap:     nmap  (installed in PATH or C:\\Program Files (x86)\\Nmap\\nmap.exe)
-    SQLMap:   wsl sqlmap  (or python sqlmap.py)
-    Netcat:   ncat  / nc  (or wsl nc)
+Known wordlist and tool paths CONFIRMED on this system (use these exact paths):
+
+  Passwords — Common Credentials:
+    ${sl}\\Passwords\\Common-Credentials\\10k-most-common.txt
+    ${sl}\\Passwords\\Common-Credentials\\100k-most-used-passwords-NCSC.txt
+    ${sl}\\Passwords\\Common-Credentials\\probable-v2_top-12000.txt
+    ${sl}\\Passwords\\Common-Credentials\\xato-net-10-million-passwords-10000.txt
+    ${sl}\\Passwords\\Common-Credentials\\xato-net-10-million-passwords-100000.txt
+    ${sl}\\Passwords\\Common-Credentials\\top-20-common-SSH-passwords.txt
+    ${sl}\\Passwords\\Common-Credentials\\top-passwords-shortlist.txt
+    ${sl}\\Passwords\\Common-Credentials\\darkweb2017_top-10000.txt
+    ${sl}\\Passwords\\Common-Credentials\\500-worst-passwords.txt
+    ${sl}\\Passwords\\darkc0de.txt
+    ${sl}\\Passwords\\corporate_passwords.txt
+
+  Passwords — Leaked Databases:
+    ${sl}\\Passwords\\Leaked-Databases\\000webhost.txt
+    ${sl}\\Passwords\\Leaked-Databases\\hotmail.txt
+    ${sl}\\Passwords\\Leaked-Databases\\alleged-gmail-passwords.txt
+
+  Usernames:
+    ${sl}\\Usernames\\top-usernames-shortlist.txt
+    ${sl}\\Usernames\\cirt-default-usernames.txt
+    ${sl}\\Usernames\\xato-net-10-million-usernames.txt
+    ${sl}\\Usernames\\Names\\names.txt
+
+  DNS / Subdomain enumeration:
+    ${sl}\\Discovery\\DNS\\subdomains-top1million-5000.txt
+    ${sl}\\Discovery\\DNS\\subdomains-top1million-20000.txt
+    ${sl}\\Discovery\\DNS\\subdomains-top1million-110000.txt
+    ${sl}\\Discovery\\DNS\\namelist.txt
+    ${sl}\\Discovery\\DNS\\bitquark-subdomains-top100000.txt
+    ${sl}\\Discovery\\DNS\\dns-Jhaddix.txt
+
+  Web Content Discovery (gobuster/ffuf dir mode):
+    ${sl}\\Discovery\\Web-Content\\common.txt
+    ${sl}\\Discovery\\Web-Content\\directory-list-2.3-small.txt
+    ${sl}\\Discovery\\Web-Content\\directory-list-2.3-medium.txt
+    ${sl}\\Discovery\\Web-Content\\big.txt
+    ${sl}\\Discovery\\Web-Content\\raft-medium-directories.txt
+    ${sl}\\Discovery\\Web-Content\\raft-large-directories.txt
+    ${sl}\\Discovery\\Web-Content\\quickhits.txt
+
+  Fuzzing:
+    ${sl}\\Fuzzing\\big-list-of-naughty-strings.txt
+    ${sl}\\Fuzzing\\command-injection-commix.txt
+    ${sl}\\Fuzzing\\Databases\\SQLi\\Generic-SQLi.txt
+    ${sl}\\Fuzzing\\Databases\\SQLi\\Generic-BlindSQLi.fuzzdb.txt
+    ${sl}\\Fuzzing\\XSS\\XSS-Jhaddix.txt
+    ${sl}\\Fuzzing\\LDAP.Fuzzing.txt
+    ${sl}\\Fuzzing\\XXE-Fuzzing.txt
+    ${sl}\\Fuzzing\\extensions-most-common.fuzz.txt
+
+  Tools on this system:
+    ffuf:       wsl ffuf  (source at ${htbBase}\\ffuf — use WSL binary)
+    gobuster:   wsl gobuster  (source at ${htbBase}\\gobuster — use WSL binary)
+    Nmap:       nmap  (C:\\Program Files (x86)\\Nmap\\nmap.exe or in PATH)
+    Hydra:      wsl hydra
+    John:       wsl john
+    Hashcat:    wsl hashcat  (or hashcat.exe if installed natively)
+    SQLMap:     wsl sqlmap
+    Netcat:     ncat  (or wsl nc)
     Metasploit: wsl msfconsole
+    Cookies:    ${htbBase}\\cookies.txt  (pre-saved session cookies)
 
 Rules:
 - Use correct Windows CMD or PowerShell syntax (backslash paths, double-quoted strings)
-- For security tools, prefer wsl <tool> if a native Windows binary is unlikely
-- Replace placeholder targets with realistic CTF examples (10.10.10.X, target.htb, 192.168.1.X)
-- Use the actual paths from this system (listed above) in wordlist arguments
-- desc must be 1–2 short plain-English sentences (max 120 chars) explaining what the command does
+- For security tools, prefer "wsl <tool>" — ffuf and gobuster are Go source repos, so WSL binary is required
+- Replace placeholder targets with realistic CTF/HTB examples (10.10.10.X, 10.129.X.X, target.htb)
+- Always use the EXACT confirmed paths above for wordlist arguments — do NOT invent paths
+- desc must be 1–2 short plain-English sentences (max 120 chars)
 - category must be ONE of: network, security, file, system, process, archive, search, text, help
 
 Respond ONLY with a valid JSON array — no markdown, no explanation, no code fences:

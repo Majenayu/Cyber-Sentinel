@@ -50,15 +50,38 @@ const CAT_COLORS: Record<string, string> = {
 };
 
 type ConnState   = 'idle' | 'connecting' | 'connected' | 'error' | 'disconnected';
+type DetectedOS  = 'unknown' | 'windows' | 'linux' | 'kali';
 type Suggestion  = { name: string; desc: string; category: string; ai?: boolean };
 
+// ── Detect OS from raw terminal output ────────────────────────────────────
+function detectOSFromOutput(text: string): DetectedOS | null {
+  const t = text.toLowerCase();
+  if (t.includes('microsoft windows') || t.includes('windows [version'))  return 'windows';
+  if (t.includes('kali gnu/linux') || t.includes('kali linux'))            return 'kali';
+  if (t.includes('ubuntu') || t.includes('debian') || t.includes('centos') ||
+      t.includes('fedora') || t.includes('linux'))                         return 'linux';
+  return null;
+}
+
+// ── OS display config ──────────────────────────────────────────────────────
+const OS_BADGE: Record<DetectedOS, { label: string; color: string }> = {
+  unknown: { label: 'OS unknown', color: 'text-muted-foreground border-border' },
+  windows: { label: '⊞ Windows',  color: 'text-blue-300 border-blue-500/40' },
+  linux:   { label: '🐧 Linux',   color: 'text-green-300 border-green-500/40' },
+  kali:    { label: '🐉 Kali',    color: 'text-purple-300 border-purple-500/40' },
+};
+
 // ── Fetch AI suggestions from the server ──────────────────────────────────
-async function fetchAiSuggestionsRemote(input: string, username: string): Promise<Suggestion[]> {
+async function fetchAiSuggestionsRemote(
+  input: string,
+  username: string,
+  platform: string,
+): Promise<Suggestion[]> {
   try {
     const res = await fetch('/api/terminal/suggest', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ input, platform: 'windows', username }),
+      body: JSON.stringify({ input, platform, username }),
       signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return [];
@@ -103,9 +126,11 @@ export default function RemoteTerminalPage() {
   const aiInputRef     = useRef('');           // stale-check snapshot
 
   // ── Connection / AI UI state ──────────────────────────────────────────
-  const [connState,  setConnState]  = useState<ConnState>('idle');
-  const [statusMsg,  setStatusMsg]  = useState('');
-  const [fullscreen, setFullscreen] = useState(false);
+  const [connState,    setConnState]    = useState<ConnState>('idle');
+  const [statusMsg,    setStatusMsg]    = useState('');
+  const [fullscreen,   setFullscreen]   = useState(false);
+  const [detectedOS,   setDetectedOS]   = useState<DetectedOS>('unknown');
+  const detectedOSRef  = useRef<DetectedOS>('unknown');
   const [suggestionsState, setSuggestionsState] = useState<Suggestion[]>([]);
   const [sugSelected,      setSugSelected]      = useState(-1);
   const [aiLoading,        setAiLoading]        = useState(false);
@@ -188,10 +213,12 @@ export default function RemoteTerminalPage() {
     inputBufRef.current      = '';
     suggestionsRef.current   = [];
     sugSelRef.current        = -1;
+    detectedOSRef.current    = 'unknown';
     clearTimeout(aiDebounceRef.current);
     setSuggestionsState([]);
     setSugSelected(-1);
     setAiLoading(false);
+    setDetectedOS('unknown');
 
     setConnState('connecting');
     setStatusMsg('Connecting…');
@@ -230,9 +257,10 @@ export default function RemoteTerminalPage() {
       clearTimeout(aiDebounceRef.current);
       setAiLoading(true);
       const snapshot = trimmed;
+      const osPlatform = detectedOSRef.current === 'unknown' ? 'windows' : detectedOSRef.current;
       aiInputRef.current = snapshot;
       aiDebounceRef.current = setTimeout(async () => {
-        const results = await fetchAiSuggestionsRemote(snapshot, capturedUsername);
+        const results = await fetchAiSuggestionsRemote(snapshot, capturedUsername, osPlatform);
         if (aiInputRef.current !== snapshot) return; // stale — a newer keystroke arrived
         setSuggestions(results);
         setAiLoading(false);
@@ -350,8 +378,16 @@ export default function RemoteTerminalPage() {
         term.write(evt.data as string);
         return;
       }
-      // Plaintext PTY data
-      term.write(evt.data as string);
+      // Plaintext PTY data — also sniff for OS fingerprint in first 4KB
+      const raw = evt.data as string;
+      term.write(raw);
+      if (detectedOSRef.current === 'unknown') {
+        const os = detectOSFromOutput(raw);
+        if (os) {
+          detectedOSRef.current = os;
+          setDetectedOS(os);
+        }
+      }
     };
 
     ws.onerror = () => {
@@ -379,6 +415,8 @@ export default function RemoteTerminalPage() {
     setConnState('idle');
     setStatusMsg('');
     setFormOpen(true);
+    setDetectedOS('unknown');
+    detectedOSRef.current = 'unknown';
     dismissSuggestions();
   }, [dismissSuggestions]);
 
@@ -417,7 +455,13 @@ export default function RemoteTerminalPage() {
         <div className="flex items-center gap-2">
           <MonitorDot className="text-primary" size={18} />
           <span className="font-mono font-bold text-sm text-primary tracking-wider">REMOTE TERMINAL</span>
-          <span className="text-muted-foreground text-xs font-mono hidden sm:inline">// Windows SSH</span>
+          <span className="text-muted-foreground text-xs font-mono hidden sm:inline">// SSH</span>
+          {/* OS badge — shown once connected, updates when OS is detected from output */}
+          {connState === 'connected' && (
+            <span className={`hidden sm:inline text-[10px] font-mono border rounded px-1.5 py-0.5 transition-colors ${OS_BADGE[detectedOS].color}`}>
+              {OS_BADGE[detectedOS].label}
+            </span>
+          )}
           {connState === 'connected' && (
             <span className="hidden sm:flex items-center gap-1 text-[10px] font-mono text-primary/60 border border-primary/20 rounded px-1.5 py-0.5">
               <Sparkles size={9} /> AI
