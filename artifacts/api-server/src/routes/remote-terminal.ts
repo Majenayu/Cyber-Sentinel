@@ -21,9 +21,15 @@ import { spawn } from "child_process";
 import { Duplex } from "stream";
 import { logger } from "../lib/logger";
 
+// Resolve cloudflared from env override, a known local path, or fall back to
+// the nix-installed binary that is on PATH (installed via replit.nix).
 const CF_PATH =
   process.env.CLOUDFLARED_PATH ||
-  "/home/runner/.local/bin/cloudflared";
+  (() => {
+    const { execSync } = require("child_process");
+    try { return execSync("which cloudflared", { encoding: "utf8" }).trim(); } catch {}
+    return "/home/runner/.local/bin/cloudflared"; // final fallback
+  })();
 
 const MAX_SESSIONS = 5;
 let sessionCount = 0;

@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.cloudflared
     pkgs.traceroute
     pkgs.netcat-gnu
     pkgs.whois

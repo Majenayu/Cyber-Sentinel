@@ -54,6 +54,12 @@ export default function RemoteTerminalPage() {
   const xtermRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  // Track whether a session was ever established (used in ws.onclose to avoid
+  // "Disconnected" flash when the socket closes before connecting).
+  const hasConnectedRef = useRef(false);
+  // Hold disposables for term.onData / term.onResize so we can clean them up
+  // before every reconnect — prevents duplicate-listener accumulation.
+  const termListenersRef = useRef<{ data: { dispose(): void }; resize: { dispose(): void } } | null>(null);
   const [connState, setConnState] = useState<ConnState>('idle');
   const [statusMsg, setStatusMsg] = useState('');
   const [fullscreen, setFullscreen] = useState(false);
@@ -108,7 +114,19 @@ export default function RemoteTerminalPage() {
       setStatusMsg('Fill in all fields.');
       return;
     }
+
+    // Dispose any lingering xterm listeners from the previous session before
+    // opening a new socket — prevents duplicate data/resize events on reconnect.
+    if (termListenersRef.current) {
+      termListenersRef.current.data.dispose();
+      termListenersRef.current.resize.dispose();
+      termListenersRef.current = null;
+    }
+
     if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
+
+    // Reset per-session flag so ws.onclose knows we haven't connected yet.
+    hasConnectedRef.current = false;
 
     setConnState('connecting');
     setStatusMsg('Connecting…');
@@ -137,21 +155,28 @@ export default function RemoteTerminalPage() {
       try {
         const msg = JSON.parse(evt.data as string);
         if (msg.type === 'connected') {
+          hasConnectedRef.current = true;
           setConnState('connected');
           setStatusMsg('Connected');
           term.writeln('\x1b[32m[✓] SSH session established.\x1b[0m\r\n');
+          // Dispose any previous listeners before registering new ones.
+          if (termListenersRef.current) {
+            termListenersRef.current.data.dispose();
+            termListenersRef.current.resize.dispose();
+          }
           // Forward keystrokes
-          term.onData((data) => {
+          const dataDisp = term.onData((data) => {
             if (wsRef.current?.readyState === WebSocket.OPEN) {
               wsRef.current.send(JSON.stringify({ type: 'data', data }));
             }
           });
           // Forward resize
-          term.onResize(({ cols, rows }) => {
+          const resizeDisp = term.onResize(({ cols, rows }) => {
             if (wsRef.current?.readyState === WebSocket.OPEN) {
               wsRef.current.send(JSON.stringify({ type: 'resize', cols, rows }));
             }
           });
+          termListenersRef.current = { data: dataDisp, resize: resizeDisp };
           return;
         }
         if (msg.type === 'error') {
@@ -178,7 +203,10 @@ export default function RemoteTerminalPage() {
     };
 
     ws.onclose = (e) => {
-      if (connState !== 'idle') {
+      // Use the ref (not captured state) so we see the live value — the
+      // callback would otherwise always read the stale 'idle' value from
+      // the time connect() was invoked.
+      if (hasConnectedRef.current || connState !== 'idle') {
         setConnState('disconnected');
         setStatusMsg('Disconnected');
         term.writeln(`\r\n\x1b[33m[⚡] Session closed (${e.code}).\x1b[0m`);
