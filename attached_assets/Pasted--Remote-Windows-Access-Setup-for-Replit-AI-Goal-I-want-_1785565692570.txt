@@ -1,0 +1,162 @@
+# Remote Windows Access Setup (for Replit AI)
+
+## Goal
+
+I want my Replit/cloud environment to remotely access my local Windows machine so it can run commands, read files, and help with development.
+
+## What I already configured
+
+### 1. Enabled OpenSSH Server on Windows
+
+PowerShell (Admin):
+
+```powershell
+Get-Service sshd
+Start-Service sshd
+Set-Service -Name sshd -StartupType Automatic
+```
+
+Status: **Running**
+
+---
+
+### 2. Firewall
+
+The OpenSSH firewall rule already existed, so no new rule was required.
+
+---
+
+### 3. Created a dedicated local SSH user
+
+PowerShell (Admin):
+
+```powershell
+net user sshuser StrongPass123! /add
+net localgroup Administrators sshuser /add
+```
+
+---
+
+### 4. Verified local SSH login
+
+Command:
+
+```powershell
+ssh sshuser@localhost
+```
+
+Result: successful login.
+
+---
+
+## Why I did NOT use ngrok
+
+I initially tried:
+
+```powershell
+ngrok tcp 22
+```
+
+but ngrok free accounts now require credit-card verification for TCP tunnels, so I switched to **Cloudflare Tunnel**.
+
+---
+
+## Cloudflare Tunnel setup
+
+### Installed cloudflared
+
+```powershell
+winget install --id Cloudflare.cloudflared -e
+```
+
+Executable path:
+
+```text
+C:\Program Files (x86)\cloudflared\cloudflared.exe
+```
+
+---
+
+### Started the tunnel
+
+```powershell
+& "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --url ssh://localhost:22
+```
+
+Cloudflare generated this public hostname:
+
+```text
+renewal-items-able-hotel.trycloudflare.com
+```
+
+Keep this PowerShell window running while remote access is needed.
+
+---
+
+# How Replit / cloud should connect
+
+Install cloudflared in the cloud environment:
+
+```bash
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared
+chmod +x cloudflared
+sudo mv cloudflared /usr/local/bin/
+```
+
+Connect via SSH:
+
+```bash
+ssh -o ProxyCommand="cloudflared access ssh --hostname renewal-items-able-hotel.trycloudflare.com" sshuser@renewal-items-able-hotel.trycloudflare.com
+```
+
+Password:
+
+```text
+StrongPass123!
+```
+
+---
+
+# Expected successful output
+
+```text
+hostname
+LAPTOP-25LQ0D83
+
+whoami
+laptop-25lq0d83\sshuser
+```
+
+---
+
+# Important file locations
+
+My main Windows user files:
+
+```text
+C:\Users\pgayu
+```
+
+If accessing through WSL, the same files are available at:
+
+```bash
+/mnt/c/Users/pgayu
+```
+
+---
+
+# What the coding agent should assume
+
+* Target OS: **Windows 11**
+* Remote access method: **SSH through Cloudflare Tunnel**
+* SSH user: **sshuser**
+* Hostname: **renewal-items-able-hotel.trycloudflare.com**
+* Tunnel must remain running on the Windows machine.
+* Commands executed through SSH run on my Windows machine, not inside Replit.
+* Prefer Windows-compatible commands (PowerShell or CMD) unless explicitly working inside WSL.
+
+---
+
+# Security note
+
+This is a temporary development tunnel. When work is finished, I stop it with **Ctrl+C** in the Cloudflare tunnel window.
