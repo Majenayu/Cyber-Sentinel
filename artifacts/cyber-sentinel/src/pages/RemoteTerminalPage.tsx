@@ -6,6 +6,7 @@ import '@xterm/xterm/css/xterm.css';
 import {
   MonitorDot, Wifi, WifiOff, Unplug, Maximize2, Minimize2,
   Loader2, ChevronDown, ChevronUp, Eye, EyeOff, Sparkles, X,
+  Clipboard, Send,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -130,6 +131,8 @@ export default function RemoteTerminalPage() {
   const [statusMsg,    setStatusMsg]    = useState('');
   const [fullscreen,   setFullscreen]   = useState(false);
   const [detectedOS,   setDetectedOS]   = useState<DetectedOS>('unknown');
+  const [sendText,     setSendText]     = useState('');
+  const [pasteMsg,     setPasteMsg]     = useState('');
   const detectedOSRef  = useRef<DetectedOS>('unknown');
   const [suggestionsState, setSuggestionsState] = useState<Suggestion[]>([]);
   const [sugSelected,      setSugSelected]      = useState(-1);
@@ -431,6 +434,32 @@ export default function RemoteTerminalPage() {
     xtermRef.current?.focus();
   }, [dismissSuggestions]);
 
+  // ── Paste from clipboard → terminal ───────────────────────────────────
+  const pasteFromClipboard = useCallback(async () => {
+    const sock = wsRef.current;
+    if (!sock || sock.readyState !== WebSocket.OPEN) return;
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) return;
+      sock.send(JSON.stringify({ type: 'data', data: text }));
+      setPasteMsg(`Pasted ${text.length} chars`);
+      setTimeout(() => setPasteMsg(''), 2000);
+      xtermRef.current?.focus();
+    } catch {
+      setPasteMsg('Allow clipboard access in browser');
+      setTimeout(() => setPasteMsg(''), 3000);
+    }
+  }, []);
+
+  // ── Send text bar → terminal (sends text + optional Enter) ────────────
+  const sendTextToTerminal = useCallback((withEnter = false) => {
+    const sock = wsRef.current;
+    if (!sock || sock.readyState !== WebSocket.OPEN || !sendText.trim()) return;
+    sock.send(JSON.stringify({ type: 'data', data: sendText + (withEnter ? '\r' : '') }));
+    setSendText('');
+    xtermRef.current?.focus();
+  }, [sendText]);
+
   // ── Resize on fullscreen toggle ───────────────────────────────────────
   useEffect(() => {
     setTimeout(() => { try { fitRef.current?.fit(); } catch {} }, 100);
@@ -473,6 +502,12 @@ export default function RemoteTerminalPage() {
             <badge.Icon size={13} className={connState === 'connecting' ? 'animate-spin' : ''} />
             <span className="hidden sm:inline">{badge.label}</span>
           </div>
+          {connState === 'connected' && (
+            <button onClick={pasteFromClipboard} title="Paste clipboard into terminal"
+              className="flex items-center gap-1 px-2 py-1 rounded border border-primary/30 text-primary/70 hover:bg-primary/10 text-xs font-mono transition-colors">
+              <Clipboard size={12} /> <span className="hidden sm:inline">Paste</span>
+            </button>
+          )}
           {connState === 'connected' && (
             <button onClick={disconnect} title="Disconnect"
               className="flex items-center gap-1 px-2 py-1 rounded border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs font-mono transition-colors">
@@ -621,6 +656,39 @@ export default function RemoteTerminalPage() {
           </div>
         )}
       </div>
+
+      {/* ── Send-text bar (visible when connected) ── */}
+      {connState === 'connected' && (
+        <div className="shrink-0 px-3 py-1.5 border-t border-border bg-background/80 flex items-center gap-2">
+          <input
+            type="text"
+            value={sendText}
+            onChange={e => setSendText(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') sendTextToTerminal(true);
+            }}
+            placeholder="Paste or type a command here, then click Send…"
+            className="flex-1 bg-background border border-border rounded px-3 py-1 text-xs font-mono text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-primary/60"
+          />
+          <button
+            onClick={() => sendTextToTerminal(false)}
+            disabled={!sendText.trim()}
+            title="Send text (no Enter)"
+            className="px-2 py-1 rounded border border-border text-muted-foreground hover:text-primary hover:border-primary/40 text-xs font-mono transition-colors disabled:opacity-30">
+            Insert
+          </button>
+          <button
+            onClick={() => sendTextToTerminal(true)}
+            disabled={!sendText.trim()}
+            title="Send text + Enter"
+            className="flex items-center gap-1 px-2 py-1 rounded border border-primary/40 text-primary hover:bg-primary/10 text-xs font-mono transition-colors disabled:opacity-30">
+            <Send size={11} /> Run
+          </button>
+          {pasteMsg && (
+            <span className="text-[10px] font-mono text-primary/60 animate-pulse">{pasteMsg}</span>
+          )}
+        </div>
+      )}
 
       {/* ── Footer ── */}
       <div className="shrink-0 px-3 py-1 border-t border-border bg-background/60 flex items-center gap-4 text-[10px] font-mono text-muted-foreground/50">
