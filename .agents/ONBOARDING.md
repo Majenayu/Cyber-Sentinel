@@ -1,6 +1,18 @@
 # Agent Onboarding — CyberSentinel
 
-> **First: ask the user what they want.** Don't run installs, set env vars, start workflows, or verify config until the user asks for it. Just take a quick look at the project and ask. This saves AI credits.
+> **IMPORTANT — Read this file first and stop exploring.**
+> This file contains everything you need. Do NOT read README.md, package.json, setup.sh, replit.nix, or any other files before asking the user what they want. Every extra file read costs AI credits. Ask first, act second.
+
+---
+
+## On import — the only correct flow
+
+1. Ask the user ONE question: do they want to (a) get the app running, (b) make specific changes, or (c) leave it as imported?
+2. If they say **leave it as imported** → mark the task complete immediately. Do nothing else.
+3. If they say **get it running** → follow the "Running the app" section below.
+4. If they say **make changes** → ask what changes and proceed.
+
+Do NOT run `pnpm install`, set env vars, start workflows, read files, or verify anything before the user answers.
 
 ---
 
@@ -10,19 +22,20 @@ CyberSentinel is a cyberpunk cybersecurity ops dashboard — pnpm monorepo with:
 
 | Artifact | Port | Description |
 |---|---|---|
-| `artifacts/cyber-sentinel` | **25629** | React + Vite frontend (Run button) |
+| `artifacts/cyber-sentinel` | **25629** | React + Vite frontend |
 | `artifacts/api-server` | **8080** | Express 5 + MongoDB + Groq/Mistral |
 | `artifacts/cyber-sentinel-mobile` | — | Expo / React Native |
 
+Login operator ID: **`Majen`**
+
 ---
 
-## When the user wants to run the app
+## Running the app
 
 **Step 1 — Dependencies** (skip if `node_modules` already exists):
 ```bash
 pnpm install
 ```
-`post-merge.sh` runs this automatically after a task-agent merge, so it may already be done.
 
 **Step 2 — Secrets** (check first, only request what's missing):
 
@@ -40,18 +53,14 @@ const status = await viewEnvVars({ type: "secret" });
 console.log(JSON.stringify(status));
 ```
 
-**Step 3 — `.replit` config** — should already be correct. Only rewrite if the preview is blank:
-
-Critical values:
+**Step 3 — `.replit` config** — should already be correct. Only rewrite if preview is blank:
 - `[[ports]] localPort = 25629` → `externalPort = 80`
-- `runButton = "artifacts/cyber-sentinel: web"`
 - `[userenv.development] PORT = "25629"` and `BASE_PATH = "/"`
 
-The artifact system permanently injects `PORT=25629` into the web workflow — never try to use port 5000.
+The artifact system permanently injects `PORT=25629` into the web workflow — never use port 5000.
 
 **Step 4 — Start workflows:**
 ```javascript
-// Starts web + API server (it's a dependency)
 await restartWorkflow({ workflowName: "artifacts/cyber-sentinel: web", timeout: 45 });
 ```
 
