@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
-  getSuggestions, getTranslation, getCommandInfo,
+  getSuggestions, getArgumentSuggestions, getTranslation, getCommandInfo,
   CATEGORY_LABELS, type CommandInfo,
 } from '@/data/terminal-commands';
 
@@ -176,8 +176,8 @@ export default function TerminalPage() {
   }, []);
 
   /**
-   * Combined suggestions: syntax fixes first, then DB entries, then any
-   * matching executables from the server's compgen list.
+   * Combined suggestions: syntax fixes, argument completions, DB command
+   * entries, then any matching executables from the server's compgen list.
    */
   const getExtendedSuggestions = useCallback((input: string, max = 7): Suggestion[] => {
     const trimmed = input.trim();
@@ -189,13 +189,19 @@ export default function TerminalPage() {
     const fix = getSyntaxFix(trimmed);
     if (fix) results.push(fix);
 
-    // 2. Rich DB suggestions
+    // 2. Argument completions — "ping goo" → "ping google.com", etc.
+    const argSugs = getArgumentSuggestions(trimmed, max);
+    for (const s of argSugs) {
+      if (!results.find(r => r.name === s.name)) results.push(s);
+    }
+
+    // 3. Rich DB suggestions (command names)
     const dbSugs = getSuggestions(trimmed, max);
     for (const s of dbSugs) {
       if (!results.find(r => r.name === s.name)) results.push(s);
     }
 
-    // 3. System commands fallback (fill up to max)
+    // 4. System commands fallback (fill up to max)
     if (results.length < max && systemCommandsRef.current.length > 0) {
       const firstWord = trimmed.toLowerCase().split(/\s+/)[0];
       const alreadyHave = new Set(results.map(r => r.name));
@@ -435,7 +441,7 @@ export default function TerminalPage() {
       // ── Backspace ─────────────────────────────────────────────
       if (data === '\x7f' || data === '\b') {
         inputBufRef.current = inputBufRef.current.slice(0, -1);
-        setSuggestions(getSuggestions(inputBufRef.current, 6));
+        setSuggestions(getExtendedSuggestions(inputBufRef.current, 7));
         sugSelRef.current = -1;
         setSugSelected(-1);
         ws?.send(data);
@@ -445,7 +451,7 @@ export default function TerminalPage() {
       // ── Printable character ───────────────────────────────────
       if (data >= ' ') {
         inputBufRef.current += data;
-        const sugs = getSuggestions(inputBufRef.current, 6);
+        const sugs = getExtendedSuggestions(inputBufRef.current, 7);
         setSuggestions(sugs);
         sugSelRef.current = -1;
         setSugSelected(-1);
@@ -636,7 +642,7 @@ export default function TerminalPage() {
                   </span>
 
                   {/* Description */}
-                  <span className="text-xs text-muted-foreground/80 flex-1 truncate leading-5">
+                  <span className="text-xs text-muted-foreground/80 flex-1 leading-5 line-clamp-2">
                     {s.desc}
                   </span>
 

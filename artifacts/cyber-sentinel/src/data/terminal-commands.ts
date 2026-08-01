@@ -575,6 +575,269 @@ export function getCommandInfo(input: string): CommandInfo | null {
   return COMMANDS[cmd] ?? null;
 }
 
+// ── Argument completion database ────────────────────────────────────────
+// Each entry is a full command + args string. When the user has typed a command
+// plus a partial argument, we filter this list to suggest real completions.
+export interface ArgCompletion {
+  full: string;      // e.g. "ping google.com"
+  desc: string;      // plain-English description shown in the suggestions panel
+  category: string;
+}
+
+export const ARGUMENT_COMPLETIONS: ArgCompletion[] = [
+  // ── ping ───────────────────────────────────────────────────────────────
+  { full: 'ping google.com',           desc: 'Test if Google is reachable. Shows round-trip time in milliseconds.', category: 'network' },
+  { full: 'ping -c 4 google.com',      desc: 'Send exactly 4 packets to Google, then stop automatically.', category: 'network' },
+  { full: 'ping 8.8.8.8',             desc: 'Ping Google\'s public DNS server by IP address.', category: 'network' },
+  { full: 'ping -c 4 8.8.8.8',        desc: 'Send 4 packets to Google DNS, then stop.', category: 'network' },
+  { full: 'ping 1.1.1.1',             desc: 'Ping Cloudflare\'s fast public DNS server.', category: 'network' },
+  { full: 'ping cloudflare.com',       desc: 'Test reachability of Cloudflare\'s servers.', category: 'network' },
+  { full: 'ping -c 10 192.168.1.1',   desc: 'Ping your local router 10 times to check LAN stability.', category: 'network' },
+  { full: 'ping localhost',            desc: 'Ping the loopback address to verify TCP/IP stack is working.', category: 'network' },
+  { full: 'ping -i 0.2 google.com',   desc: 'Flood ping — send packets every 0.2 seconds (requires root).', category: 'network' },
+  // ── nmap ───────────────────────────────────────────────────────────────
+  { full: 'nmap -sV 192.168.1.1',          desc: 'Detect exact service versions running on each open port.', category: 'security' },
+  { full: 'nmap -sS 192.168.1.1',          desc: 'Stealth SYN scan — half-open, less likely to be logged.', category: 'security' },
+  { full: 'nmap -A 192.168.1.1',           desc: 'Aggressive scan: OS detection, versions, scripts, traceroute.', category: 'security' },
+  { full: 'nmap -p 80,443 192.168.1.1',    desc: 'Scan only HTTP and HTTPS ports on the target.', category: 'security' },
+  { full: 'nmap -p 1-1000 192.168.1.1',    desc: 'Scan the first 1000 ports for open services.', category: 'security' },
+  { full: 'nmap -p- 192.168.1.1',          desc: 'Scan all 65535 ports — thorough but slow.', category: 'security' },
+  { full: 'nmap -sn 192.168.1.0/24',       desc: 'Ping sweep the whole subnet to find all live hosts.', category: 'security' },
+  { full: 'nmap -O 192.168.1.1',           desc: 'Try to fingerprint the remote operating system.', category: 'security' },
+  { full: 'nmap -sV --open 192.168.1.1',   desc: 'Show only open ports and detect their service versions.', category: 'security' },
+  { full: 'nmap -v 192.168.1.1',           desc: 'Run a scan with verbose output to see progress in real time.', category: 'security' },
+  { full: 'nmap -sV -sC 192.168.1.1',      desc: 'Scan with service detection and run default NSE scripts.', category: 'security' },
+  { full: 'nmap localhost',                 desc: 'Quick scan of your own machine to see what ports are open.', category: 'security' },
+  { full: 'nmap -sV -p- 192.168.1.1',      desc: 'Full scan — all 65535 ports with service version detection.', category: 'security' },
+  { full: 'nmap -Pn 192.168.1.1',          desc: 'Skip host discovery and scan even if host seems offline.', category: 'security' },
+  // ── curl ───────────────────────────────────────────────────────────────
+  { full: 'curl https://example.com',                       desc: 'Fetch a webpage and print its full HTML to the terminal.', category: 'network' },
+  { full: 'curl -I https://example.com',                    desc: 'Fetch only HTTP response headers — useful for debugging.', category: 'network' },
+  { full: 'curl -L https://example.com',                    desc: 'Follow redirects automatically until you reach the final URL.', category: 'network' },
+  { full: 'curl -o file.zip https://example.com/file.zip',  desc: 'Download a file and save it as file.zip.', category: 'network' },
+  { full: 'curl -X POST https://api.example.com/data',      desc: 'Send a POST request to an API endpoint.', category: 'network' },
+  { full: 'curl -s https://api.ipify.org',                  desc: 'Get your current public IP address silently.', category: 'network' },
+  { full: 'curl ifconfig.me',                               desc: 'Show your public IP address (simple alternative to api.ipify.org).', category: 'network' },
+  { full: 'curl -s -o /dev/null -w "%{http_code}" https://example.com', desc: 'Check if a site is up — prints just the HTTP status code.', category: 'network' },
+  { full: 'curl -H "Authorization: Bearer TOKEN" https://api.example.com', desc: 'Make an authenticated API request with a Bearer token header.', category: 'network' },
+  { full: 'curl -k https://expired.badssl.com',             desc: 'Ignore TLS/SSL certificate errors (insecure — dev only).', category: 'network' },
+  // ── wget ───────────────────────────────────────────────────────────────
+  { full: 'wget https://example.com/file.zip',              desc: 'Download a file from the internet to your current directory.', category: 'network' },
+  { full: 'wget -O output.zip https://example.com/file.zip',desc: 'Download a file and save it with a specific name.', category: 'network' },
+  { full: 'wget -r https://example.com',                    desc: 'Recursively download an entire website.', category: 'network' },
+  { full: 'wget -c https://example.com/file.zip',           desc: 'Resume a download that was interrupted mid-way.', category: 'network' },
+  // ── dig ────────────────────────────────────────────────────────────────
+  { full: 'dig google.com',              desc: 'Full DNS lookup — shows A record and all DNS response details.', category: 'network' },
+  { full: 'dig google.com A',            desc: 'Query for IPv4 address (A) records for the domain.', category: 'network' },
+  { full: 'dig google.com AAAA',         desc: 'Query for IPv6 address (AAAA) records.', category: 'network' },
+  { full: 'dig google.com MX',           desc: 'Find the mail server (MX) records for the domain.', category: 'network' },
+  { full: 'dig google.com NS',           desc: 'Find the authoritative nameservers for the domain.', category: 'network' },
+  { full: 'dig google.com TXT',          desc: 'Get TXT records — used for SPF, DKIM, and domain verification.', category: 'network' },
+  { full: 'dig +short google.com',       desc: 'Show just the IP address, without extra DNS detail.', category: 'network' },
+  { full: 'dig @8.8.8.8 google.com',    desc: 'Query using Google\'s DNS server directly (8.8.8.8).', category: 'network' },
+  { full: 'dig -x 8.8.8.8',             desc: 'Reverse DNS lookup — find the hostname for an IP address.', category: 'network' },
+  // ── nslookup ───────────────────────────────────────────────────────────
+  { full: 'nslookup google.com',         desc: 'Look up the IP address for google.com using your default DNS.', category: 'network' },
+  { full: 'nslookup 8.8.8.8',           desc: 'Reverse lookup — find the hostname behind an IP address.', category: 'network' },
+  { full: 'nslookup google.com 8.8.8.8',desc: 'Query Google\'s DNS server specifically for google.com records.', category: 'network' },
+  // ── traceroute ─────────────────────────────────────────────────────────
+  { full: 'traceroute google.com',       desc: 'Trace every router hop your packets take to reach Google.', category: 'network' },
+  { full: 'traceroute 8.8.8.8',         desc: 'Trace the path to Google\'s DNS server hop by hop.', category: 'network' },
+  { full: 'traceroute -n google.com',    desc: 'Trace route without resolving hostnames — faster output.', category: 'network' },
+  // ── whois ──────────────────────────────────────────────────────────────
+  { full: 'whois google.com',            desc: 'Look up registration info: owner, registrar, expiry for google.com.', category: 'network' },
+  { full: 'whois 8.8.8.8',             desc: 'Find who owns an IP address — useful for OSINT and threat intel.', category: 'network' },
+  { full: 'whois cloudflare.com',        desc: 'Look up domain ownership and registrar info for cloudflare.com.', category: 'network' },
+  // ── nc ─────────────────────────────────────────────────────────────────
+  { full: 'nc -zv google.com 80',        desc: 'Test if port 80 (HTTP) is open on google.com.', category: 'network' },
+  { full: 'nc -zv google.com 443',       desc: 'Test if port 443 (HTTPS) is reachable on google.com.', category: 'network' },
+  { full: 'nc -l 4444',                  desc: 'Listen on port 4444 for an incoming raw TCP connection.', category: 'network' },
+  { full: 'nc -zv 192.168.1.1 22',       desc: 'Check if SSH port 22 is open on a local network host.', category: 'network' },
+  { full: 'nc -zv 192.168.1.1 1-1000',   desc: 'Scan the first 1000 ports on a host for open connections.', category: 'network' },
+  // ── ssh ────────────────────────────────────────────────────────────────
+  { full: 'ssh user@192.168.1.1',          desc: 'Open an encrypted shell on the remote host as "user".', category: 'network' },
+  { full: 'ssh root@192.168.1.1',          desc: 'Connect as root — use a non-root user in production.', category: 'network' },
+  { full: 'ssh -p 2222 user@192.168.1.1',  desc: 'Connect via SSH on a non-standard port (2222).', category: 'network' },
+  { full: 'ssh -i key.pem user@192.168.1.1', desc: 'Authenticate with a private key file instead of a password.', category: 'network' },
+  { full: 'ssh -L 8080:localhost:80 user@host', desc: 'Forward local port 8080 to port 80 on the remote server.', category: 'network' },
+  // ── openssl ────────────────────────────────────────────────────────────
+  { full: 'openssl s_client -connect google.com:443',    desc: 'Inspect Google\'s TLS certificate and cipher details.', category: 'security' },
+  { full: 'openssl s_client -connect example.com:443',   desc: 'Check TLS certificate info for any domain on port 443.', category: 'security' },
+  { full: 'openssl genrsa -out key.pem 2048',            desc: 'Generate a 2048-bit RSA private key and save it.', category: 'security' },
+  { full: 'openssl x509 -in cert.pem -text',             desc: 'Read and display the details of a certificate file.', category: 'security' },
+  { full: 'openssl dgst -sha256 file.txt',               desc: 'Calculate the SHA-256 checksum of a file.', category: 'security' },
+  // ── grep ───────────────────────────────────────────────────────────────
+  { full: 'grep -r "password" /var/www',   desc: 'Recursively search all files in /var/www for the word "password".', category: 'search' },
+  { full: 'grep -i "error" /var/log/syslog', desc: 'Case-insensitive search for "error" in the system log.', category: 'search' },
+  { full: 'grep -n "TODO" file.txt',        desc: 'Show line numbers next to every match for "TODO".', category: 'search' },
+  { full: 'grep -v "debug" app.log',        desc: 'Print only lines that do NOT contain "debug".', category: 'search' },
+  { full: 'grep -c "error" app.log',        desc: 'Count how many lines contain "error" — shows a number only.', category: 'search' },
+  { full: 'grep -E "^[0-9]+" file.txt',     desc: 'Use extended regex to match lines that start with digits.', category: 'search' },
+  // ── ls ─────────────────────────────────────────────────────────────────
+  { full: 'ls -la',         desc: 'List all files including hidden ones with permissions and sizes.', category: 'file' },
+  { full: 'ls -lh',         desc: 'Long list with file sizes shown as KB/MB/GB — human readable.', category: 'file' },
+  { full: 'ls -la /etc',    desc: 'List all files in /etc with permissions (config files).', category: 'file' },
+  { full: 'ls -lt',         desc: 'Sort by modification time — most recently changed files first.', category: 'file' },
+  { full: 'ls -lS',         desc: 'Sort by file size — largest files shown first.', category: 'file' },
+  { full: 'ls -la /var/log',desc: 'List all log files including hidden ones with sizes.', category: 'file' },
+  // ── find ───────────────────────────────────────────────────────────────
+  { full: 'find . -name "*.log"',           desc: 'Find all .log files in the current directory and below.', category: 'file' },
+  { full: 'find /etc -name "*.conf"',       desc: 'Search for config files in /etc recursively.', category: 'file' },
+  { full: 'find /var/log -mtime -1',        desc: 'Find files modified in the last 24 hours in /var/log.', category: 'file' },
+  { full: 'find . -empty',                  desc: 'Find empty files and directories in the current tree.', category: 'file' },
+  { full: 'find . -type f -name "*.sh"',    desc: 'Find all shell script files recursively.', category: 'file' },
+  // ── ps ─────────────────────────────────────────────────────────────────
+  { full: 'ps aux',                  desc: 'Show all running processes with CPU and memory usage.', category: 'process' },
+  { full: 'ps aux | grep nginx',     desc: 'Find only nginx-related processes in the process list.', category: 'process' },
+  { full: 'ps -ef',                  desc: 'List all processes in full format with parent PID shown.', category: 'process' },
+  // ── systemctl ──────────────────────────────────────────────────────────
+  { full: 'systemctl status nginx',   desc: 'Check if nginx is running and see its most recent log output.', category: 'system' },
+  { full: 'systemctl start nginx',    desc: 'Start the nginx web server now.', category: 'system' },
+  { full: 'systemctl stop nginx',     desc: 'Stop the nginx web server immediately.', category: 'system' },
+  { full: 'systemctl restart nginx',  desc: 'Restart nginx to apply config changes without full reboot.', category: 'system' },
+  { full: 'systemctl enable nginx',   desc: 'Make nginx start automatically every time the system boots.', category: 'system' },
+  { full: 'systemctl disable nginx',  desc: 'Stop nginx from starting on boot.', category: 'system' },
+  { full: 'systemctl list-units',     desc: 'List all active systemd services and their current state.', category: 'system' },
+  { full: 'systemctl status ssh',     desc: 'Check if the SSH server is running and see recent log entries.', category: 'system' },
+  // ── tail ───────────────────────────────────────────────────────────────
+  { full: 'tail -f /var/log/syslog',           desc: 'Watch the system log update live — press Ctrl+C to stop.', category: 'file' },
+  { full: 'tail -f /var/log/nginx/access.log', desc: 'Follow nginx access logs in real time.', category: 'file' },
+  { full: 'tail -n 50 /var/log/syslog',        desc: 'Show the last 50 lines of the system log file.', category: 'file' },
+  { full: 'tail -f app.log',                   desc: 'Watch an application log file update in real time.', category: 'file' },
+  // ── cat ────────────────────────────────────────────────────────────────
+  { full: 'cat /etc/passwd',      desc: 'Display user accounts stored on the system.', category: 'file' },
+  { full: 'cat /etc/hosts',       desc: 'View local hostname-to-IP mappings (static DNS overrides).', category: 'file' },
+  { full: 'cat /etc/os-release',  desc: 'Show your Linux distribution name and version info.', category: 'file' },
+  { full: 'cat ~/.bashrc',        desc: 'View your bash shell config — aliases, exports, and prompt.', category: 'file' },
+  { full: 'cat /proc/cpuinfo',    desc: 'Display detailed CPU info including cores and model name.', category: 'file' },
+  { full: 'cat /proc/meminfo',    desc: 'Show detailed RAM information including total and available.', category: 'file' },
+  // ── chmod ──────────────────────────────────────────────────────────────
+  { full: 'chmod 755 script.sh',  desc: 'Owner can read/write/execute; everyone else can read and run.', category: 'file' },
+  { full: 'chmod 644 file.txt',   desc: 'Owner can read and write; others can only read.', category: 'file' },
+  { full: 'chmod +x script.sh',   desc: 'Make a script executable so you can run it directly.', category: 'file' },
+  { full: 'chmod 600 id_rsa',     desc: 'Private key permissions — only the owner can read or write.', category: 'file' },
+  { full: 'chmod -R 755 folder/', desc: 'Apply 755 permissions to a folder and all its contents.', category: 'file' },
+  // ── sudo ───────────────────────────────────────────────────────────────
+  { full: 'sudo systemctl restart nginx', desc: 'Restart nginx with root privileges to apply config changes.', category: 'system' },
+  { full: 'sudo apt update',              desc: 'Refresh the package list from all repositories as root.', category: 'system' },
+  { full: 'sudo apt install nmap',        desc: 'Install the nmap port scanner with root privileges.', category: 'system' },
+  { full: 'sudo -i',                      desc: 'Open a full root shell session — be careful with this.', category: 'system' },
+  { full: 'sudo !!',                      desc: 'Re-run your last command with sudo if it failed due to permissions.', category: 'system' },
+  // ── git ────────────────────────────────────────────────────────────────
+  { full: 'git status',                     desc: 'Show changed, staged, and untracked files in your repo.', category: 'system' },
+  { full: 'git log --oneline',              desc: 'Show a compact one-line-per-commit history.', category: 'system' },
+  { full: 'git diff',                       desc: 'Show what changed in your files since the last commit.', category: 'system' },
+  { full: 'git add .',                      desc: 'Stage all changed files in the current directory for commit.', category: 'system' },
+  { full: 'git commit -m "message"',        desc: 'Save staged changes as a commit with a description.', category: 'system' },
+  { full: 'git push origin main',           desc: 'Push your local commits to the main branch on GitHub.', category: 'system' },
+  { full: 'git pull origin main',           desc: 'Download and merge the latest changes from GitHub.', category: 'system' },
+  { full: 'git clone https://github.com/user/repo', desc: 'Download a GitHub repository to your local machine.', category: 'system' },
+  { full: 'git branch -a',                  desc: 'List all local and remote branches in the repository.', category: 'system' },
+  { full: 'git stash',                      desc: 'Temporarily save uncommitted changes so you can switch branches.', category: 'system' },
+  // ── python3 ────────────────────────────────────────────────────────────
+  { full: 'python3 -c "print(\'hello\')"',    desc: 'Run a one-liner Python expression directly from the command line.', category: 'system' },
+  { full: 'python3 -m http.server 8000',    desc: 'Start a simple HTTP file server on port 8000 in the current directory.', category: 'network' },
+  { full: 'python3 script.py',              desc: 'Execute a Python script file.', category: 'system' },
+  { full: 'python3 -m pip install requests',desc: 'Install the Python "requests" library using pip.', category: 'system' },
+  // ── docker ─────────────────────────────────────────────────────────────
+  { full: 'docker ps',                      desc: 'List all currently running Docker containers.', category: 'system' },
+  { full: 'docker ps -a',                   desc: 'List all containers including stopped ones.', category: 'system' },
+  { full: 'docker images',                  desc: 'Show all Docker images stored locally on this machine.', category: 'system' },
+  { full: 'docker pull ubuntu',             desc: 'Download the latest Ubuntu image from Docker Hub.', category: 'system' },
+  { full: 'docker run -it ubuntu bash',     desc: 'Start an interactive Ubuntu container and open a bash shell.', category: 'system' },
+  { full: 'docker stop container_id',       desc: 'Send a stop signal to a running container gracefully.', category: 'system' },
+  { full: 'docker logs container_id',       desc: 'View the stdout/stderr logs from a container.', category: 'system' },
+  { full: 'docker exec -it container_id bash', desc: 'Open a bash shell inside an already-running container.', category: 'system' },
+  // ── tcpdump ────────────────────────────────────────────────────────────
+  { full: 'tcpdump -i eth0',                desc: 'Capture all packets on the eth0 network interface.', category: 'security' },
+  { full: 'tcpdump -i eth0 port 80',        desc: 'Capture only HTTP traffic (port 80) on eth0.', category: 'security' },
+  { full: 'tcpdump -i eth0 -w capture.pcap',desc: 'Save captured packets to a file for Wireshark analysis.', category: 'security' },
+  { full: 'tcpdump -n port 443',            desc: 'Capture HTTPS traffic without resolving hostnames.', category: 'security' },
+  // ── hashcat ────────────────────────────────────────────────────────────
+  { full: 'hashcat -m 0 hash.txt wordlist.txt',      desc: 'Crack MD5 hashes using a dictionary wordlist attack.', category: 'security' },
+  { full: 'hashcat -m 1000 hash.txt wordlist.txt',   desc: 'Crack NTLM (Windows password) hashes with a wordlist.', category: 'security' },
+  { full: 'hashcat -m 0 -a 3 hash.txt ?a?a?a?a?a?a', desc: 'Brute-force all 6-character combinations against MD5 hashes.', category: 'security' },
+  // ── hydra ──────────────────────────────────────────────────────────────
+  { full: 'hydra -l admin -P wordlist.txt ssh://192.168.1.1',    desc: 'Brute-force SSH login for user "admin" using a password list.', category: 'security' },
+  { full: 'hydra -l admin -P wordlist.txt http-get://target.com',desc: 'Brute-force HTTP basic authentication with a password list.', category: 'security' },
+  { full: 'hydra -L users.txt -P pass.txt ftp://192.168.1.1',   desc: 'Try many user+password combinations against an FTP server.', category: 'security' },
+  // ── gobuster ───────────────────────────────────────────────────────────
+  { full: 'gobuster dir -u http://target.com -w /usr/share/wordlists/dirb/common.txt', desc: 'Find hidden directories on a web server using a wordlist.', category: 'security' },
+  { full: 'gobuster dns -d target.com -w subdomains.txt',        desc: 'Enumerate DNS subdomains of a domain using a wordlist.', category: 'security' },
+  // ── nikto ──────────────────────────────────────────────────────────────
+  { full: 'nikto -h http://target.com',      desc: 'Scan a website for known vulnerabilities and misconfigurations.', category: 'security' },
+  { full: 'nikto -h https://target.com -ssl',desc: 'Scan an HTTPS site for web vulnerabilities specifically.', category: 'security' },
+  // ── sqlmap ─────────────────────────────────────────────────────────────
+  { full: 'sqlmap -u "http://site.com/?id=1" --dbs',   desc: 'Auto-detect SQL injection and list all database names.', category: 'security' },
+  { full: 'sqlmap -u "http://site.com/?id=1" --tables',desc: 'Find SQL injection and list tables in discovered databases.', category: 'security' },
+  // ── john ───────────────────────────────────────────────────────────────
+  { full: 'john --wordlist=rockyou.txt hash.txt', desc: 'Crack password hashes using the famous rockyou wordlist.', category: 'security' },
+  { full: 'john --show hash.txt',                 desc: 'Display all passwords already cracked in a previous run.', category: 'security' },
+  // ── ss / netstat ───────────────────────────────────────────────────────
+  { full: 'ss -tulnp',   desc: 'Show all listening TCP and UDP ports with the process using each.', category: 'network' },
+  { full: 'ss -an',      desc: 'Show all active socket connections in numeric format.', category: 'network' },
+  { full: 'ss -s',       desc: 'Show a summary count of socket statistics by type.', category: 'network' },
+  // ── tar ────────────────────────────────────────────────────────────────
+  { full: 'tar -czf archive.tar.gz folder/',  desc: 'Compress a folder into a .tar.gz archive.', category: 'archive' },
+  { full: 'tar -xzf archive.tar.gz',          desc: 'Extract a .tar.gz archive into the current directory.', category: 'archive' },
+  { full: 'tar -tvf archive.tar.gz',          desc: 'List the contents of a .tar.gz without extracting it.', category: 'archive' },
+  { full: 'tar -xzf archive.tar.gz -C /tmp/', desc: 'Extract an archive into the /tmp directory.', category: 'archive' },
+  // ── apt / apt-get ──────────────────────────────────────────────────────
+  { full: 'apt update',          desc: 'Refresh the package list from all configured repositories.', category: 'system' },
+  { full: 'apt upgrade',         desc: 'Install available updates for all installed packages.', category: 'system' },
+  { full: 'apt install nmap',    desc: 'Install the nmap network scanner.', category: 'system' },
+  { full: 'apt install curl',    desc: 'Install the curl HTTP transfer tool.', category: 'system' },
+  { full: 'apt remove nmap',     desc: 'Uninstall nmap from the system.', category: 'system' },
+  { full: 'apt search nmap',     desc: 'Search the package database for packages matching "nmap".', category: 'system' },
+  { full: 'apt-get update',      desc: 'Update the package index (older apt-get syntax).', category: 'system' },
+  { full: 'apt-get install nmap',desc: 'Install nmap using the older apt-get interface.', category: 'system' },
+  // ── man ────────────────────────────────────────────────────────────────
+  { full: 'man nmap',       desc: 'Open the nmap manual — full docs for every flag and option.', category: 'help' },
+  { full: 'man grep',       desc: 'Open the grep manual page.', category: 'help' },
+  { full: 'man curl',       desc: 'Open the full curl documentation.', category: 'help' },
+  { full: 'man ls',         desc: 'Open the ls manual page.', category: 'help' },
+  { full: 'man ssh',        desc: 'Open the SSH manual page.', category: 'help' },
+  { full: 'man iptables',   desc: 'Open the iptables manual for firewall rule syntax.', category: 'help' },
+  // ── df / du ────────────────────────────────────────────────────────────
+  { full: 'df -h',                    desc: 'Show disk usage for all drives in human-readable sizes.', category: 'system' },
+  { full: 'df -h /',                  desc: 'Show free space remaining on the root partition.', category: 'system' },
+  { full: 'du -sh /*',               desc: 'Show how much space each top-level directory uses.', category: 'system' },
+  { full: 'du -sh /var/log',         desc: 'Check total disk space consumed by log files.', category: 'system' },
+  { full: 'du --max-depth=1 -h',     desc: 'Show sizes of immediate subdirectories only.', category: 'system' },
+  // ── uname ──────────────────────────────────────────────────────────────
+  { full: 'uname -a',    desc: 'Show all system info: kernel version, hostname, and architecture.', category: 'system' },
+  { full: 'uname -r',    desc: 'Show just the kernel version number.', category: 'system' },
+  // ── which ──────────────────────────────────────────────────────────────
+  { full: 'which python3', desc: 'Find the full path where python3 is installed.', category: 'system' },
+  { full: 'which nmap',    desc: 'Check if nmap is installed and find its location.', category: 'system' },
+  { full: 'which git',     desc: 'Find the git executable location on this system.', category: 'system' },
+  // ── mv / cp / rm ───────────────────────────────────────────────────────
+  { full: 'mv old.txt new.txt',     desc: 'Rename a file — the original is removed.', category: 'file' },
+  { full: 'mv file.txt /tmp/',      desc: 'Move a file to the /tmp directory.', category: 'file' },
+  { full: 'cp file.txt backup.txt', desc: 'Copy a file — both source and copy exist afterwards.', category: 'file' },
+  { full: 'cp -r folder/ backup/',  desc: 'Copy an entire directory and all its contents.', category: 'file' },
+  { full: 'rm -rf /tmp/junk',       desc: 'Delete a directory and all its contents permanently.', category: 'file' },
+  // ── ssh-keygen ─────────────────────────────────────────────────────────
+  { full: 'ssh-keygen -t ed25519',       desc: 'Generate a modern Ed25519 key pair (recommended).', category: 'security' },
+  { full: 'ssh-keygen -t rsa -b 4096',   desc: 'Generate a 4096-bit RSA key pair for SSH authentication.', category: 'security' },
+];
+
+/**
+ * Get argument-completion suggestions when the user has typed a command + partial argument.
+ * e.g.  "ping goo"   → ["ping google.com", "ping google.com -c 4", ...]
+ *       "nmap -s"    → ["nmap -sV ...", "nmap -sS ...", "nmap -sn ...", ...]
+ */
+export function getArgumentSuggestions(input: string, max = 6): Array<{ name: string; desc: string; category: string }> {
+  const trimmed = input.trim();
+  if (!trimmed || !trimmed.includes(' ')) return []; // only activate when args present
+
+  const lower = trimmed.toLowerCase();
+  return ARGUMENT_COMPLETIONS
+    .filter(c => c.full.toLowerCase().startsWith(lower))
+    .slice(0, max)
+    .map(c => ({ name: c.full, desc: c.desc, category: c.category }));
+}
+
 /**
  * Get top-N suggestions matching the current input.
  */
