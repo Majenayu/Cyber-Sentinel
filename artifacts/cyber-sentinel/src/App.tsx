@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -39,7 +39,6 @@ import AlertSiren from "@/components/AlertSiren";
 import GlitchScreensaver from "@/components/GlitchScreensaver";
 import HackerCinema from "@/components/HackerCinema";
 import TypingSound from "@/components/TypingSound";
-import { useLocation } from "wouter";
 import { PushBell } from "@/components/PushBell";
 
 const queryClient = new QueryClient();
@@ -55,7 +54,7 @@ function Layout({ active }: { active: boolean }) {
   const [cinemaMode, setCinemaMode] = useState(false);
   const [typingSounds, setTypingSounds] = useState(() => localStorage.getItem('cs-typing-sounds') === 'true');
   const gSequence = useRef<string[]>([]);
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -161,9 +160,14 @@ function Layout({ active }: { active: boolean }) {
             <Route path="/skill-tree" component={() => <Wrap title="Skill Tree"><SkillTree /></Wrap>} />
             <Route path="/tracker" component={() => <Wrap title="QR Tracker"><TrackerPage /></Wrap>} />
             <Route path="/terminal" component={() => <Wrap title="Terminal"><TerminalPage /></Wrap>} />
-            <Route path="/remote-terminal" component={() => <Wrap title="Remote Terminal"><RemoteTerminalPage /></Wrap>} />
             <Route component={NotFound} />
           </Switch>
+        </div>
+
+        {/* ── Remote Terminal — always mounted so SSH session + xterm buffer survive navigation ── */}
+        <div className={`flex-1 overflow-hidden flex flex-col ${location === '/remote-terminal' ? '' : 'hidden'}`}
+          aria-hidden={location !== '/remote-terminal'}>
+          <Wrap title="Remote Terminal"><RemoteTerminalPage /></Wrap>
         </div>
       </main>
     </div>
