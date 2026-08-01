@@ -10,6 +10,7 @@
 import { IncomingMessage, Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { spawn } from "child_process";
+import { writeFileSync, unlinkSync } from "fs";
 import { logger } from "../lib/logger";
 
 const MAX_SESSIONS = 10;
@@ -37,35 +38,95 @@ export PATH="/nix/store/30yhi8slm1993fabx0052whmsv86x3zm-iproute2-6.11.0/sbin:/n
 # ── Prompt ────────────────────────────────────────────────────────────
 export PS1="\\[\\033[01;32m\\][CS]\\[\\033[00m\\] \\[\\033[01;34m\\]\\w\\[\\033[00m\\]\\$ "
 
-# ── Windows command aliases (map to Linux equivalents) ────────────────
+# ── Windows / macOS command aliases ──────────────────────────────────
 alias ipconfig='ip addr show'
-alias ipconfig/all='ip addr show'
 alias ifconfig='ip addr show'
 alias cls='clear'
 alias dir='ls -la'
-alias type='cat'
 alias del='rm'
 alias copy='cp'
 alias move='mv'
 alias md='mkdir'
 alias rd='rmdir'
 alias nslookup='dig'
-netstat() { ss "$@"; }
+alias where='which'
+alias tasklist='ps aux'
+alias set='env'
 
-# ── command_not_found_handle: suggest Linux equivalent ────────────────
+# ipconfig /all and /flushdns handled via function (slash in alias name is invalid)
+ipconfig() {
+  local arg="\${1:-}"
+  local lower
+  lower=$(echo "$arg" | tr '[:upper:]' '[:lower:]')
+  case "$lower" in
+    /all|//all)  ip addr show ;;
+    /flushdns)   resolvectl flush-caches 2>/dev/null && echo "DNS cache flushed" || echo "DNS flush not available" ;;
+    *)           ip addr show ;;
+  esac
+}
+export -f ipconfig 2>/dev/null || true
+
+netstat() { ss "$@"; }
+export -f netstat 2>/dev/null || true
+
+# ── ping: ICMP raw sockets are blocked in this container ─────────────
+# Falls back to TCP reachability check + DNS resolution
+ping() {
+  # Find the target host (first non-flag argument)
+  local host=""
+  for _arg in "$@"; do
+    case "$_arg" in -*) ;; *) host="$_arg"; break ;; esac
+  done
+
+  if [ -z "$host" ]; then
+    echo "Usage: ping [options] <host>"
+    return 1
+  fi
+
+  # Quick check: does native ping actually work?
+  if command ping -c1 -W1 "$host" >/dev/null 2>&1; then
+    command ping "$@"
+    return $?
+  fi
+
+  # Fallback — container blocks raw/ICMP sockets
+  echo -e "\\033[33m[CS] ICMP ping blocked (container lacks cap_net_raw).\\033[0m"
+  echo -e "\\033[33m[CS] Running TCP reachability check instead...\\033[0m\\n"
+
+  # DNS resolve
+  local ip
+  ip=$(dig +short "$host" A 2>/dev/null | head -1)
+  if [ -n "$ip" ]; then
+    echo -e "\\033[32mDNS  $host  →  $ip\\033[0m"
+  else
+    echo -e "\\033[31mDNS  could not resolve $host\\033[0m"
+  fi
+
+  # TCP probe ports 80 and 443
+  for _port in 80 443; do
+    local _t0 _t1 _ms
+    _t0=$(date +%s%3N)
+    if nc -z -w 3 "$host" "$_port" 2>/dev/null; then
+      _t1=$(date +%s%3N)
+      _ms=$(( _t1 - _t0 ))
+      echo -e "\\033[32mTCP  $host:$_port  open  (\${_ms} ms)\\033[0m"
+    else
+      echo -e "\\033[31mTCP  $host:$_port  unreachable\\033[0m"
+    fi
+  done
+}
+export -f ping 2>/dev/null || true
+
+# ── command_not_found_handle ──────────────────────────────────────────
 command_not_found_handle() {
   local cmd="$1"
   echo -e "\\033[31mbash: $cmd: command not found\\033[0m"
   local lower
   lower=$(echo "$cmd" | tr '[:upper:]' '[:lower:]')
   case "$lower" in
-    ipconfig*)  echo -e "\\033[33mHint: use 'ip addr show' or 'ip a' for network interfaces\\033[0m" ;;
-    ifconfig*)  echo -e "\\033[33mHint: use 'ip addr show' or 'ip a'\\033[0m" ;;
-    tracert*)   echo -e "\\033[33mHint: use 'traceroute <host>'\\033[0m" ;;
-    netstat*)   echo -e "\\033[33mHint: use 'ss -tulnp' for listening ports\\033[0m" ;;
-    cls)        clear ;;
-    dir)        ls -la ;;
-    nmap*)      echo -e "\\033[33mHint: nmap may not be installed. Try 'nc -zv <host> <port>'\\033[0m" ;;
+    tracert*)  echo -e "\\033[33mHint: use 'traceroute <host>'\\033[0m" ;;
+    nmap*)     echo -e "\\033[33mHint: nmap may not be installed. Try 'nc -zv <host> <port>'\\033[0m" ;;
+    ping-*)    echo -e "\\033[33mHint: use 'ping <host>' — the CS ping wrapper handles fallback\\033[0m" ;;
   esac
   return 127
 }
@@ -73,7 +134,7 @@ export -f command_not_found_handle 2>/dev/null || true
 `;
 
     const rcFile = `/tmp/cs-terminal-${Date.now()}.bashrc`;
-    require("fs").writeFileSync(rcFile, bashrc);
+    writeFileSync(rcFile, bashrc);
 
     const shell = spawn(
       "script",
