@@ -4,6 +4,22 @@ import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/scheduler";
 import { attachTerminalWs } from "./routes/terminal";
 
+// ── Required-secrets guard ────────────────────────────────────────────────────
+// Exit cleanly (no crash-loop) when secrets haven't been added yet.
+// This prevents burning compute credits on repeated failed restarts.
+const missingSecrets: string[] = [];
+if (!process.env.MONGODB_URI) missingSecrets.push("MONGODB_URI");
+if (!process.env.GROQ_API_KEY) missingSecrets.push("GROQ_API_KEY");
+
+if (missingSecrets.length > 0) {
+  console.error(
+    `\n⚠️  CyberSentinel API server cannot start — missing required secrets:\n` +
+    missingSecrets.map(k => `   • ${k}`).join("\n") +
+    `\n\nAdd them in the Replit Secrets tab (🔒 lock icon), then restart this workflow.\n`
+  );
+  process.exit(0); // clean exit — workflow will not auto-restart
+}
+
 // API_PORT is the dedicated port var for this service (avoids conflict with the Vite frontend
 // which owns the global PORT env var in development). In production on Render/Railway, set
 // API_PORT to match whatever the platform assigns (e.g. API_PORT=10000 alongside PORT=10000).
