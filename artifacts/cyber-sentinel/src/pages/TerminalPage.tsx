@@ -10,7 +10,7 @@ import {
 import { useTheme } from '@/contexts/ThemeContext';
 import {
   getSuggestions, getArgumentSuggestions, getTranslation, getCommandInfo,
-  CATEGORY_LABELS, type CommandInfo,
+  getSecListsSuggestions, CATEGORY_LABELS, type CommandInfo,
 } from '@/data/terminal-commands';
 
 // ── WebSocket URL (proxied through Vite → same origin) ──────────────────
@@ -205,6 +205,12 @@ export default function TerminalPage() {
     const trimmed = input.trim();
     if (!trimmed) return [];
 
+    // SecLists paths are local configuration, not model-generated content.
+    // Prefer the confirmed profile so AI cannot replace it with a nonexistent
+    // /usr/share/wordlists/seclists path.
+    const secLists = getSecListsSuggestions(trimmed, 'linux');
+    if (secLists.length > 0) return secLists.slice(0, max);
+
     const results: Suggestion[] = [];
 
     // 1. Syntax fix hint (always first if applicable)
@@ -260,6 +266,10 @@ export default function TerminalPage() {
 
     setAiLoading(true);
     aiInputRef.current = trimmed;
+    if (getSecListsSuggestions(trimmed, 'linux').length > 0) {
+      setAiLoading(false);
+      return;
+    }
 
     aiDebounceRef.current = setTimeout(async () => {
       const snapshot = trimmed; // capture so we can discard stale responses
@@ -395,7 +405,6 @@ export default function TerminalPage() {
       allowProposedApi: true,
       scrollback: 5000,
       convertEol: false,
-      copyOnSelect: true,   // auto-copy on text selection
     });
 
     const fitAddon   = new FitAddon();

@@ -42,6 +42,7 @@ function buildWindowsPrompt(username: string) {
   const user = username || 'pgayu';
   const htbBase = `C:\\Users\\${user}\\Downloads\\hack-the-box`;
   const sl = `${htbBase}\\SecLists-master`;  // actual folder name on disk
+  const wslSl = `/mnt/c/Users/${user}/Downloads/hack-the-box/SecLists-master`;
   return `You are a Windows CMD/PowerShell terminal autocomplete engine for a cybersecurity (Hack The Box / CTF) operator.
 The operator's Windows machine: username="${user}", HTB tools folder="${htbBase}"
 
@@ -110,11 +111,20 @@ Known wordlist and tool paths CONFIRMED on this system (use these exact paths):
     Metasploit: wsl msfconsole
     Cookies:    ${htbBase}\\cookies.txt  (pre-saved session cookies)
 
+WSL path rule (critical):
+- Any command beginning with "wsl" must use the mounted WSL path "${wslSl}".
+- Example ffuf: wsl ffuf -u "https://target/FUZZ" -w "${wslSl}/Discovery/Web-Content/common.txt"
+- Example gobuster: wsl gobuster dir -u "https://target/" -w "${wslSl}/Discovery/Web-Content/common.txt"
+- Example DNS: wsl gobuster dns -d target.htb -w "${wslSl}/Discovery/DNS/subdomains-top1million-5000.txt"
+- Do NOT pass "C:\\..." paths to a wsl command; WSL tools cannot read them directly.
+- Do NOT use /usr/share/seclists on this Windows host unless the operator explicitly says the package was installed inside WSL.
+- The uploaded tree confirms the folder name is "SecLists-master" and the Web-Content file is "common.txt"; do not invent "directories.txt".
+
 Rules:
 - Use correct Windows CMD or PowerShell syntax (backslash paths, double-quoted strings)
 - For security tools, prefer "wsl <tool>" — ffuf and gobuster are Go source repos, so WSL binary is required
 - Replace placeholder targets with realistic CTF/HTB examples (10.10.10.X, 10.129.X.X, target.htb)
-- Always use the EXACT confirmed paths above for wordlist arguments — do NOT invent paths
+- Always use the EXACT confirmed paths above for native Windows arguments, and the exact WSL equivalents above for commands beginning with "wsl"
 - desc must be 1–2 short plain-English sentences (max 120 chars)
 - category must be ONE of: network, security, file, system, process, archive, search, text, help
 
@@ -180,6 +190,25 @@ router.post('/terminal/suggest', async (req, res) => {
     } catch {
       // Model returned non-JSON — return empty gracefully
       suggestions = [];
+    }
+
+    // Keep AI suggestions executable on the actual remote host. In
+    // particular, WSL tools need /mnt/c paths, not PowerShell C:\\ paths.
+    if (isWindows) {
+      const safeUser = (username || 'pgayu').replace(/[^a-zA-Z0-9._-]/g, '') || 'pgayu';
+      const windowsRoot = `C:\\Users\\${safeUser}\\Downloads\\hack-the-box\\SecLists-master`;
+      const wslRoot = `/mnt/c/Users/${safeUser}/Downloads/hack-the-box/SecLists-master`;
+      suggestions = suggestions.map((suggestion) => {
+        let name = suggestion.name;
+        if (/^\s*wsl(?:\s|$)/i.test(name)) {
+          name = name
+            .replaceAll(windowsRoot, wslRoot)
+            .replaceAll('/usr/share/wordlists/seclists', wslRoot)
+            .replaceAll('/usr/share/seclists', wslRoot)
+            .replaceAll('/directories.txt', '/common.txt');
+        }
+        return { ...suggestion, name };
+      });
     }
 
     res.json({ suggestions });

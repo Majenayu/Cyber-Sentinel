@@ -494,6 +494,88 @@ export interface TranslationEntry {
   note: string;    // Short: what was auto-translated
 }
 
+// ── SecLists path profile ───────────────────────────────────────────────
+// The operator's wordlists live on the Windows host, not in this Replit
+// container.  Keep the two path syntaxes explicit: PowerShell/CMD uses the
+// Windows path, while tools launched through WSL must use /mnt/c.
+export interface SecListsPathProfile {
+  windowsRoot: string;
+  wslRoot: string;
+  linuxRoot: string;
+}
+
+export function getSecListsPathProfile(username = 'pgayu'): SecListsPathProfile {
+  const safeUser = username.replace(/[^a-zA-Z0-9._-]/g, '') || 'pgayu';
+  const windowsRoot = `C:\\Users\\${safeUser}\\Downloads\\hack-the-box\\SecLists-master`;
+  const wslRoot = `/mnt/c/Users/${safeUser}/Downloads/hack-the-box/SecLists-master`;
+  return {
+    windowsRoot,
+    wslRoot,
+    // Debian/Kali's package path is valid only after the seclists package is
+    // installed. The uploaded Windows tree is the confirmed source of truth.
+    linuxRoot: '/usr/share/seclists',
+  };
+}
+
+/**
+ * Return local, deterministic SecLists suggestions for the remote terminal.
+ * These are intentionally handled before the AI request: a path must not be
+ * guessed by a model, and WSL cannot consume a C:\\ path directly.
+ */
+export function getSecListsSuggestions(
+  input: string,
+  platform: string,
+  username = 'pgayu',
+): Array<{ name: string; desc: string; category: string }> {
+  const trimmed = input.trim();
+  if (!trimmed) return [];
+
+  const lower = trimmed.toLowerCase();
+  const profile = getSecListsPathProfile(username);
+  const isWindows = platform === 'windows';
+  const toolPrefix = isWindows ? 'wsl ' : '';
+  const root = isWindows ? profile.wslRoot : profile.linuxRoot;
+  const pathNeedsFix = /(?:\/usr\/share\/(?:wordlists\/)?seclists|wordlist\.txt|subdomains\.txt|directories\.txt)/i.test(trimmed);
+  const suggestions: Array<{ name: string; desc: string; category: string }> = [];
+
+  if (lower.startsWith('ffuf') || lower.startsWith('wsl ffuf')) {
+    const wordlist = `${root}/Discovery/Web-Content/common.txt`;
+    if (!pathNeedsFix || lower.includes(' -w')) {
+      suggestions.push({
+        name: `${toolPrefix}ffuf -u "https://target/FUZZ" -w "${wordlist}" -e .json,.php,.html -fc 404`,
+        desc: isWindows
+          ? 'Uses the confirmed SecLists Web-Content path through WSL.'
+          : 'Uses the installed SecLists Web-Content path.',
+        category: 'security',
+      });
+    }
+  }
+
+  if (lower.startsWith('gobuster dir') || lower.startsWith('wsl gobuster dir')) {
+    const wordlist = `${root}/Discovery/Web-Content/common.txt`;
+    suggestions.push({
+      name: `${toolPrefix}gobuster dir -u "https://target/" -w "${wordlist}" -x json,php,html -t 30`,
+      desc: isWindows
+        ? 'Uses the confirmed SecLists path through WSL; avoids the missing directories.txt name.'
+        : 'Uses the installed SecLists Web-Content path.',
+      category: 'security',
+    });
+  }
+
+  if (lower.startsWith('gobuster dns') || lower.startsWith('wsl gobuster dns')) {
+    const wordlist = `${root}/Discovery/DNS/subdomains-top1million-5000.txt`;
+    suggestions.push({
+      name: `${toolPrefix}gobuster dns -d target.htb -w "${wordlist}"`,
+      desc: isWindows
+        ? 'Uses the confirmed SecLists DNS path through WSL.'
+        : 'Uses the installed SecLists DNS path.',
+      category: 'security',
+    });
+  }
+
+  return suggestions;
+}
+
 export const OS_TRANSLATIONS: Record<string, TranslationEntry> = {
   // Windows
   'ipconfig':              { linux: 'ip addr show',                          note: 'ipconfig → ip addr show' },

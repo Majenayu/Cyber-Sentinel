@@ -9,6 +9,7 @@ import {
   Clipboard, ClipboardCopy, Send,
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { getSecListsSuggestions } from '@/data/terminal-commands';
 
 // ── WebSocket URL for remote terminal ─────────────────────────────────────
 function getWsUrl() {
@@ -123,7 +124,7 @@ export default function RemoteTerminalPage() {
   const inputBufRef    = useRef('');           // what the user has typed on the current line
   const suggestionsRef = useRef<Suggestion[]>([]);
   const sugSelRef      = useRef(-1);           // keyboard-selected index (-1 = none)
-  const aiDebounceRef  = useRef<ReturnType<typeof setTimeout>>();
+  const aiDebounceRef  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const aiInputRef     = useRef('');           // stale-check snapshot
 
   // ── Connection / AI UI state ──────────────────────────────────────────
@@ -261,6 +262,13 @@ export default function RemoteTerminalPage() {
       setAiLoading(true);
       const snapshot = trimmed;
       const osPlatform = detectedOSRef.current === 'unknown' ? 'windows' : detectedOSRef.current;
+      const localPathSuggestions = getSecListsSuggestions(snapshot, osPlatform, capturedUsername);
+      if (localPathSuggestions.length > 0) {
+        aiInputRef.current = snapshot;
+        setSuggestions(localPathSuggestions);
+        setAiLoading(false);
+        return;
+      }
       aiInputRef.current = snapshot;
       aiDebounceRef.current = setTimeout(async () => {
         const results = await fetchAiSuggestionsRemote(snapshot, capturedUsername, osPlatform);

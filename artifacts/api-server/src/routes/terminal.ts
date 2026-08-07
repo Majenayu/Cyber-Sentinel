@@ -275,7 +275,7 @@ export -f command_not_found_handle 2>/dev/null || true
         // Not JSON — raw keystroke, pass through
       }
 
-      if (shell?.stdin.writable) {
+      if (shell?.stdin && shell.stdin.writable) {
         shell.stdin.write(data);
       }
     });
