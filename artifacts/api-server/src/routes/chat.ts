@@ -7,16 +7,50 @@ import { detectToolsInText } from './scrape';
 
 const router = Router();
 
+function deriveSessionTitle(content: string): string {
+  const title = String(content ?? '')
+    .replace(/^\[CTF MODE\]\s*/i, '')
+    .split(/\n\n---\s*\n\[Attached /i)[0]
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!title) return 'NEW OPERATION';
+  return title.length > 64 ? `${title.slice(0, 61).trimEnd()}…` : title;
+}
+
+function getLatestUserMessage(session: any): string | null {
+  const latest = [...(session.messages ?? [])]
+    .reverse()
+    .find((message: any) => message.role === 'user' && typeof message.content === 'string');
+  return latest?.content ?? null;
+}
+
 router.get('/chat/sessions', async (req, res) => {
   try {
     await connectToDatabase();
-    const sessions = await Session.find({}).sort({ updatedAt: -1 }).select('title createdAt updatedAt');
-    res.json(sessions.map(s => ({
-      id: s._id.toString(),
-      title: s.title,
-      createdAt: s.createdAt,
-      updatedAt: s.updatedAt,
-    })));
+    const sessions = await Session.find({}).sort({ updatedAt: -1 }).select('title createdAt updatedAt messages');
+    const response = [];
+
+    for (const session of sessions) {
+      const latestUserMessage = getLatestUserMessage(session);
+      const derivedTitle = latestUserMessage ? deriveSessionTitle(latestUserMessage) : session.title;
+
+      // Backfill old Op_* / custom titles from the latest request without changing
+      // the original creation date or the session's activity timestamp.
+      if (derivedTitle && session.title !== derivedTitle) {
+        await Session.updateOne({ _id: session._id }, { $set: { title: derivedTitle } });
+        session.title = derivedTitle;
+      }
+
+      response.push({
+        id: session._id.toString(),
+        title: session.title,
+        createdAt: session.createdAt,
+        updatedAt: session.updatedAt,
+      });
+    }
+
+    res.json(response);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -77,6 +111,7 @@ router.post('/chat/sessions/:id/messages/stream', async (req, res) => {
     const { content, provider: providerPref } = req.body;
     const history = session.messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content }));
 
+    session.title = deriveSessionTitle(content);
     session.messages.push({ role: 'user', content, createdAt: new Date() } as any);
     await session.save();
 
@@ -178,6 +213,7 @@ router.post('/chat/sessions/:id/messages', async (req, res) => {
     const { content } = req.body;
     const history = session.messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content }));
 
+    session.title = deriveSessionTitle(content);
     session.messages.push({ role: 'user', content, createdAt: new Date() } as any);
 
     let aiContent: string;
@@ -224,6 +260,7 @@ router.post('/chat/sessions/:id/messages/best', async (req, res) => {
     const { content } = req.body;
     const history = session.messages.slice(-10).map((m: any) => ({ role: m.role, content: m.content }));
 
+    session.title = deriveSessionTitle(content);
     session.messages.push({ role: 'user', content, createdAt: new Date() } as any);
     await session.save();
 

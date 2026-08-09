@@ -40,6 +40,25 @@ interface Message {
 interface Session { id: string; title: string; createdAt: string; updatedAt: string; }
 interface SaveModal { content: string; title: string; tags: string; }
 
+function deriveSessionTitle(content: string): string {
+  const title = content
+    .replace(/^\[CTF MODE\]\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!title) return 'NEW OPERATION';
+  return title.length > 64 ? `${title.slice(0, 61).trimEnd()}…` : title;
+}
+
+function formatSessionCreatedAt(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Date unavailable';
+  return `Created ${date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })}`;
+}
+
 const SESSION_TEMPLATES = [
   { label: 'Pentest Web App', prompt: 'Give me a complete web application penetration testing checklist. Include all phases: recon, scanning, enumeration, exploitation, post-exploitation. For each phase list the top tools and exact commands.' },
   { label: 'HTB/THM Box', prompt: 'I started a HackTheBox/TryHackMe machine. Walk me through a systematic methodology: initial nmap scan, service enumeration, web directory brute force, and common initial foothold techniques. Give exact commands.' },
@@ -216,9 +235,7 @@ export default function ChatPage() {
 
   const createSession = async (initialPrompt?: string) => {
     try {
-      const now = new Date();
-      const label = `Op_${now.toLocaleDateString('en-GB').replace(/\//g, '.')}_${now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
-      const res = await fetch('/api/chat/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: label }) });
+      const res = await fetch('/api/chat/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'NEW OPERATION' }) });
       const s: Session = await res.json();
       setSessions(prev => [s, ...prev]);
       setCurrentSessionId(s.id);
@@ -361,9 +378,13 @@ export default function ChatPage() {
 
     const fullContent = buildMessageWithAttachments(ctfMode ? `[CTF MODE] ${text}` : text);
     const attachmentSummaries = attachedFiles.filter(f => !f.error).map(f => ({ name: f.name, summary: f.analysis ? 'image analyzed' : 'text attached' }));
+    const sessionTitle = deriveSessionTitle(text);
 
     const userMsgId = `user-${Date.now()}`;
     setMessages(prev => [...prev, { id: userMsgId, role: 'user', content: text, attachments: attachmentSummaries.length ? attachmentSummaries : undefined }]);
+    setSessions(prev => prev.map(session =>
+      session.id === currentSessionId ? { ...session, title: sessionTitle, updatedAt: new Date().toISOString() } : session
+    ));
     setInput('');
     setAttachedFiles([]);
     setIsLoading(true);
@@ -661,10 +682,16 @@ export default function ChatPage() {
                 <p className="text-[11px] text-muted-foreground text-center">No sessions yet.</p>
                 <button onClick={() => createSession()} className="w-full py-2 px-3 border border-primary/50 text-primary text-xs rounded hover:bg-primary/10 transition-colors">+ New Session</button>
               </div>
-            ) : sessions.map(s => (
+             ) : sessions.map(s => (
               <div key={s.id} onClick={() => setCurrentSessionId(s.id)}
                 className={cn('group p-2.5 rounded cursor-pointer border transition-all flex items-center justify-between gap-2', currentSessionId === s.id ? 'bg-secondary/60 border-primary/30 text-primary' : 'border-transparent hover:bg-secondary/30 text-muted-foreground hover:text-foreground')}>
-                <div className="flex items-center gap-2 truncate min-w-0"><Terminal size={12} className="shrink-0" /><span className="truncate text-[11px]">{s.title}</span></div>
+                 <div className="flex items-center gap-2 truncate min-w-0">
+                   <Terminal size={12} className="shrink-0" />
+                   <div className="min-w-0">
+                     <span className="block truncate text-[11px]" title={s.title}>{s.title}</span>
+                     <span className="block text-[9px] text-muted-foreground/50 truncate">{formatSessionCreatedAt(s.createdAt)}</span>
+                   </div>
+                 </div>
                 <button onClick={e => deleteSession(s.id, e)} className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-destructive transition-all shrink-0"><Trash2 size={11} /></button>
               </div>
             ))}
