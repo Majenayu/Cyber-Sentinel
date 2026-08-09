@@ -43,17 +43,17 @@ nmap --script=http-enum 10.10.10.121
 
 **Directory Scan:**
 \`\`\`bash
-gobuster dir -u http://10.10.10.121/ -w /usr/share/wordlists/dirb/common.txt
+wsl gobuster dir -u http://10.10.10.121/ -w "/mnt/c/Users/pgayu/Downloads/hack-the-box/SecLists-master/Discovery/Web-Content/common.txt"
 \`\`\`
 
 **With file extensions:**
 \`\`\`bash
-gobuster dir -u http://10.10.10.121/ -w common.txt -x php,html,txt -t 50
+wsl gobuster dir -u http://10.10.10.121/ -w "/mnt/c/Users/pgayu/Downloads/hack-the-box/SecLists-master/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt" -x php,html,txt -t 50
 \`\`\`
 
 **DNS Subdomain:**
 \`\`\`bash
-gobuster dns -d target.com -w /usr/share/SecLists/Discovery/DNS/namelist.txt
+wsl gobuster dns -d target.com -w "/mnt/c/Users/pgayu/Downloads/hack-the-box/SecLists-master/Discovery/DNS/subdomains-top1million-5000.txt"
 \`\`\``,
   },
   {
@@ -66,12 +66,12 @@ gobuster dns -d target.com -w /usr/share/SecLists/Discovery/DNS/namelist.txt
 
 **Directory Fuzzing:**
 \`\`\`bash
-ffuf -u http://10.10.10.121/FUZZ -w /usr/share/wordlists/dirb/common.txt
+wsl ffuf -u http://10.10.10.121/FUZZ -w "/mnt/c/Users/pgayu/Downloads/hack-the-box/SecLists-master/Discovery/Web-Content/common.txt"
 \`\`\`
 
 **Subdomain Fuzzing:**
 \`\`\`bash
-ffuf -u http://FUZZ.target.com -w subdomains-top1million-5000.txt
+wsl ffuf -u http://FUZZ.target.com -w "/mnt/c/Users/pgayu/Downloads/hack-the-box/SecLists-master/Discovery/DNS/subdomains-top1million-5000.txt"
 \`\`\`
 
 **Key Flags:** -u, -w, -mc, -fc, -fs, -t, -o`,
@@ -105,12 +105,12 @@ sqlmap -u "http://target.com/page?id=1" -D db_name -T users --dump
     officialUrl: 'https://github.com/vanhauser-thc/thc-hydra',
     cheatsheet: `**SSH Brute Force:**
 \`\`\`bash
-hydra -l admin -P /usr/share/wordlists/rockyou.txt ssh://10.10.10.121
+wsl hydra -l admin -P "/mnt/c/Users/pgayu/Downloads/hack-the-box/SecLists-master/Passwords/Common-Credentials/top-20-common-SSH-passwords.txt" ssh://10.10.10.121
 \`\`\`
 
 **HTTP Form:**
 \`\`\`bash
-hydra -l admin -P rockyou.txt 10.10.10.121 http-post-form "/login:username=^USER^&password=^PASS^:Invalid"
+wsl hydra -l admin -P "/mnt/c/Users/pgayu/Downloads/hack-the-box/SecLists-master/Passwords/Common-Credentials/top-passwords-shortlist.txt" 10.10.10.121 http-post-form "/login:username=^USER^&password=^PASS^:Invalid"
 \`\`\``,
   },
   {
@@ -163,12 +163,25 @@ whatweb -a 3 http://10.10.10.121
 export async function seedTools() {
   await connectToDatabase();
   let seeded = 0;
+  let updated = 0;
   for (const tool of TOOLS) {
     const existing = await Tool.findOne({ slug: tool.slug });
     if (!existing) {
       await Tool.create(tool);
       seeded++;
+    } else if (
+      ['gobuster', 'ffuf', 'hydra'].includes(tool.slug) &&
+      (
+        existing.cheatsheet.includes('/usr/share/') ||
+        /(?:-w\s+)(?:common\.txt|subdomains-top1million-5000\.txt)\b/.test(existing.cheatsheet) ||
+        /(?:-P\s+)rockyou\.txt\b/.test(existing.cheatsheet)
+      )
+    ) {
+      // Refresh only the seeded tools whose wordlist examples were known to be stale.
+      // User-created tools and already-correct records are left untouched.
+      await Tool.updateOne({ _id: existing._id }, { $set: { cheatsheet: tool.cheatsheet } });
+      updated++;
     }
   }
-  return seeded;
+  return seeded + updated;
 }

@@ -8,8 +8,7 @@ const router = Router();
 router.get('/tools', async (req, res) => {
   try {
     await connectToDatabase();
-    const count = await Tool.countDocuments({});
-    if (count === 0) await seedTools();
+    await seedTools();
     const tools = await Tool.find({}).sort({ name: 1 });
     res.json(tools.map(t => ({
       id: t._id.toString(),
@@ -27,6 +26,7 @@ router.get('/tools', async (req, res) => {
 router.get('/tools/:slug', async (req, res) => {
   try {
     await connectToDatabase();
+    await seedTools();
     const tool = await Tool.findOne({ slug: req.params.slug });
     if (!tool) { res.status(404).json({ error: 'Not found' }); return; }
     res.json({
