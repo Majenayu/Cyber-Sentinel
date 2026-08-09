@@ -135,7 +135,7 @@ function Layout({ active }: { active: boolean }) {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto h-full overflow-hidden flex flex-col">
+        <div className={`flex-1 overflow-y-auto h-full overflow-hidden flex flex-col ${location === '/remote-terminal' ? 'hidden' : ''}`}>
           <Switch>
             <Route path="/" component={() => <Wrap title="Dashboard"><Dashboard /></Wrap>} />
             <Route path="/chat" component={() => <Wrap title="AI Ops"><ChatPage /></Wrap>} />
@@ -160,6 +160,8 @@ function Layout({ active }: { active: boolean }) {
             <Route path="/skill-tree" component={() => <Wrap title="Skill Tree"><SkillTree /></Wrap>} />
             <Route path="/tracker" component={() => <Wrap title="QR Tracker"><TrackerPage /></Wrap>} />
             <Route path="/terminal" component={() => <Wrap title="Terminal"><TerminalPage /></Wrap>} />
+            {/* Remote Terminal is mounted below so its SSH session survives navigation. */}
+            <Route path="/remote-terminal" component={() => null} />
             <Route component={NotFound} />
           </Switch>
         </div>
