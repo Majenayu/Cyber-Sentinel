@@ -112,6 +112,9 @@ async function buildAll() {
       "cohere-ai",
       "@google/generative-ai",
     ],
+    alias: {
+      express: path.resolve(artifactDir, "node_modules/express"),
+    },
     sourcemap: "linked",
     plugins: [
       // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it

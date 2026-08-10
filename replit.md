@@ -93,7 +93,7 @@ If `SMTP_PASSWORD` is missing or wrong, the app still works — intrusion attemp
   - `src/lib/mongodb.ts` — MongoDB connection
   - `src/lib/groq.ts` — Groq AI client
   - `src/lib/models/` — Mongoose models (Knowledge, Session, Command, Tool, Intrusion)
-  - `src/routes/sunday.ts` — Sunday authorization-first assessment coordinator
+  - `sunday/api/sunday.ts` — Sunday authorization-first assessment coordinator
 - `lib/api-spec/openapi.yaml` — OpenAPI source of truth
 - `lib/api-client-react/` — generated React Query hooks
 - `lib/api-zod/` — generated Zod schemas
@@ -115,7 +115,7 @@ If `SMTP_PASSWORD` is missing or wrong, the app still works — intrusion attemp
 
 ## Sunday assessment coordinator
 
-The web app's `/sunday` page is the operator-controlled core feature inspired by the imported GhostAttack snapshot. It records a target and scope declaration, defaults to dry-run, and shows phase progress, evidence, findings, and a Markdown report. Active mode is intentionally bounded to public-host DNS resolution and a small TCP reachability set. It does not automatically execute payloads, fuzzing, exploitation, persistence, or credential actions.
+The Sunday feature index lives in `sunday/`. The web app's `/sunday` page is the operator-controlled core feature inspired by the imported GhostAttack snapshot. It records a target and scope declaration, defaults to dry-run, and shows phase progress, evidence, findings, and a Markdown report. Active mode is intentionally bounded to public-host DNS resolution and a small TCP reachability set. It does not automatically execute payloads, fuzzing, exploitation, persistence, or credential actions.
 
 ---
 

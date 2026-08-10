@@ -19,7 +19,7 @@ import stealthRouter from "./stealth";
 import pushRouter from "./push";
 import researchRouter from "./research";
 import terminalSuggestRouter from "./terminal-suggest";
-import sundayRouter from "./sunday";
+import sundayRouter from "../../../../sunday/api/sunday";
 
 const router: IRouter = Router();
 

@@ -4,10 +4,14 @@
     "incremental": true,
     "tsBuildInfoFile": ".tsbuildinfo",
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "../..",
+    "baseUrl": ".",
+    "paths": {
+      "express": ["./node_modules/express"]
+    },
     "types": ["node"]
   },
-  "include": ["src"],
+  "include": ["src", "../../sunday/api"],
   "references": [
     {
       "path": "../../lib/api-zod"

@@ -28,7 +28,7 @@ import SkillTree from "@/pages/SkillTree";
 import TrackerPage from "@/pages/TrackerPage";
 import TerminalPage from "@/pages/TerminalPage";
 import RemoteTerminalPage from "@/pages/RemoteTerminalPage";
-import Sunday from "@/pages/Sunday";
+import Sunday from "../../../sunday/web/Sunday";
 import Sidebar from "@/components/Sidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Menu } from "lucide-react";
@@ -78,7 +78,7 @@ function Layout({ active }: { active: boolean }) {
       }
       if (gSequence.current[0] === 'g') {
         const shortcuts: Record<string, string> = {
-          d: '/', c: '/chat', k: '/vault', t: '/tools', m: '/commands', i: '/intrusions', x: '/terminal',
+          d: '/', c: '/chat', s: '/sunday', k: '/vault', t: '/tools', m: '/commands', i: '/intrusions', x: '/terminal',
         };
         const target = shortcuts[e.key.toLowerCase()];
         if (target) { navigate(target); gSequence.current = []; return; }

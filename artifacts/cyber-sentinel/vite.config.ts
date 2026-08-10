@@ -37,6 +37,8 @@ export default defineConfig({
     alias: {
       "@": path.resolve(import.meta.dirname, "src"),
       "@assets": path.resolve(import.meta.dirname, "..", "..", "attached_assets"),
+      react: path.resolve(import.meta.dirname, "node_modules/react"),
+      "lucide-react": path.resolve(import.meta.dirname, "node_modules/lucide-react"),
     },
     dedupe: ["react", "react-dom"],
   },
@@ -67,6 +69,7 @@ export default defineConfig({
     hmr: true,
     fs: {
       strict: true,
+      allow: [path.resolve(import.meta.dirname, "..", "..", "sunday")],
     },
     proxy: {
       "/api": {
