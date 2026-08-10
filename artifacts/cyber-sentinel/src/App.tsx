@@ -28,6 +28,7 @@ import SkillTree from "@/pages/SkillTree";
 import TrackerPage from "@/pages/TrackerPage";
 import TerminalPage from "@/pages/TerminalPage";
 import RemoteTerminalPage from "@/pages/RemoteTerminalPage";
+import Sunday from "@/pages/Sunday";
 import Sidebar from "@/components/Sidebar";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Menu } from "lucide-react";
@@ -139,6 +140,7 @@ function Layout({ active }: { active: boolean }) {
           <Switch>
             <Route path="/" component={() => <Wrap title="Dashboard"><Dashboard /></Wrap>} />
             <Route path="/chat" component={() => <Wrap title="AI Ops"><ChatPage /></Wrap>} />
+            <Route path="/sunday" component={() => <Wrap title="Sunday"><Sunday /></Wrap>} />
             <Route path="/vault" component={() => <Wrap title="Knowledge Base"><VaultPage /></Wrap>} />
             <Route path="/tools" component={() => <Wrap title="Tool Reference"><ToolsPage /></Wrap>} />
             <Route path="/commands" component={() => <Wrap title="Commands"><CommandsPage /></Wrap>} />

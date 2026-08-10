@@ -19,6 +19,7 @@ import stealthRouter from "./stealth";
 import pushRouter from "./push";
 import researchRouter from "./research";
 import terminalSuggestRouter from "./terminal-suggest";
+import sundayRouter from "./sunday";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(stealthRouter);
 router.use(pushRouter);
 router.use(researchRouter);
 router.use(terminalSuggestRouter);
+router.use(sundayRouter);
 
 export default router;

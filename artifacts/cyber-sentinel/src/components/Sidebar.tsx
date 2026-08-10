@@ -5,7 +5,7 @@ import {
   Database, Wrench, FileCode, Bot, Settings, Activity, ShieldAlert,
   Terminal, Bug, Globe, ShieldOff, Key, Zap, Hash, Users, Radar,
   AlertTriangle, GitBranch, Mail, Fingerprint, Search, ChevronLeft, ChevronRight,
-  Music, Radio, MonitorDot
+  Music, Radio, MonitorDot, BotMessageSquare
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -64,6 +64,7 @@ function Clock() {
 const MAIN_NAV = [
   { href: '/', label: 'Dashboard', icon: Activity, shortcut: 'G D' },
   { href: '/chat', label: 'AI Ops', icon: Bot, shortcut: 'G C' },
+  { href: '/sunday', label: 'Sunday', icon: BotMessageSquare, shortcut: 'G S' },
   { href: '/vault', label: 'Knowledge Base', icon: Database, shortcut: 'G K' },
   { href: '/tools', label: 'Tool Reference', icon: Wrench, shortcut: 'G T' },
   { href: '/commands', label: 'Saved Commands', icon: FileCode, shortcut: 'G M' },
